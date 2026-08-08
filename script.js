@@ -13,7 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const navButtons = document.querySelectorAll(
-    ".nav-panel .secondary-button, .nav-panel .primary-button",
+    ".nav-panel .nav-button, .nav-panel .primary-button",
   );
   const profileButton = document.querySelector(".profile-button");
   const pages = document.querySelectorAll(".panel-page");
@@ -26,6 +26,21 @@ document.addEventListener("DOMContentLoaded", () => {
       page.hidden = !isActive;
       page.classList.toggle("panel-page--active", isActive);
     });
+
+    navButtons.forEach((button) => button.classList.remove("is-active"));
+    if (profileButton) profileButton.classList.remove("is-active");
+
+    if (pageKey === "profile") {
+      profileButton?.classList.add("is-active");
+    } else {
+      const activeIndex = Number(pageKey) - 1;
+      navButtons[activeIndex]?.classList.add("is-active");
+    }
+
+    // Page-specific initialization
+    if (String(pageKey) === "3" && typeof window.initAddSales === "function") {
+      window.initAddSales();
+    }
   };
 
   navButtons.forEach((button, index) => {
@@ -36,5 +51,5 @@ document.addEventListener("DOMContentLoaded", () => {
     profileButton.addEventListener("click", () => showPage("profile"));
   }
 
-  showPage(1);
+  showPage(3);
 });
