@@ -1,4 +1,4 @@
-// js/add-sales.js
+// js/pages/add-sales.js
 
 window.initAddSales = (function () {
   let initialized = false;
@@ -341,7 +341,7 @@ window.initAddSales = (function () {
         cashGroup.classList.toggle("form-group--disabled", !isCashActive);
         cashInput.disabled = !isCashActive;
         if (!isCashActive) cashInput.value = "";
-        else if (!cashInput.value && paymentMethod === "cash") {
+        else if (paymentMethod === "cash") {
           cashInput.value = totalVal.toFixed(3);
         }
       }
@@ -350,10 +350,45 @@ window.initAddSales = (function () {
         cardGroup.classList.toggle("form-group--disabled", !isCardActive);
         cardInput.disabled = !isCardActive;
         if (!isCardActive) cardInput.value = "";
-        else if (!cardInput.value && paymentMethod === "card") {
+        else if (paymentMethod === "card") {
           cardInput.value = totalVal.toFixed(3);
         }
       }
+
+      if (isPaid && paymentMethod === "both") {
+        if (!cashInput.value && !cardInput.value) {
+          const half = (totalVal / 2).toFixed(3);
+          cashInput.value = half;
+          cardInput.value = (totalVal - parseFloat(half)).toFixed(3);
+        }
+      }
+    }
+
+    // Auto-balance calculation when typing in "both" payment method mode
+    if (cashInput && cardInput) {
+      cashInput.addEventListener("input", () => {
+        if (paymentStatus === "paid" && paymentMethod === "both") {
+          const grandTotal = getGrandTotalValue();
+          const cashVal = parseFloat(cashInput.value) || 0;
+          if (cashVal >= 0 && cashVal <= grandTotal) {
+            cardInput.value = (grandTotal - cashVal).toFixed(3);
+            UI.clearInlineError(cardInput);
+            UI.clearInlineError(cashInput);
+          }
+        }
+      });
+
+      cardInput.addEventListener("input", () => {
+        if (paymentStatus === "paid" && paymentMethod === "both") {
+          const grandTotal = getGrandTotalValue();
+          const cardVal = parseFloat(cardInput.value) || 0;
+          if (cardVal >= 0 && cardVal <= grandTotal) {
+            cashInput.value = (grandTotal - cardVal).toFixed(3);
+            UI.clearInlineError(cardInput);
+            UI.clearInlineError(cashInput);
+          }
+        }
+      });
     }
 
     function getGrandTotalValue() {
@@ -391,7 +426,6 @@ window.initAddSales = (function () {
 
     setupToggleGroup(methodToggle, (val) => {
       paymentMethod = val;
-      // Reset amount inputs when switching method for crisp experience
       if (cashInput) cashInput.value = "";
       if (cardInput) cardInput.value = "";
       updatePaymentInputStates();
@@ -403,20 +437,23 @@ window.initAddSales = (function () {
       if (!clearBtn) return;
 
       const secNum = Number(clearBtn.dataset.section);
+      UI.clearAllInlineErrors(root);
+
       if (secNum === 1) {
         if (dateInput) dateInput.value = getTodayString();
         if (nameInput) nameInput.value = "";
         if (numberInput) numberInput.value = "";
         if (emailInput) emailInput.value = "";
+        UI.toast("Customer details cleared", "info");
       } else if (secNum === 2) {
         items = [{ id: Date.now(), name: "", qty: 1, unitPrice: 0 }];
         renderItems();
+        UI.toast("Item details cleared", "info");
       } else if (secNum === 3) {
         vatBill = "yes";
         paymentStatus = "paid";
         paymentMethod = "cash";
 
-        // Reset toggles visual active state
         const resetToggle = (container, val) => {
           if (!container) return;
           container.querySelectorAll(".toggle-btn").forEach((btn) => {
@@ -432,6 +469,7 @@ window.initAddSales = (function () {
         if (cardInput) cardInput.value = "";
 
         calculateTotals();
+        UI.toast("Payment details cleared", "info");
       }
     });
 
@@ -454,36 +492,58 @@ window.initAddSales = (function () {
       }
     });
 
-    // Section Validation
+    // Section Validation using Inline Errors & Modals
     function validateSection(sectionNum) {
+      UI.clearAllInlineErrors(root);
+
       if (sectionNum === 1) {
         if (!dateInput.value) {
-          alert("Please select a date.");
+          UI.showInlineError(dateInput, "Please select a date.");
           dateInput.focus();
           return false;
         }
         if (!nameInput.value.trim()) {
-          alert("Please enter the customer name.");
+          UI.showInlineError(nameInput, "Please enter customer name.");
           nameInput.focus();
           return false;
+        }
+        const emailVal = emailInput ? emailInput.value.trim() : "";
+        if (emailVal.length > 0) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(emailVal)) {
+            UI.showInlineError(emailInput, "Invalid email format (e.g. name@domain.com)");
+            emailInput.focus();
+            return false;
+          }
         }
         return true;
       }
 
       if (sectionNum === 2) {
         if (items.length === 0) {
-          alert("Please add at least one item.");
+          UI.modal({
+            title: "Missing Items",
+            message: "Please add at least one item to proceed.",
+            type: "error"
+          });
           return false;
         }
+        const nameInputs = root.querySelectorAll(".item-name-input");
+        const qtyInputs = root.querySelectorAll(".item-qty-input");
+
         for (let i = 0; i < items.length; i++) {
           if (!items[i].name.trim()) {
-            alert(`Please enter the item name for Item #${i + 1}.`);
-            const inputs = root.querySelectorAll(".item-name-input");
-            if (inputs[i]) inputs[i].focus();
+            if (nameInputs[i]) {
+              UI.showInlineError(nameInputs[i], "Please enter item name.");
+              nameInputs[i].focus();
+            }
             return false;
           }
           if (items[i].qty < 1) {
-            alert(`Quantity for Item #${i + 1} must be at least 1.`);
+            if (qtyInputs[i]) {
+              UI.showInlineError(qtyInputs[i], "Quantity must be at least 1.");
+              qtyInputs[i].focus();
+            }
             return false;
           }
         }
@@ -492,28 +552,65 @@ window.initAddSales = (function () {
 
       if (sectionNum === 3) {
         if (paymentStatus === "paid") {
-          const grandTotal = getGrandTotalValue();
-          const cashVal = parseFloat(cashInput.value) || 0;
-          const cardVal = parseFloat(cardInput.value) || 0;
+          const grandTotal = Math.round(getGrandTotalValue() * 1000) / 1000;
+          const cashVal = Math.round((parseFloat(cashInput.value) || 0) * 1000) / 1000;
+          const cardVal = Math.round((parseFloat(cardInput.value) || 0) * 1000) / 1000;
 
-          if (paymentMethod === "cash" && cashVal <= 0) {
-            alert("Please enter a valid cash amount.");
-            cashInput.focus();
-            return false;
+          if (paymentMethod === "cash") {
+            if (cashVal <= 0) {
+              UI.showInlineError(cashInput, "Please enter a valid cash amount.");
+              cashInput.focus();
+              return false;
+            }
+            if (cashVal < grandTotal - 0.0001) {
+              UI.showInlineError(cashInput, `Paid amount (${formatOMR(cashVal)}) is lower than Total (${formatOMR(grandTotal)}).`);
+              cashInput.focus();
+              return false;
+            }
+            if (cashVal > grandTotal + 0.0001) {
+              UI.showInlineError(cashInput, `Paid amount (${formatOMR(cashVal)}) is higher than Total (${formatOMR(grandTotal)}).`);
+              cashInput.focus();
+              return false;
+            }
           }
-          if (paymentMethod === "card" && cardVal <= 0) {
-            alert("Please enter a valid card amount.");
-            cardInput.focus();
-            return false;
+
+          if (paymentMethod === "card") {
+            if (cardVal <= 0) {
+              UI.showInlineError(cardInput, "Please enter a valid card amount.");
+              cardInput.focus();
+              return false;
+            }
+            if (cardVal < grandTotal - 0.0001) {
+              UI.showInlineError(cardInput, `Paid amount (${formatOMR(cardVal)}) is lower than Total (${formatOMR(grandTotal)}).`);
+              cardInput.focus();
+              return false;
+            }
+            if (cardVal > grandTotal + 0.0001) {
+              UI.showInlineError(cardInput, `Paid amount (${formatOMR(cardVal)}) is higher than Total (${formatOMR(grandTotal)}).`);
+              cardInput.focus();
+              return false;
+            }
           }
+
           if (paymentMethod === "both") {
             if (cashVal <= 0) {
-              alert("Please enter cash amount.");
+              UI.showInlineError(cashInput, "Please enter cash amount.");
               cashInput.focus();
               return false;
             }
             if (cardVal <= 0) {
-              alert("Please enter card amount.");
+              UI.showInlineError(cardInput, "Please enter card amount.");
+              cardInput.focus();
+              return false;
+            }
+            const combinedVal = Math.round((cashVal + cardVal) * 1000) / 1000;
+            if (combinedVal < grandTotal - 0.0001) {
+              UI.showInlineError(cardInput, `Combined paid (${formatOMR(combinedVal)}) is lower than Total (${formatOMR(grandTotal)}).`);
+              cardInput.focus();
+              return false;
+            }
+            if (combinedVal > grandTotal + 0.0001) {
+              UI.showInlineError(cardInput, `Combined paid (${formatOMR(combinedVal)}) is higher than Total (${formatOMR(grandTotal)}).`);
               cardInput.focus();
               return false;
             }
@@ -525,8 +622,12 @@ window.initAddSales = (function () {
       return true;
     }
 
-    // Save Sale Action
+    // Save Sale Action with Confirmation Modal
     function saveSale() {
+      const grandTotalVal = getGrandTotalValue();
+      const cashVal = parseFloat(cashInput.value) || 0;
+      const cardVal = parseFloat(cardInput.value) || 0;
+
       const saleData = {
         date: dateInput.value,
         customerName: nameInput.value.trim(),
@@ -536,22 +637,40 @@ window.initAddSales = (function () {
         vatBill: vatBill,
         paymentStatus: paymentStatus,
         paymentMethod: paymentStatus === "paid" ? paymentMethod : "n/a",
-        cashAmount: parseFloat(cashInput.value) || 0,
-        cardAmount: parseFloat(cardInput.value) || 0,
-        grandTotal: getGrandTotalValue(),
+        cashAmount: cashVal,
+        cardAmount: cardVal,
+        grandTotal: grandTotalVal,
       };
 
-      console.log("Sale Saved Successfully:", saleData);
-      alert(`Sale recorded successfully!\nCustomer: ${saleData.customerName}\nTotal: ${formatOMR(saleData.grandTotal)}`);
+      let paymentSummaryStr = "";
+      if (paymentStatus === "not_paid") {
+        paymentSummaryStr = "Payment Status: Not Paid";
+      } else if (paymentMethod === "cash") {
+        paymentSummaryStr = `Paid: ${formatOMR(cashVal)} (Cash)`;
+      } else if (paymentMethod === "card") {
+        paymentSummaryStr = `Paid: ${formatOMR(cardVal)} (Card)`;
+      } else if (paymentMethod === "both") {
+        paymentSummaryStr = `Paid: ${formatOMR(cashVal)} (Cash) + ${formatOMR(cardVal)} (Card)`;
+      }
 
-      // Reset Form to Section 1
-      items = [{ id: Date.now(), name: "", qty: 1, unitPrice: 0 }];
-      if (nameInput) nameInput.value = "";
-      if (numberInput) numberInput.value = "";
-      if (emailInput) emailInput.value = "";
-      if (dateInput) dateInput.value = getTodayString();
-      renderItems();
-      showSection(1);
+      console.log("Sale Saved Successfully:", saleData);
+
+      UI.modal({
+        title: "Sale Recorded Successfully",
+        message: `Customer: ${saleData.customerName}\n${paymentSummaryStr}\nGrand Total: ${formatOMR(saleData.grandTotal)}`,
+        type: "success",
+        confirmText: "Done",
+        onConfirm: () => {
+          items = [{ id: Date.now(), name: "", qty: 1, unitPrice: 0 }];
+          if (nameInput) nameInput.value = "";
+          if (numberInput) numberInput.value = "";
+          if (emailInput) emailInput.value = "";
+          if (dateInput) dateInput.value = getTodayString();
+          renderItems();
+          showSection(1);
+          UI.toast("Form reset for next sale", "info");
+        }
+      });
     }
 
     // Initial render

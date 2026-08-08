@@ -4,8 +4,11 @@ const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
   "./style.css",
-  "./script.js",
-  "./js/add-sales.js",
+  "./css/base.css",
+  "./css/pages/add-sales.css",
+  "./js/notifications.js",
+  "./js/app.js",
+  "./js/pages/add-sales.js",
   "./manifest.json",
   "./assets/logo/logo_short_blue_black_onwhite.svg"
 ];
