@@ -1,0 +1,18 @@
+{
+  "name": "GPS Sales & Inventory",
+  "short_name": "GPS",
+  "description": "Sales and Inventory Management Mobile App",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#efefef",
+  "theme_color": "#4567fa",
+  "icons": [
+    {
+      "src": "./assets/logo/logo_short_blue_black_onwhite.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
