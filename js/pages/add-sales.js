@@ -323,10 +323,9 @@ window.initAddSales = (function () {
           dropdown.innerHTML = matches
             .map(
               (m) => `
-            <div class="autocomplete-item" data-name="${m.name}" data-price="${m.unitPrice}">
+            <div class="autocomplete-item" data-name="${m.name}">
               <span class="autocomplete-name">${m.name}</span>
               <span class="autocomplete-meta">
-                <span>OMR ${Number(m.unitPrice).toFixed(3)}</span>
                 <span>Stock: ${m.qty}</span>
               </span>
             </div>`
@@ -351,12 +350,9 @@ window.initAddSales = (function () {
           if (!clickedItem) return;
 
           const selName = clickedItem.dataset.name;
-          const selPrice = parseFloat(clickedItem.dataset.price) || 0;
 
           item.name = selName;
-          item.unitPrice = selPrice;
           nameIn.value = selName;
-          priceIn.value = selPrice;
 
           const invItem = window.DataStore ? window.DataStore.findItemByName(selName) : null;
           updateStockBadge(invItem);

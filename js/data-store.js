@@ -1,18 +1,18 @@
 // js/data-store.js - High Performance Branch-Scoped Data Store for Sales & Inventory
 
 window.DataStore = (function () {
-  // Sample Fallbacks per branch
+  // Sample Fallbacks per branch if local storage and cloud have zero items
   const DEFAULT_INVENTORY = {
     alkhoud: [
-      { sku: "SKU-AK-600KG", name: "Beninca 600KG (Al Khoud)", qty: 15, unitPrice: 85.0, alertLevel: 3 },
-      { sku: "SKU-AK-PUP", name: "Beninca Pupilla (Al Khoud)", qty: 25, unitPrice: 12.5, alertLevel: 5 },
-      { sku: "SKU-AK-TOGO", name: "Beninca TO.GO (Al Khoud)", qty: 40, unitPrice: 7.0, alertLevel: 10 },
-      { sku: "SKU-AK-CABLE", name: "Armored Cable 3 Core 2.5mm", qty: 100, unitPrice: 1.2, alertLevel: 20 }
+      { sku: "SKU-65239E2A", name: "Beninca 600KG", category: "Gate Automation", qty: 15, alertLevel: 3 },
+      { sku: "SKU-99A04B11", name: "Beninca Pupilla Photo Cell", category: "Accessories", qty: 25, alertLevel: 5 },
+      { sku: "SKU-31FA78B0", name: "Beninca TO.GO 2VA Remote", category: "Remotes", qty: 40, alertLevel: 10 },
+      { sku: "SKU-E84C12D5", name: "Armored Cable 3 Core 2.5mm", category: "Cables", qty: 100, alertLevel: 20 }
     ],
     ghala: [
-      { sku: "SKU-G-600KG", name: "Beninca 600KG (Ghala)", qty: 8, unitPrice: 85.0, alertLevel: 2 },
-      { sku: "SKU-G-PUP", name: "Beninca Pupilla (Ghala)", qty: 12, unitPrice: 12.5, alertLevel: 5 },
-      { sku: "SKU-G-TOGO", name: "Beninca TO.GO (Ghala)", qty: 20, unitPrice: 7.0, alertLevel: 8 }
+      { sku: "SKU-65239E2A", name: "Beninca 600KG", category: "Gate Automation", qty: 8, alertLevel: 2 },
+      { sku: "SKU-99A04B11", name: "Beninca Pupilla Photo Cell", category: "Accessories", qty: 12, alertLevel: 5 },
+      { sku: "SKU-31FA78B0", name: "Beninca TO.GO 2VA Remote", category: "Remotes", qty: 20, alertLevel: 8 }
     ]
   };
 
@@ -86,7 +86,8 @@ window.DataStore = (function () {
       return inv.filter(
         (item) =>
           item.name.toLowerCase().includes(q) ||
-          (item.sku && item.sku.toLowerCase().includes(q))
+          (item.sku && item.sku.toLowerCase().includes(q)) ||
+          (item.category && item.category.toLowerCase().includes(q))
       );
     },
 
@@ -125,8 +126,8 @@ window.DataStore = (function () {
               inventory.push({
                 sku: "SKU-" + Date.now().toString().slice(-5),
                 name: soldItem.name.trim(),
+                category: "General",
                 qty: 0,
-                unitPrice: Number(soldItem.unitPrice) || 0,
                 alertLevel: 5,
                 lastUpdated: new Date().toLocaleTimeString()
               });
@@ -169,16 +170,16 @@ window.DataStore = (function () {
         inventory[index] = {
           ...inventory[index],
           ...itemData,
+          category: itemData.category || inventory[index].category || "General",
           qty: Number(itemData.qty) || 0,
-          unitPrice: Number(itemData.unitPrice) || 0,
           lastUpdated: new Date().toLocaleTimeString()
         };
       } else {
         inventory.push({
           sku: itemData.sku || "SKU-" + Date.now().toString().slice(-5),
           name: name,
+          category: itemData.category || "General",
           qty: Number(itemData.qty) || 0,
-          unitPrice: Number(itemData.unitPrice) || 0,
           alertLevel: Number(itemData.alertLevel) || 5,
           lastUpdated: new Date().toLocaleTimeString()
         });
@@ -199,7 +200,7 @@ window.DataStore = (function () {
       return { success: true };
     },
 
-    // Sync Active Branch data from Google Sheets Cloud
+    // Sync Active Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
     syncFromCloud: function (webAppUrl) {
       if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve();
 
@@ -210,14 +211,15 @@ window.DataStore = (function () {
         .then((res) => res.json())
         .then((data) => {
           if (data && data.status === "success") {
-            if (Array.isArray(data.inventory) && data.inventory.length > 0) {
+            // Override local inventory with Google Sheets data if data exists
+            if (Array.isArray(data.inventory)) {
               saveBranchData("inventory", data.inventory, branch);
             }
             if (Array.isArray(data.sales)) {
               saveBranchData("sales", data.sales, branch);
             }
             window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-            console.log(`Synced ${branch} cloud data!`);
+            console.log(`Successfully synced real ${branch} Google Sheet data!`);
           }
         })
         .catch((err) => console.warn("Cloud sync check error:", err));
