@@ -41,6 +41,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // Page-specific initialization
+    if (String(pageKey) === "1" && typeof window.initViewSales === "function") {
+      window.initViewSales();
+    }
+    if (String(pageKey) === "2" && typeof window.initViewInventory === "function") {
+      window.initViewInventory();
+    }
     if (String(pageKey) === "3" && typeof window.initAddSales === "function") {
       window.initAddSales();
     }
@@ -97,7 +103,11 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  showPage(3);
+  // Pre-initialize initial page components
+  if (typeof window.initViewSales === "function") window.initViewSales();
+  if (typeof window.initViewInventory === "function") window.initViewInventory();
+
+  showPage(1);
 });
 
 // Register Service Worker for PWA / Standalone installability

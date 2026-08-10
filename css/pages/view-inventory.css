@@ -1,0 +1,185 @@
+/* css/pages/view-inventory.css - View Inventory Page Glassmorphic Styles */
+
+#view-inventory-root,
+.view-inventory-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.inv-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(69, 103, 250, 0.2);
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.inv-stats-row {
+  display: flex;
+  gap: 10px;
+}
+
+.stat-card--alert .stat-value {
+  color: #dc2626;
+}
+
+/* Controls Bar */
+.inv-controls-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.filter-pill--warning {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #b45309;
+}
+
+.filter-pill--warning.filter-pill--active {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+}
+
+/* Inventory List Body */
+.inv-list-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inv-item-card {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(69, 103, 250, 0.18);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+  backdrop-filter: blur(8px);
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.inv-item-card--low {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(255, 241, 242, 0.75);
+}
+
+.inv-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.item-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0;
+}
+
+.item-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.sku-badge {
+  font-family: monospace;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(69, 103, 250, 0.12);
+  color: var(--color-brand, #4567fa);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.category-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 8px;
+  border-radius: 8px;
+}
+
+.stock-display-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 60px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+
+.stock-display-pill--low {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  animation: pulse-border 2s infinite;
+}
+
+.stock-qty-val {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.stock-qty-unit {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.inv-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.alert-threshold-info {
+  color: #64748b;
+}
+
+.status-indicator {
+  font-weight: 700;
+}
+
+.status-indicator--ok {
+  color: #16a34a;
+}
+
+.status-indicator--low {
+  color: #dc2626;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}

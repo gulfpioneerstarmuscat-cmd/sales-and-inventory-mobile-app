@@ -21,6 +21,8 @@
 
     <link rel="stylesheet" href="style.css" />
     <link rel="stylesheet" href="css/pages/profile.css" />
+    <link rel="stylesheet" href="css/pages/view-sales.css" />
+    <link rel="stylesheet" href="css/pages/view-inventory.css" />
   </head>
   <body>
     <div class="bg">
@@ -39,19 +41,15 @@
 
         <div class="form-panel" aria-label="Page content panel">
           <div class="panel-page panel-page--active" data-page="1">
-            <h2>Page 1</h2>
-            <p>
-              <!-- Placeholder: replace this with the real content for page 1 -->
-              Content for the first section goes here.
-            </p>
+            <div id="view-sales-root">
+              <!-- View Sales history will be rendered here -->
+            </div>
           </div>
 
           <div class="panel-page" data-page="2" hidden>
-            <h2>Page 2</h2>
-            <p>
-              <!-- Placeholder: replace this with the real content for page 2 -->
-              Content for the second section goes here.
-            </p>
+            <div id="view-inventory-root">
+              <!-- View Stock Inventory will be rendered here -->
+            </div>
           </div>
 
           <div class="panel-page" data-page="3" hidden>
@@ -121,6 +119,8 @@
     <script src="js/auth.js"></script>
     <script src="js/data-store.js"></script>
     <script src="js/notifications.js"></script>
+    <script src="js/pages/view-sales.js"></script>
+    <script src="js/pages/view-inventory.js"></script>
     <script src="js/pages/profile.js"></script>
     <script src="js/pages/add-sales.js"></script>
     <script src="js/app.js"></script>
