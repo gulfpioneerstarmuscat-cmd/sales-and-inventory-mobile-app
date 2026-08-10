@@ -1,38 +1,186 @@
-// js/pages/view-sales.js - View Sales History Component with Compact Tiles & Panel Sub-Page Navigation
+// js/pages/view-sales.js - View Sales History Component with DD-MM-YYYY Formatting & Sale Date Focus
 
 window.initViewSales = (function () {
   let initialized = false;
   let searchQuery = "";
-  let statusFilter = "all";
+  let statusFilter = "today"; // Default filter pill: "today"
   let selectedDate = "";
   let selectedSale = null;
+
+  // Month Stats Filter State (Default: Current Month YYYY-MM)
+  let selectedStatsMonth = getCurrentMonthKey();
+  let isMonthPickerOpen = false;
+
+  function getCurrentMonthKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    return `${y}-${m}`;
+  }
+
+  function getTodayDateString() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  function getSixMonthsAgoMs() {
+    const d = new Date();
+    d.setMonth(d.getMonth() - 6);
+    return d.getTime();
+  }
+
+  function formatMonthLabel(monthKey) {
+    if (monthKey === "all") return "ALL TIME";
+    const parts = monthKey.split("-");
+    if (parts.length !== 2) return monthKey;
+    const year = parts[0];
+    const monthIndex = Number(parts[1]) - 1;
+    const d = new Date(Number(year), monthIndex, 1);
+    const monthName = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
+    return `${monthName} ${year}`;
+  }
+
+  // Normalize Date to YYYY-MM-DD for internal comparisons & filtering
+  function getNormalizedYMD(rawDate) {
+    if (!rawDate || typeof rawDate !== "string") return "";
+    const str = rawDate.trim();
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+
+    if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+      const parts = str.split("-");
+      return `${parts[2]}-${parts[1]}-${parts[0]}`;
+    }
+
+    if (str.includes("/")) {
+      const cleanStr = str.replace(/[^\d\/]/g, "");
+      const parts = cleanStr.split("/");
+      if (parts.length === 3) {
+        const d = parts[0].padStart(2, "0");
+        const m = parts[1].padStart(2, "0");
+        const y = parts[2].length === 2 ? "20" + parts[2] : parts[2];
+        return `${y}-${m}-${d}`;
+      }
+    }
+
+    return str.slice(0, 10);
+  }
+
+  // Format Display Sale Date as DD-MM-YYYY (No Time, Staff Focused)
+  function formatDisplaySaleDate(rawDate) {
+    const ymd = getNormalizedYMD(rawDate);
+    if (ymd && /^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
+      const [y, m, d] = ymd.split("-");
+      return `${d}-${m}-${y}`;
+    }
+    return rawDate || "N/A";
+  }
 
   function renderViewSalesUI() {
     const root = document.getElementById("view-sales-root");
     if (!root) return;
 
-    // If a sale tile was clicked, render the clean Detail Sub-Page View inside the form panel!
+    // Render Detail Sub-Page View if a sale card was clicked
     if (selectedSale) {
       renderDetailSubPageUI(selectedSale);
       return;
     }
 
     const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
-    const allSales = window.DataStore ? window.DataStore.getSales(branch) : [];
+    const rawSales = window.DataStore ? window.DataStore.getSales(branch) : [];
 
-    // Filter Sales
-    const filteredSales = allSales.filter((sale) => {
-      // Status Filter
-      if (statusFilter === "paid" && sale.paymentStatus !== "paid") return false;
-      if (statusFilter === "not_paid" && sale.paymentStatus !== "not_paid") return false;
+    // Sort Sales by Sale Date Descending (Newest / Latest First at Top)
+    const allSales = [...rawSales].sort((a, b) => {
+      const dateA = getNormalizedYMD(a.date || a.timestamp);
+      const dateB = getNormalizedYMD(b.date || b.timestamp);
+      return dateB.localeCompare(dateA);
+    });
 
-      // Date Filter
-      if (selectedDate) {
-        const saleDateStr = sale.date || (sale.timestamp ? sale.timestamp.slice(0, 10) : "");
-        if (saleDateStr !== selectedDate) return false;
+    // Collect Unique Month Keys for Stat Card Selector
+    const monthSet = new Set();
+    monthSet.add(getCurrentMonthKey());
+
+    allSales.forEach((s) => {
+      const ymd = getNormalizedYMD(s.date || s.timestamp);
+      if (ymd && ymd.length >= 7) {
+        monthSet.add(ymd.slice(0, 7));
+      }
+    });
+    const availableMonthKeys = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
+
+    // Calculate Month-Specific Stats for Top Header Cards
+    let statsRevenue = 0;
+    let statsSalesCount = 0;
+    let statsPaidCount = 0;
+
+    allSales.forEach((s) => {
+      const ymd = getNormalizedYMD(s.date || s.timestamp);
+      const sMonthKey = ymd ? ymd.slice(0, 7) : "";
+      const isMatchingMonth = selectedStatsMonth === "all" || sMonthKey === selectedStatsMonth;
+
+      if (isMatchingMonth) {
+        statsSalesCount++;
+        const gTotal = Number(s.grandTotal) || 0;
+        if (s.paymentStatus === "paid") {
+          statsRevenue += gTotal;
+          statsPaidCount++;
+        }
+      }
+    });
+
+    // Filter Calculations for Pills
+    const todayStr = getTodayDateString();
+    const sixMonthsAgoMs = getSixMonthsAgoMs();
+
+    let todayCount = 0;
+    let sixMonthsAllCount = 0;
+    let sixMonthsPaidCount = 0;
+    let sixMonthsUnpaidCount = 0;
+
+    allSales.forEach((s) => {
+      const ymd = getNormalizedYMD(s.date || s.timestamp);
+      const sTimeMs = ymd ? new Date(ymd).getTime() : 0;
+
+      // Count Today
+      if (ymd === todayStr) {
+        todayCount++;
       }
 
-      // Search Query
+      // Count 6 Months Window
+      if (sTimeMs === 0 || sTimeMs >= sixMonthsAgoMs) {
+        sixMonthsAllCount++;
+        if (s.paymentStatus === "paid") sixMonthsPaidCount++;
+        else sixMonthsUnpaidCount++;
+      }
+    });
+
+    // Filter List Items
+    const filteredSales = allSales.filter((sale) => {
+      const ymd = getNormalizedYMD(sale.date || sale.timestamp);
+      const sTimeMs = ymd ? new Date(ymd).getTime() : 0;
+
+      // 1. Status Filter Pills logic
+      if (statusFilter === "today") {
+        if (ymd !== todayStr) return false;
+      } else if (statusFilter === "all") {
+        if (sTimeMs > 0 && sTimeMs < sixMonthsAgoMs) return false;
+      } else if (statusFilter === "paid") {
+        if (sale.paymentStatus !== "paid") return false;
+        if (sTimeMs > 0 && sTimeMs < sixMonthsAgoMs) return false;
+      } else if (statusFilter === "not_paid") {
+        if (sale.paymentStatus !== "not_paid") return false;
+        if (sTimeMs > 0 && sTimeMs < sixMonthsAgoMs) return false;
+      }
+
+      // 2. Specific Date Picker Filter
+      if (selectedDate && ymd !== selectedDate) {
+        return false;
+      }
+
+      // 3. Search Query Filter
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchCust = (sale.customerName || "").toLowerCase().includes(q);
@@ -45,38 +193,32 @@ window.initViewSales = (function () {
       return true;
     });
 
-    // Calculate Summary Metrics
-    let totalRevenue = 0;
-    let paidCount = 0;
-    let unpaidCount = 0;
-
-    allSales.forEach((s) => {
-      const gTotal = Number(s.grandTotal) || 0;
-      if (s.paymentStatus === "paid") {
-        totalRevenue += gTotal;
-        paidCount++;
-      } else {
-        unpaidCount++;
-      }
-    });
+    const activeMonthLabel = formatMonthLabel(selectedStatsMonth);
 
     root.innerHTML = `
       <div class="view-sales-container">
-        <!-- Header & Stats Summary -->
+        <!-- Header & Interactive Month Stat Cards -->
         <div class="sales-page-header">
           <div class="header-titles">
             <h3 class="page-title">Sales History</h3>
           </div>
 
           <div class="sales-stats-row">
-            <div class="stat-card stat-card--revenue">
-              <span class="stat-label">Total Revenue</span>
-              <span class="stat-value">OMR ${totalRevenue.toFixed(3)}</span>
-            </div>
-            <div class="stat-card stat-card--count">
-              <span class="stat-label">Total Sales</span>
-              <span class="stat-value">${allSales.length} (${paidCount} Paid)</span>
-            </div>
+            <button type="button" class="stat-card stat-card--interactive stat-card--revenue" id="btn-stats-month-1" title="Click to change month period">
+              <div class="stat-card-header">
+                <span class="stat-label">Revenue (${escapeHtml(activeMonthLabel)})</span>
+                <span class="stat-chevron">▾</span>
+              </div>
+              <span class="stat-value">OMR ${statsRevenue.toFixed(3)}</span>
+            </button>
+
+            <button type="button" class="stat-card stat-card--interactive stat-card--count" id="btn-stats-month-2" title="Click to change month period">
+              <div class="stat-card-header">
+                <span class="stat-label">Sales (${escapeHtml(activeMonthLabel)})</span>
+                <span class="stat-chevron">▾</span>
+              </div>
+              <span class="stat-value">${statsSalesCount} (${statsPaidCount} Paid)</span>
+            </button>
           </div>
         </div>
 
@@ -99,20 +241,21 @@ window.initViewSales = (function () {
             selectedDate
               ? `
             <div class="active-date-pill-row">
-              <span class="active-date-pill">📅 Date: ${selectedDate} <button type="button" id="btn-clear-date">&times;</button></span>
+              <span class="active-date-pill">📅 Date: ${formatDisplaySaleDate(selectedDate)} <button type="button" id="btn-clear-date">&times;</button></span>
             </div>
           `
               : ""
           }
 
           <div class="filter-pills-row">
-            <button type="button" class="filter-pill ${statusFilter === "all" ? "filter-pill--active" : ""}" data-status="all">All (${allSales.length})</button>
-            <button type="button" class="filter-pill filter-pill--paid ${statusFilter === "paid" ? "filter-pill--active" : ""}" data-status="paid">Paid (${paidCount})</button>
-            <button type="button" class="filter-pill filter-pill--unpaid ${statusFilter === "not_paid" ? "filter-pill--active" : ""}" data-status="not_paid">Unpaid (${unpaidCount})</button>
+            <button type="button" class="filter-pill filter-pill--today ${statusFilter === "today" ? "filter-pill--active" : ""}" data-status="today">Today (${todayCount})</button>
+            <button type="button" class="filter-pill ${statusFilter === "all" ? "filter-pill--active" : ""}" data-status="all">All (${sixMonthsAllCount})</button>
+            <button type="button" class="filter-pill filter-pill--paid ${statusFilter === "paid" ? "filter-pill--active" : ""}" data-status="paid">Paid (${sixMonthsPaidCount})</button>
+            <button type="button" class="filter-pill filter-pill--unpaid ${statusFilter === "not_paid" ? "filter-pill--active" : ""}" data-status="not_paid">Unpaid (${sixMonthsUnpaidCount})</button>
           </div>
         </div>
 
-        <!-- Sales Compact Cards List -->
+        <!-- Sales Compact Cards List (Newest Sales Top) -->
         <div class="sales-list-body">
           ${
             filteredSales.length === 0
@@ -120,7 +263,13 @@ window.initViewSales = (function () {
               <div class="empty-state">
                 <div class="empty-icon">🧾</div>
                 <h4>No Sales Found</h4>
-                <p>${searchQuery || selectedDate || statusFilter !== "all" ? "No sales match your search filters." : `No sales recorded yet.`}</p>
+                <p>${
+                  statusFilter === "today"
+                    ? "No sales recorded yet today."
+                    : searchQuery || selectedDate || statusFilter !== "all"
+                    ? "No sales match your search filters."
+                    : `No sales recorded in the past 6 months.`
+                }</p>
               </div>
             `
               : filteredSales
@@ -128,10 +277,54 @@ window.initViewSales = (function () {
                   .join("")
           }
         </div>
+
+        <!-- Period Selector Modal -->
+        ${isMonthPickerOpen ? renderMonthPickerModalHtml(availableMonthKeys) : ""}
       </div>
     `;
 
     // Attach Event Listeners
+    const card1 = root.querySelector("#btn-stats-month-1");
+    const card2 = root.querySelector("#btn-stats-month-2");
+
+    function toggleMonthPicker() {
+      isMonthPickerOpen = !isMonthPickerOpen;
+      renderViewSalesUI();
+    }
+
+    if (card1) card1.addEventListener("click", toggleMonthPicker);
+    if (card2) card2.addEventListener("click", toggleMonthPicker);
+
+    // Month Selector Modal Events
+    if (isMonthPickerOpen) {
+      const modalBackdrop = root.querySelector(".month-modal-backdrop");
+      const closeBtn = root.querySelector("#btn-close-month-modal");
+      const optBtns = root.querySelectorAll(".month-opt-btn");
+
+      if (modalBackdrop) {
+        modalBackdrop.addEventListener("click", (e) => {
+          if (e.target === modalBackdrop) {
+            isMonthPickerOpen = false;
+            renderViewSalesUI();
+          }
+        });
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener("click", () => {
+          isMonthPickerOpen = false;
+          renderViewSalesUI();
+        });
+      }
+
+      optBtns.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          selectedStatsMonth = btn.dataset.month;
+          isMonthPickerOpen = false;
+          renderViewSalesUI();
+        });
+      });
+    }
+
     const searchIn = root.querySelector("#sales-search-input");
     if (searchIn) {
       searchIn.addEventListener("input", (e) => {
@@ -196,48 +389,61 @@ window.initViewSales = (function () {
     });
   }
 
-  // Clean Date & Time Helpers
-  function formatCleanDate(rawDate, timestamp) {
-    if (rawDate && typeof rawDate === "string") {
-      const clean = rawDate.split("T")[0];
-      if (clean.length === 10) return clean;
-    }
-    if (timestamp) {
-      try {
-        const d = new Date(timestamp);
-        if (!isNaN(d.getTime())) {
-          const year = d.getFullYear();
-          const month = String(d.getMonth() + 1).padStart(2, "0");
-          const day = String(d.getDate()).padStart(2, "0");
-          return `${year}-${month}-${day}`;
-        }
-      } catch (e) {}
-    }
-    return rawDate || "N/A";
+  // Render Month Period Picker Selector Modal
+  function renderMonthPickerModalHtml(availableMonthKeys) {
+    const currentKey = getCurrentMonthKey();
+
+    return `
+      <div class="month-modal-backdrop">
+        <div class="month-modal-card">
+          <div class="month-modal-header">
+            <h4 class="month-modal-title">Select Time Period</h4>
+            <button type="button" class="btn-close-month-modal" id="btn-close-month-modal">&times;</button>
+          </div>
+
+          <div class="month-modal-body">
+            <!-- All Time Option -->
+            <button type="button" class="month-opt-btn ${selectedStatsMonth === "all" ? "month-opt-btn--selected" : ""}" data-month="all">
+              <span class="opt-label">ALL TIME</span>
+              <span class="opt-desc">Total Revenue & Sales across all time</span>
+              ${selectedStatsMonth === "all" ? `<span class="opt-check">✓</span>` : ""}
+            </button>
+
+            <div class="month-opts-divider">MONTHLY PERIODS</div>
+
+            ${availableMonthKeys
+              .map((mKey) => {
+                const label = formatMonthLabel(mKey);
+                const isCurrent = mKey === currentKey;
+                const isSelected = selectedStatsMonth === mKey;
+                return `
+                <button type="button" class="month-opt-btn ${isSelected ? "month-opt-btn--selected" : ""}" data-month="${mKey}">
+                  <div class="opt-left">
+                    <span class="opt-label">${escapeHtml(label)}</span>
+                    ${isCurrent ? `<span class="opt-tag-current">Current Month</span>` : ""}
+                  </div>
+                  ${isSelected ? `<span class="opt-check">✓</span>` : ""}
+                </button>
+              `;
+              })
+              .join("")}
+          </div>
+        </div>
+      </div>
+    `;
   }
 
-  function formatCleanTime(timestamp) {
-    if (!timestamp) return "";
-    try {
-      const d = new Date(timestamp);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true });
-      }
-    } catch (e) {}
-    return "";
-  }
-
-  // Compact Tile Renderer (Customer Name, Total Price, Sale Date, Paid Status)
+  // Compact Tile Renderer (Customer Name, Total Price, Sale Date DD-MM-YYYY, Paid Status)
   function renderCompactSaleTileHtml(sale, index) {
     const isPaid = sale.paymentStatus === "paid";
-    const dateStr = formatCleanDate(sale.date, sale.timestamp);
+    const displayDateStr = formatDisplaySaleDate(sale.date);
     const grandTotal = Number(sale.grandTotal) || 0;
 
     return `
       <div class="compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}" data-index="${index}">
         <div class="tile-left">
           <span class="tile-customer-name">${escapeHtml(sale.customerName || "Walk-in Customer")}</span>
-          <span class="tile-date">📅 ${escapeHtml(dateStr)}</span>
+          <span class="tile-date">📅 ${escapeHtml(displayDateStr)}</span>
         </div>
         <div class="tile-right">
           <span class="tile-amount">OMR ${grandTotal.toFixed(3)}</span>
@@ -249,15 +455,13 @@ window.initViewSales = (function () {
     `;
   }
 
-  // Clean Detailed Sub-Page View (Replaces Form Panel View with zero double-nesting)
+  // Clean Detailed Sub-Page View (Replaces Form Panel View, Displays Sale Date in DD-MM-YYYY)
   function renderDetailSubPageUI(sale) {
     const root = document.getElementById("view-sales-root");
     if (!root) return;
 
     const isPaid = sale.paymentStatus === "paid";
-    const dateStr = formatCleanDate(sale.date, sale.timestamp);
-    const timeStr = formatCleanTime(sale.timestamp);
-    const dateTimeStr = timeStr ? `${dateStr} • ${timeStr}` : dateStr;
+    const displayDateStr = formatDisplaySaleDate(sale.date);
 
     const grandTotal = Number(sale.grandTotal) || 0;
     const cashAmt = Number(sale.cashAmount) || 0;
@@ -294,7 +498,7 @@ window.initViewSales = (function () {
               <span class="receipt-icon">🧾</span>
               <div class="header-main-meta">
                 <h3 class="detail-cust-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
-                <span class="detail-timestamp">📅 ${escapeHtml(dateTimeStr)}</span>
+                <span class="detail-timestamp">📅 Sale Date: ${escapeHtml(displayDateStr)}</span>
               </div>
             </div>
           </div>
@@ -391,6 +595,8 @@ window.initViewSales = (function () {
       initialized = true;
       window.addEventListener("branchChanged", () => {
         selectedSale = null;
+        statusFilter = "today";
+        selectedStatsMonth = getCurrentMonthKey();
         renderViewSalesUI();
       });
       window.addEventListener("inventoryDataChanged", () => renderViewSalesUI());
