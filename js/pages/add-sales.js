@@ -6,6 +6,9 @@
 // Modify any values here to change application defaults in one place.
 // =========================================================================
 const FORM_DEFAULTS = {
+  // Google Sheets Web App Deployment URL (Loaded from local config.js)
+  googleSheetWebAppUrl: (window.APP_CONFIG && window.APP_CONFIG.googleSheetWebAppUrl) || "",
+
   // Payment Details Defaults
   vatBill: "no",        // "yes" (5% VAT) | "no" (0% VAT)
   paymentStatus: "paid", // "paid" | "not_paid"
@@ -248,7 +251,7 @@ window.initAddSales = (function () {
       calculateTotals();
     }
 
-    // Item List Rendering
+    // Item List Rendering with Autocomplete & Live Stock Badge
     function renderItems() {
       if (!itemsListContainer) return;
       itemsListContainer.innerHTML = "";
@@ -256,6 +259,13 @@ window.initAddSales = (function () {
       items.forEach((item, index) => {
         const row = document.createElement("div");
         row.className = "item-row-card";
+        
+        // Find existing matching inventory item to display stock info
+        const existingInv = window.DataStore ? window.DataStore.findItemByName(item.name) : null;
+        const stockBadgeHtml = existingInv
+          ? `<div class="stock-badge ${existingInv.qty <= (existingInv.alertLevel || 5) ? "stock-badge--low" : ""}">In Stock: ${existingInv.qty} units</div>`
+          : "";
+
         row.innerHTML = `
           <div class="item-row-header">
             <span class="item-row-number">Item #${index + 1}</span>
@@ -267,9 +277,11 @@ window.initAddSales = (function () {
                 : ""
             }
           </div>
-          <div class="form-group">
+          <div class="form-group form-group-relative">
             <label class="form-label">Item Name / SKU / Model <span class="required-star">*</span></label>
-            <input type="text" class="form-input item-name-input" value="${item.name}" placeholder="e.g. Beninca 600KG / Pupilla" required />
+            <input type="text" class="form-input item-name-input" value="${item.name}" placeholder="e.g. Beninca 600KG / Pupilla" autocomplete="off" required />
+            <div class="stock-badge-container">${stockBadgeHtml}</div>
+            <div class="autocomplete-dropdown" hidden></div>
           </div>
           <div class="form-row-2col">
             <div class="form-group">
@@ -283,14 +295,80 @@ window.initAddSales = (function () {
           </div>
         `;
 
-        // Event listeners for item inputs
         const nameIn = row.querySelector(".item-name-input");
         const qtyIn = row.querySelector(".item-qty-input");
         const priceIn = row.querySelector(".item-price-input");
         const removeBtn = row.querySelector(".btn-remove-item");
+        const dropdown = row.querySelector(".autocomplete-dropdown");
+        const badgeContainer = row.querySelector(".stock-badge-container");
+
+        function updateStockBadge(invItem) {
+          if (invItem && badgeContainer) {
+            const isLow = invItem.qty <= (invItem.alertLevel || 5);
+            badgeContainer.innerHTML = `<div class="stock-badge ${isLow ? "stock-badge--low" : ""}">In Stock: ${invItem.qty} units</div>`;
+          } else if (badgeContainer) {
+            badgeContainer.innerHTML = "";
+          }
+        }
+
+        function showSuggestions(val) {
+          if (!window.DataStore || !dropdown) return;
+          const matches = window.DataStore.searchItems(val);
+          if (matches.length === 0) {
+            dropdown.hidden = true;
+            dropdown.innerHTML = "";
+            return;
+          }
+
+          dropdown.innerHTML = matches
+            .map(
+              (m) => `
+            <div class="autocomplete-item" data-name="${m.name}" data-price="${m.unitPrice}">
+              <span class="autocomplete-name">${m.name}</span>
+              <span class="autocomplete-meta">
+                <span>OMR ${Number(m.unitPrice).toFixed(3)}</span>
+                <span>Stock: ${m.qty}</span>
+              </span>
+            </div>`
+            )
+            .join("");
+          dropdown.hidden = false;
+        }
 
         nameIn.addEventListener("input", (e) => {
           item.name = e.target.value;
+          const invItem = window.DataStore ? window.DataStore.findItemByName(item.name) : null;
+          updateStockBadge(invItem);
+          showSuggestions(e.target.value);
+        });
+
+        nameIn.addEventListener("focus", (e) => {
+          showSuggestions(e.target.value || "");
+        });
+
+        dropdown.addEventListener("click", (e) => {
+          const clickedItem = e.target.closest(".autocomplete-item");
+          if (!clickedItem) return;
+
+          const selName = clickedItem.dataset.name;
+          const selPrice = parseFloat(clickedItem.dataset.price) || 0;
+
+          item.name = selName;
+          item.unitPrice = selPrice;
+          nameIn.value = selName;
+          priceIn.value = selPrice;
+
+          const invItem = window.DataStore ? window.DataStore.findItemByName(selName) : null;
+          updateStockBadge(invItem);
+
+          dropdown.hidden = true;
+          calculateTotals();
+        });
+
+        document.addEventListener("click", (e) => {
+          if (!row.contains(e.target)) {
+            dropdown.hidden = true;
+          }
         });
 
         qtyIn.addEventListener("input", (e) => {
@@ -683,6 +761,11 @@ window.initAddSales = (function () {
 
       console.log("Sale Saved Successfully:", saleData);
 
+      // Record Sale in DataStore (Instant 0ms Local Stock Deduction + Background Sync to Google Sheets)
+      if (window.DataStore) {
+        window.DataStore.recordSale(saleData, FORM_DEFAULTS.googleSheetWebAppUrl);
+      }
+
       UI.modal({
         title: "Sale Recorded Successfully",
         message: `Customer: ${saleData.customerName}\n${paymentSummaryStr}\nGrand Total: ${formatOMR(saleData.grandTotal)}`,
@@ -699,6 +782,19 @@ window.initAddSales = (function () {
           UI.toast("Form reset for next sale", "info");
         }
       });
+    }
+
+    // Re-render & cloud sync on branch change
+    window.addEventListener("branchChanged", () => {
+      renderItems();
+      if (window.DataStore) {
+        window.DataStore.syncFromCloud(FORM_DEFAULTS.googleSheetWebAppUrl);
+      }
+    });
+
+    // Background cloud sync on initial load
+    if (window.DataStore) {
+      window.DataStore.syncFromCloud(FORM_DEFAULTS.googleSheetWebAppUrl);
     }
 
     // Initial render

@@ -386,3 +386,70 @@
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(22, 163, 74, 0.45);
 }
+
+/* Autocomplete Dropdown & Stock Badge */
+.form-group-relative {
+  position: relative;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: #ffffff;
+  border: 1px solid rgba(69, 103, 250, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  max-height: 180px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.autocomplete-item {
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  transition: background 0.15s ease;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover {
+  background: rgba(69, 103, 250, 0.08);
+}
+
+.autocomplete-name {
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.autocomplete-meta {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  gap: 8px;
+}
+
+.stock-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #16a34a;
+  background: rgba(22, 163, 74, 0.1);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 4px;
+}
+
+.stock-badge--low {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.1);
+}

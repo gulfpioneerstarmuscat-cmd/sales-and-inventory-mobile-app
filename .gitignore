@@ -1,2 +1,11 @@
 .vscode
 CNAME
+
+# Google Apps Script & Secrets (Hidden from GitHub)
+apps-script/
+google-apps-script/
+backend/
+.clasp.json
+clasp.json
+config.js
+config.json

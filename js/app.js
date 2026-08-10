@@ -44,6 +44,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (String(pageKey) === "3" && typeof window.initAddSales === "function") {
       window.initAddSales();
     }
+    if (String(pageKey) === "profile" && typeof window.initProfilePage === "function") {
+      window.initProfilePage();
+    }
   };
 
   navButtons.forEach((button, index) => {
