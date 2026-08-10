@@ -1,3 +1,6 @@
+
+
+
 document.addEventListener("DOMContentLoaded", () => {
   const isMobile =
     window.matchMedia("(max-width: 767px)").matches ||
@@ -50,6 +53,46 @@ document.addEventListener("DOMContentLoaded", () => {
   if (profileButton) {
     profileButton.addEventListener("click", () => showPage("profile"));
   }
+
+  // Auto-select entire input content on click/focus for fast overwriting
+  let lastFocusedInput = null;
+
+  function selectTargetInput(target) {
+    if (
+      target &&
+      (target.tagName === "INPUT" || target.tagName === "TEXTAREA") &&
+      !target.readOnly &&
+      !target.disabled
+    ) {
+      const type = target.type;
+      if (!type || ["text", "number", "tel", "email", "search", "url", "password"].includes(type)) {
+        setTimeout(() => {
+          try {
+            if (typeof target.select === "function") {
+              target.select();
+            }
+          } catch (err) {
+            // Ignore browsers restricting select on certain input types
+          }
+        }, 0);
+      }
+    }
+  }
+
+  document.addEventListener("focusin", (e) => {
+    lastFocusedInput = e.target;
+    selectTargetInput(e.target);
+  });
+
+  document.addEventListener("mouseup", (e) => {
+    if (lastFocusedInput && lastFocusedInput === e.target) {
+      const target = lastFocusedInput;
+      lastFocusedInput = null;
+      selectTargetInput(target);
+    } else {
+      lastFocusedInput = null;
+    }
+  });
 
   showPage(3);
 });

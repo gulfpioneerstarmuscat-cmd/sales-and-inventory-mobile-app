@@ -1,5 +1,33 @@
 // js/pages/add-sales.js
 
+// =========================================================================
+// FORM DEFAULTS CONFIGURATION
+// Centralized location for all default input values & initial form settings.
+// Modify any values here to change application defaults in one place.
+// =========================================================================
+const FORM_DEFAULTS = {
+  // Payment Details Defaults
+  vatBill: "no",        // "yes" (5% VAT) | "no" (0% VAT)
+  paymentStatus: "paid", // "paid" | "not_paid"
+  paymentMethod: "cash", // "cash" | "card" | "both"
+
+  // Item Row Defaults
+  item: {
+    qty: 1,              // Default item quantity
+    unitPrice: 0,        // Default unit price (OMR)
+    name: ""             // Default item name/SKU
+  }
+};
+
+function createDefaultItem() {
+  return {
+    id: Date.now(),
+    name: FORM_DEFAULTS.item.name,
+    qty: FORM_DEFAULTS.item.qty,
+    unitPrice: FORM_DEFAULTS.item.unitPrice
+  };
+}
+
 window.initAddSales = (function () {
   let initialized = false;
 
@@ -89,25 +117,25 @@ window.initAddSales = (function () {
       <div class="form-group">
         <label class="form-label">VAT Bill <span class="required-star">*</span></label>
         <div class="toggle-group" id="vat-bill-toggle">
-          <button type="button" class="toggle-btn" data-value="no">No (0%)</button>
-          <button type="button" class="toggle-btn toggle-btn--active" data-value="yes">Yes (5%)</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.vatBill === "no" ? "toggle-btn--active" : ""}" data-value="no">No (0%)</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.vatBill === "yes" ? "toggle-btn--active" : ""}" data-value="yes">Yes (5%)</button>
         </div>
       </div>
 
       <div class="form-group">
         <label class="form-label">Payment Status <span class="required-star">*</span></label>
         <div class="toggle-group" id="payment-status-toggle">
-          <button type="button" class="toggle-btn toggle-btn--active" data-value="paid">Paid</button>
-          <button type="button" class="toggle-btn" data-value="not_paid">Not Paid</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentStatus === "paid" ? "toggle-btn--active" : ""}" data-value="paid">Paid</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentStatus === "not_paid" ? "toggle-btn--active" : ""}" data-value="not_paid">Not Paid</button>
         </div>
       </div>
 
       <div class="form-group" id="payment-method-group">
         <label class="form-label">Payment Method <span class="required-star">*</span></label>
         <div class="toggle-group" id="payment-method-toggle">
-          <button type="button" class="toggle-btn toggle-btn--active" data-value="cash">Cash</button>
-          <button type="button" class="toggle-btn" data-value="card">Card</button>
-          <button type="button" class="toggle-btn" data-value="both">Both</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "cash" ? "toggle-btn--active" : ""}" data-value="cash">Cash</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "card" ? "toggle-btn--active" : ""}" data-value="card">Card</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "both" ? "toggle-btn--active" : ""}" data-value="both">Both</button>
         </div>
       </div>
 
@@ -157,10 +185,10 @@ window.initAddSales = (function () {
 
     // State Variables
     let currentSection = 1;
-    let items = [{ id: 1, name: "", qty: 1, unitPrice: 0 }];
-    let vatBill = "yes";
-    let paymentStatus = "paid";
-    let paymentMethod = "cash";
+    let items = [createDefaultItem()];
+    let vatBill = FORM_DEFAULTS.vatBill;
+    let paymentStatus = FORM_DEFAULTS.paymentStatus;
+    let paymentMethod = FORM_DEFAULTS.paymentMethod;
 
     // DOM Elements
     const dateInput = document.getElementById("sale-date");
@@ -241,7 +269,7 @@ window.initAddSales = (function () {
           </div>
           <div class="form-group">
             <label class="form-label">Item Name / SKU / Model <span class="required-star">*</span></label>
-            <input type="text" class="form-input item-name-input" value="${item.name}" placeholder="e.g. iPhone 15 Pro / SKU-102" required />
+            <input type="text" class="form-input item-name-input" value="${item.name}" placeholder="e.g. Beninca 600KG / Pupilla" required />
           </div>
           <div class="form-row-2col">
             <div class="form-group">
@@ -291,7 +319,7 @@ window.initAddSales = (function () {
 
     if (addItemBtn) {
       addItemBtn.addEventListener("click", () => {
-        items.push({ id: Date.now(), name: "", qty: 1, unitPrice: 0 });
+        items.push(createDefaultItem());
         renderItems();
       });
     }
@@ -446,13 +474,13 @@ window.initAddSales = (function () {
         if (emailInput) emailInput.value = "";
         UI.toast("Customer details cleared", "info");
       } else if (secNum === 2) {
-        items = [{ id: Date.now(), name: "", qty: 1, unitPrice: 0 }];
+        items = [createDefaultItem()];
         renderItems();
         UI.toast("Item details cleared", "info");
       } else if (secNum === 3) {
-        vatBill = "yes";
-        paymentStatus = "paid";
-        paymentMethod = "cash";
+        vatBill = FORM_DEFAULTS.vatBill;
+        paymentStatus = FORM_DEFAULTS.paymentStatus;
+        paymentMethod = FORM_DEFAULTS.paymentMethod;
 
         const resetToggle = (container, val) => {
           if (!container) return;
@@ -461,9 +489,9 @@ window.initAddSales = (function () {
           });
         };
 
-        resetToggle(vatToggle, "yes");
-        resetToggle(statusToggle, "paid");
-        resetToggle(methodToggle, "cash");
+        resetToggle(vatToggle, FORM_DEFAULTS.vatBill);
+        resetToggle(statusToggle, FORM_DEFAULTS.paymentStatus);
+        resetToggle(methodToggle, FORM_DEFAULTS.paymentMethod);
 
         if (cashInput) cashInput.value = "";
         if (cardInput) cardInput.value = "";
@@ -661,7 +689,7 @@ window.initAddSales = (function () {
         type: "success",
         confirmText: "Done",
         onConfirm: () => {
-          items = [{ id: Date.now(), name: "", qty: 1, unitPrice: 0 }];
+          items = [createDefaultItem()];
           if (nameInput) nameInput.value = "";
           if (numberInput) numberInput.value = "";
           if (emailInput) emailInput.value = "";
