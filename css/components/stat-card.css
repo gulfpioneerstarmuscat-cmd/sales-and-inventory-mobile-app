@@ -1,0 +1,59 @@
+/* css/components/stat-card.css - Reusable Stat Card Styling */
+
+.stat-card {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(69, 103, 250, 0.15);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  backdrop-filter: blur(8px);
+  text-align: left;
+}
+
+.stat-card--interactive {
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.stat-card--interactive:hover {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--color-brand, #4567fa);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(69, 103, 250, 0.15);
+}
+
+.stat-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.stat-chevron {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.stat-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-brand, #4567fa);
+}
+
+.stat-card--alert {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.stat-card--alert .stat-value {
+  color: #dc2626;
+}

@@ -1,4 +1,4 @@
-// js/pages/view-sales.js - View Sales History Component with DD-MM-YYYY Formatting & Sale Date Focus
+// js/pages/view-sales.js - View Sales History Component with Component Helpers
 
 window.initViewSales = (function () {
   let initialized = false;
@@ -24,12 +24,6 @@ window.initViewSales = (function () {
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
-  }
-
-  function getSixMonthsAgoMs() {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 6);
-    return d.getTime();
   }
 
   function formatMonthLabel(monthKey) {
@@ -69,7 +63,6 @@ window.initViewSales = (function () {
       }
     }
 
-    // Fallback: Parse using JS Date constructor
     const d = new Date(rawDate);
     if (!isNaN(d.getTime())) {
       const y = d.getFullYear();
@@ -81,7 +74,6 @@ window.initViewSales = (function () {
     return String(rawDate).slice(0, 10);
   }
 
-  // Format Display Sale Date as DD-MM-YYYY (No Time, Staff Focused)
   function formatDisplaySaleDate(rawDate) {
     const ymd = getNormalizedYMD(rawDate);
     if (ymd && /^\d{4}-\d{2}-\d{2}$/.test(ymd)) {
@@ -95,7 +87,6 @@ window.initViewSales = (function () {
     const root = document.getElementById("view-sales-root");
     if (!root) return;
 
-    // Render Detail Sub-Page View if a sale card was clicked
     if (selectedSale) {
       renderDetailSubPageUI(selectedSale);
       return;
@@ -104,7 +95,6 @@ window.initViewSales = (function () {
     const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
     const rawSales = window.DataStore ? window.DataStore.getSales(branch) : [];
 
-    // Sort Sales strictly by Sale Date Descending (Newest Sale Date first). Tie-breaker: Entry ID
     const allSales = [...rawSales].sort((a, b) => {
       const dateA = getNormalizedYMD(a.date);
       const dateB = getNormalizedYMD(b.date);
@@ -116,7 +106,6 @@ window.initViewSales = (function () {
       return idB - idA;
     });
 
-    // Collect Unique Month Keys for Stat Card Selector using Sale Date
     const monthSet = new Set();
     monthSet.add(getCurrentMonthKey());
 
@@ -128,7 +117,6 @@ window.initViewSales = (function () {
     });
     const availableMonthKeys = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
 
-    // Calculate Month-Specific Stats using Sale Date
     let statsRevenue = 0;
     let statsSalesCount = 0;
     let statsPaidCount = 0;
@@ -148,7 +136,6 @@ window.initViewSales = (function () {
       }
     });
 
-    // Filter Calculations for Pills based on Date Scope
     const todayStr = getTodayDateString();
 
     let todayCount = 0;
@@ -159,12 +146,10 @@ window.initViewSales = (function () {
     allSales.forEach((s) => {
       const ymd = getNormalizedYMD(s.date);
 
-      // 1. Today count ALWAYS reflects current day's sales count
       if (ymd === todayStr) {
         todayCount++;
       }
 
-      // 2. Determine if sale matches the Date Filter (if selectedDate is set, match exact date; else match all)
       const matchesPickedDate = !selectedDate || (ymd === selectedDate);
 
       if (matchesPickedDate) {
@@ -177,16 +162,13 @@ window.initViewSales = (function () {
       }
     });
 
-    // Filter List Items strictly based on Sale Date and selected filters
     const filteredSales = allSales.filter((sale) => {
       const ymd = getNormalizedYMD(sale.date);
 
-      // 1. Specific Date Picker Filter
       if (selectedDate && ymd !== selectedDate) {
         return false;
       }
 
-      // 2. Status Filter Pills logic
       if (statusFilter === "today") {
         if (ymd !== todayStr) return false;
       } else if (statusFilter === "paid") {
@@ -195,7 +177,6 @@ window.initViewSales = (function () {
         if (sale.paymentStatus !== "not_paid") return false;
       }
 
-      // 3. Search Query Filter
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         const matchCust = (sale.customerName || "").toLowerCase().includes(q);
@@ -210,50 +191,88 @@ window.initViewSales = (function () {
 
     const activeMonthLabel = formatMonthLabel(selectedStatsMonth);
 
+    // Component Helper Configurations
+    const syncBtnHtml = window.renderSyncButtonHtml ? window.renderSyncButtonHtml("btn-sync-sales") : "";
+
+    const statCardsHtml = `
+      <div class="sales-stats-row">
+        ${
+          window.renderStatCardHtml
+            ? window.renderStatCardHtml({
+                id: "btn-stats-month-1",
+                interactive: true,
+                cardClass: "stat-card--interactive stat-card--revenue",
+                title: "Click to change month period",
+                label: `Revenue (${activeMonthLabel})`,
+                value: `OMR ${statsRevenue.toFixed(3)}`
+              })
+            : ""
+        }
+        ${
+          window.renderStatCardHtml
+            ? window.renderStatCardHtml({
+                id: "btn-stats-month-2",
+                interactive: true,
+                cardClass: "stat-card--interactive stat-card--count",
+                title: "Click to change month period",
+                label: `Sales (${activeMonthLabel})`,
+                value: `${statsSalesCount} (${statsPaidCount} Paid)`
+              })
+            : ""
+        }
+      </div>
+    `;
+
+    const dateTriggerExtraHtml = `
+      <div class="date-picker-trigger-wrapper">
+        <button type="button" class="btn-date-picker ${selectedDate ? "btn-date-picker--active" : ""}" id="btn-trigger-date" title="Filter by Date">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </button>
+      </div>
+    `;
+
+    const searchBoxHtml = window.renderSearchBoxHtml
+      ? window.renderSearchBoxHtml({
+          id: "sales-search-input",
+          placeholder: "Search customer, phone, or item...",
+          value: searchQuery,
+          clearBtnId: "btn-clear-sales-search",
+          extraRightHtml: dateTriggerExtraHtml
+        })
+      : "";
+
+    const filterPillsConfig = [
+      {
+        status: "today",
+        label: "Today",
+        count: todayCount,
+        colorTheme: "today",
+        isActive: statusFilter === "today" && !selectedDate,
+        disabled: Boolean(selectedDate),
+        title: selectedDate ? "Clear date picker filter to enable Today button" : ""
+      },
+      { status: "all", label: "All", count: pillAllCount, isActive: statusFilter === "all" },
+      { status: "paid", label: "Paid", count: pillPaidCount, colorTheme: "paid", isActive: statusFilter === "paid" },
+      { status: "not_paid", label: "Unpaid", count: pillUnpaidCount, colorTheme: "unpaid", isActive: statusFilter === "not_paid" }
+    ];
+
+    const filterPillsHtml = window.renderFilterPillsHtml ? window.renderFilterPillsHtml(filterPillsConfig) : "";
+
     root.innerHTML = `
       <div class="view-sales-container">
         <!-- Header & Interactive Month Stat Cards -->
         <div class="sales-page-header">
           <div class="header-titles">
             <h3 class="page-title">Sales History</h3>
-            <button type="button" class="btn-sync-cloud" id="btn-sync-sales" title="Sync Live Data from Google Sheets">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
-              <span>Sync</span>
-            </button>
+            ${syncBtnHtml}
           </div>
 
-          <div class="sales-stats-row">
-            <button type="button" class="stat-card stat-card--interactive stat-card--revenue" id="btn-stats-month-1" title="Click to change month period">
-              <div class="stat-card-header">
-                <span class="stat-label">Revenue (${escapeHtml(activeMonthLabel)})</span>
-                <span class="stat-chevron">▾</span>
-              </div>
-              <span class="stat-value">OMR ${statsRevenue.toFixed(3)}</span>
-            </button>
-
-            <button type="button" class="stat-card stat-card--interactive stat-card--count" id="btn-stats-month-2" title="Click to change month period">
-              <div class="stat-card-header">
-                <span class="stat-label">Sales (${escapeHtml(activeMonthLabel)})</span>
-                <span class="stat-chevron">▾</span>
-              </div>
-              <span class="stat-value">${statsSalesCount} (${statsPaidCount} Paid)</span>
-            </button>
-          </div>
+          ${statCardsHtml}
         </div>
 
         <!-- Search, Date Picker & Filter Controls -->
         <div class="sales-controls-bar">
-          <div class="search-box-wrapper">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            <input type="text" id="sales-search-input" class="search-input" placeholder="Search customer, phone, or item..." value="${escapeHtml(searchQuery)}" />
-            ${searchQuery ? `<button type="button" class="btn-clear-search" id="btn-clear-sales-search">&times;</button>` : ""}
-            
-            <div class="date-picker-trigger-wrapper">
-              <button type="button" class="btn-date-picker ${selectedDate ? "btn-date-picker--active" : ""}" id="btn-trigger-date" title="Filter by Date">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-              </button>
-            </div>
-          </div>
+          ${searchBoxHtml}
 
           ${
             selectedDate
@@ -265,12 +284,7 @@ window.initViewSales = (function () {
               : ""
           }
 
-          <div class="filter-pills-row">
-            <button type="button" class="filter-pill filter-pill--today ${statusFilter === "today" && !selectedDate ? "filter-pill--active" : ""} ${selectedDate ? "filter-pill--disabled" : ""}" data-status="today" ${selectedDate ? "disabled title='Clear date picker filter to enable Today button'" : ""}>Today (${todayCount})</button>
-            <button type="button" class="filter-pill ${statusFilter === "all" ? "filter-pill--active" : ""}" data-status="all">All (${pillAllCount})</button>
-            <button type="button" class="filter-pill filter-pill--paid ${statusFilter === "paid" ? "filter-pill--active" : ""}" data-status="paid">Paid (${pillPaidCount})</button>
-            <button type="button" class="filter-pill filter-pill--unpaid ${statusFilter === "not_paid" ? "filter-pill--active" : ""}" data-status="not_paid">Unpaid (${pillUnpaidCount})</button>
-          </div>
+          ${filterPillsHtml}
         </div>
 
         <!-- Sales Compact Cards List (Newest Sales Top) -->
@@ -302,18 +316,8 @@ window.initViewSales = (function () {
 
     // Attach Event Listeners
     const syncBtn = root.querySelector("#btn-sync-sales");
-    if (syncBtn) {
-      syncBtn.addEventListener("click", () => {
-        syncBtn.classList.add("is-spinning");
-        const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
-        if (window.DataStore && webAppUrl) {
-          window.DataStore.syncFromCloud(webAppUrl).finally(() => {
-            setTimeout(() => syncBtn.classList.remove("is-spinning"), 300);
-          });
-        } else {
-          syncBtn.classList.remove("is-spinning");
-        }
-      });
+    if (syncBtn && window.bindSyncButtonEvent) {
+      window.bindSyncButtonEvent(syncBtn);
     }
 
     const card1 = root.querySelector("#btn-stats-month-1");
@@ -383,13 +387,13 @@ window.initViewSales = (function () {
             onSelect: (chosenYMD) => {
               selectedDate = chosenYMD;
               if (selectedDate) {
-                statusFilter = "all"; // Auto switch to ALL status pill when picking a date
+                statusFilter = "all";
               }
               renderViewSalesUI();
             },
             onClear: () => {
               selectedDate = "";
-              statusFilter = "today"; // Reset date filter & remove date pill when Today is pressed
+              statusFilter = "today";
               renderViewSalesUI();
             }
           });
@@ -401,7 +405,7 @@ window.initViewSales = (function () {
     if (clearDateBtn) {
       clearDateBtn.addEventListener("click", () => {
         selectedDate = "";
-        statusFilter = "today"; // Auto switch back to TODAY status pill when removing date filter
+        statusFilter = "today";
         renderViewSalesUI();
       });
     }
@@ -414,8 +418,7 @@ window.initViewSales = (function () {
       });
     });
 
-    // Compact Tile Click Handlers -> Navigates to Detailed Sub-Page View
-    const compactTiles = root.querySelectorAll(".compact-sale-tile");
+    const compactTiles = root.querySelectorAll(".compact-sale-tile, .compact-tile");
     compactTiles.forEach((tile) => {
       tile.addEventListener("click", () => {
         const idx = Number(tile.dataset.index);
@@ -428,7 +431,6 @@ window.initViewSales = (function () {
     });
   }
 
-  // Render Month Period Picker Selector Modal
   function renderMonthPickerModalHtml(availableMonthKeys) {
     const currentKey = getCurrentMonthKey();
 
@@ -441,7 +443,6 @@ window.initViewSales = (function () {
           </div>
 
           <div class="month-modal-body">
-            <!-- All Time Option -->
             <button type="button" class="month-opt-btn ${selectedStatsMonth === "all" ? "month-opt-btn--selected" : ""}" data-month="all">
               <span class="opt-label">ALL TIME</span>
               <span class="opt-desc">Total Revenue & Sales across all time</span>
@@ -472,29 +473,42 @@ window.initViewSales = (function () {
     `;
   }
 
-  // Compact Tile Renderer (Customer Name, Total Price, Sale Date DD-MM-YYYY, Paid Status)
   function renderCompactSaleTileHtml(sale, index) {
     const isPaid = sale.paymentStatus === "paid";
     const displayDateStr = formatDisplaySaleDate(sale.date);
     const grandTotal = Number(sale.grandTotal) || 0;
 
+    const badgeHtml = `
+      <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
+        ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
+      </span>
+    `;
+
+    if (window.renderCompactTileHtml) {
+      return window.renderCompactTileHtml({
+        containerClass: `compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}`,
+        index: index,
+        title: sale.customerName || "Walk-in Customer",
+        subtitle: displayDateStr,
+        metric: `OMR ${grandTotal.toFixed(3)}`,
+        badgeHtml: badgeHtml
+      });
+    }
+
     return `
-      <div class="compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}" data-index="${index}">
+      <div class="compact-tile compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}" data-index="${index}">
         <div class="tile-left">
-          <span class="tile-customer-name">${escapeHtml(sale.customerName || "Walk-in Customer")}</span>
-          <span class="tile-date">${escapeHtml(displayDateStr)}</span>
+          <span class="tile-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</span>
+          <span class="tile-subtitle">${escapeHtml(displayDateStr)}</span>
         </div>
         <div class="tile-right">
-          <span class="tile-amount">OMR ${grandTotal.toFixed(3)}</span>
-          <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
-            ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
-          </span>
+          <span class="tile-metric">OMR ${grandTotal.toFixed(3)}</span>
+          ${badgeHtml}
         </div>
       </div>
     `;
   }
 
-  // Clean Detailed Sub-Page View (Replaces Form Panel View, Displays Sale Date in DD-MM-YYYY)
   function renderDetailSubPageUI(sale) {
     const root = document.getElementById("view-sales-root");
     if (!root) return;
@@ -516,109 +530,109 @@ window.initViewSales = (function () {
       .map((line) => line.trim())
       .filter(Boolean);
 
-    root.innerHTML = `
-      <div class="view-sales-container detail-subpage-view">
-        <!-- Sub-Page Header with Back Button -->
-        <div class="detail-nav-bar">
-          <button type="button" class="btn-back-to-list" id="btn-back-to-sales">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            <span>Back to Sales</span>
-          </button>
+    const badgeHtml = `
+      <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
+        ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
+      </span>
+    `;
 
-          <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
-            ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
-          </span>
+    const contentCardsHtml = `
+      <!-- Sale Customer Header -->
+      <div class="detail-card detail-card--header">
+        <div class="detail-header-top">
+          <div class="header-main-meta">
+            <h3 class="detail-cust-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
+            <span class="detail-timestamp">Sale Date: ${escapeHtml(displayDateStr)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer Contact Details -->
+      <div class="detail-card">
+        <h4 class="card-section-label">Customer Info</h4>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-lbl">Phone Number</span>
+            <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
+          </div>
+          <div class="info-item">
+            <span class="info-lbl">Email Address</span>
+            <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link">${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Purchased Items Breakdown -->
+      <div class="detail-card">
+        <h4 class="card-section-label">Purchased Items (${itemsFormatted.length})</h4>
+        <div class="purchased-items-list">
+          ${
+            itemsFormatted.length > 0
+              ? itemsFormatted.map((it) => `<div class="purchased-item-row"><span class="bullet">•</span> <span>${escapeHtml(it)}</span></div>`).join("")
+              : `<div class="purchased-item-row">• General Sale Item</div>`
+          }
+        </div>
+      </div>
+
+      <!-- Payment Breakdown -->
+      <div class="detail-card detail-card--payment">
+        <h4 class="card-section-label">Payment Breakdown</h4>
+        <div class="pay-row">
+          <span class="pay-lbl">VAT Status</span>
+          <span class="pay-val">${isVat ? "Yes (5% VAT)" : "No VAT (0%)"}</span>
+        </div>
+        <div class="pay-row">
+          <span class="pay-lbl">Payment Method</span>
+          <span class="pay-val">${escapeHtml(pMethodLabel)}</span>
         </div>
 
-        <div class="detail-scroll-area">
-          <!-- Sale Customer Header -->
-          <div class="detail-card detail-card--header">
-            <div class="detail-header-top">
-              <div class="header-main-meta">
-                <h3 class="detail-cust-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
-                <span class="detail-timestamp">Sale Date: ${escapeHtml(displayDateStr)}</span>
-              </div>
-            </div>
+        ${
+          sale.paymentMethod === "both" || cashAmt > 0
+            ? `
+          <div class="pay-row">
+            <span class="pay-lbl">Cash Paid</span>
+            <span class="pay-val">OMR ${cashAmt.toFixed(3)}</span>
           </div>
+        `
+            : ""
+        }
 
-          <!-- Customer Contact Details -->
-          <div class="detail-card">
-            <h4 class="card-section-label">Customer Info</h4>
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-lbl">Phone Number</span>
-                <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link"> ${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-lbl">Email Address</span>
-                <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link"> ${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
-              </div>
-            </div>
+        ${
+          sale.paymentMethod === "both" || cardAmt > 0
+            ? `
+          <div class="pay-row">
+            <span class="pay-lbl">Card Paid</span>
+            <span class="pay-val">OMR ${cardAmt.toFixed(3)}</span>
           </div>
+        `
+            : ""
+        }
 
-          <!-- Purchased Items Breakdown -->
-          <div class="detail-card">
-            <h4 class="card-section-label">Purchased Items (${itemsFormatted.length})</h4>
-            <div class="purchased-items-list">
-              ${
-                itemsFormatted.length > 0
-                  ? itemsFormatted.map((it) => `<div class="purchased-item-row"><span class="bullet">•</span> <span>${escapeHtml(it)}</span></div>`).join("")
-                  : `<div class="purchased-item-row">• General Sale Item</div>`
-              }
-            </div>
-          </div>
-
-          <!-- Payment Breakdown -->
-          <div class="detail-card detail-card--payment">
-            <h4 class="card-section-label">Payment Breakdown</h4>
-            <div class="pay-row">
-              <span class="pay-lbl">VAT Status</span>
-              <span class="pay-val">${isVat ? "Yes (5% VAT)" : "No VAT (0%)"}</span>
-            </div>
-            <div class="pay-row">
-              <span class="pay-lbl">Payment Method</span>
-              <span class="pay-val">${escapeHtml(pMethodLabel)}</span>
-            </div>
-
-            ${
-              sale.paymentMethod === "both" || cashAmt > 0
-                ? `
-              <div class="pay-row">
-                <span class="pay-lbl">Cash Paid</span>
-                <span class="pay-val">OMR ${cashAmt.toFixed(3)}</span>
-              </div>
-            `
-                : ""
-            }
-
-            ${
-              sale.paymentMethod === "both" || cardAmt > 0
-                ? `
-              <div class="pay-row">
-                <span class="pay-lbl">Card Paid</span>
-                <span class="pay-val">OMR ${cardAmt.toFixed(3)}</span>
-              </div>
-            `
-                : ""
-            }
-
-            <div class="pay-row pay-row--total">
-              <span class="pay-lbl bold">Grand Total</span>
-              <span class="pay-val total-amount-big">OMR ${grandTotal.toFixed(3)}</span>
-            </div>
-          </div>
+        <div class="pay-row pay-row--total">
+          <span class="pay-lbl bold">Grand Total</span>
+          <span class="pay-val total-amount-big">OMR ${grandTotal.toFixed(3)}</span>
         </div>
       </div>
     `;
 
+    const subPageHtml = window.renderDetailSubPageWrapperHtml
+      ? window.renderDetailSubPageWrapperHtml({
+          backBtnId: "btn-back-to-sales",
+          backLabel: "Back to Sales",
+          badgeHtml: badgeHtml,
+          contentCardsHtml: contentCardsHtml
+        })
+      : "";
+
+    root.innerHTML = `<div class="view-sales-container">${subPageHtml}</div>`;
+
     const backBtn = root.querySelector("#btn-back-to-sales");
-
-    function returnToList() {
-      selectedSale = null;
-      renderViewSalesUI();
+    if (backBtn) {
+      backBtn.addEventListener("click", () => {
+        selectedSale = null;
+        renderViewSalesUI();
+      });
     }
-
-    if (backBtn) backBtn.addEventListener("click", returnToList);
   }
 
   function escapeHtml(str) {

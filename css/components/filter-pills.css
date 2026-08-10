@@ -1,0 +1,104 @@
+/* css/components/filter-pills.css - Reusable Filter Pills Styling */
+
+.filter-pills-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.filter-pill {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 20px;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.filter-pill:hover {
+  transform: translateY(-1px);
+}
+
+.filter-pill--active {
+  background: var(--color-brand, #4567fa) !important;
+  color: #ffffff !important;
+  border-color: var(--color-brand, #4567fa) !important;
+  box-shadow: 0 3px 10px rgba(69, 103, 250, 0.25);
+}
+
+/* Today Filter Pill (Passive Blue) */
+.filter-pill--today {
+  border: 1px solid #a5b4fc !important;
+  color: #4338ca !important;
+  background: #e0e7ff !important;
+}
+
+.filter-pill--today.filter-pill--active {
+  background: var(--color-brand, #4567fa) !important;
+  color: #ffffff !important;
+  border-color: var(--color-brand, #4567fa) !important;
+}
+
+/* Paid & In Stock Filter Pill (Passive Rich Green) */
+.filter-pill--paid,
+.filter-pill--instock {
+  border: 1px solid #86efac !important;
+  color: #15803d !important;
+  background: #dcfce7 !important;
+}
+
+.filter-pill--paid.filter-pill--active,
+.filter-pill--instock.filter-pill--active {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25);
+}
+
+/* Low Stock Filter Pill (Passive Rich Yellow / Amber) */
+.filter-pill--lowstock {
+  border: 1px solid #fde047 !important;
+  color: #b45309 !important;
+  background: #fef3c7 !important;
+}
+
+.filter-pill--lowstock.filter-pill--active {
+  background: #d97706 !important;
+  color: #ffffff !important;
+  border-color: #d97706 !important;
+  box-shadow: 0 3px 10px rgba(217, 119, 6, 0.25);
+}
+
+/* Unpaid & No Stock Filter Pill (Passive Rich Red) */
+.filter-pill--unpaid,
+.filter-pill--nostock {
+  border: 1px solid #fca5a5 !important;
+  color: #b91c1c !important;
+  background: #fee2e2 !important;
+}
+
+.filter-pill--unpaid.filter-pill--active,
+.filter-pill--nostock.filter-pill--active {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.25);
+}
+
+.filter-pill[disabled],
+.filter-pill--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: rgba(226, 232, 240, 0.5) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(203, 213, 225, 0.5) !important;
+  box-shadow: none !important;
+}

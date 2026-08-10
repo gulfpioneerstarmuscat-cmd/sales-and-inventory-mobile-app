@@ -1,0 +1,79 @@
+/* css/components/compact-tile.css - Reusable Compact Tile Styling */
+
+.compact-tile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  backdrop-filter: blur(8px);
+  user-select: none;
+}
+
+.compact-tile:hover {
+  transform: translateY(-1px);
+}
+
+.tile-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  overflow: hidden;
+  flex: 1;
+  padding-right: 8px;
+}
+
+.tile-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.tile-subtitle {
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.tile-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.tile-metric {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.tile-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.tile-badge--paid {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.tile-badge--unpaid {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}

@@ -1,0 +1,33 @@
+/* css/components/sync-button.css - Reusable Cloud Sync Button Styling */
+
+.btn-sync-cloud {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(69, 103, 250, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-sync-cloud:hover,
+.btn-sync-cloud:active {
+  background: rgba(69, 103, 250, 0.2);
+  transform: scale(1.03);
+}
+
+.btn-sync-cloud.is-spinning svg {
+  animation: sync-spin 0.8s linear infinite;
+}
+
+@keyframes sync-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}

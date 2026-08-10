@@ -1,11 +1,17 @@
 // sw.js - Robust Service Worker with Network-First Strategy & Resilient PWA Pre-caching
-const CACHE_NAME = "gps-app-v25";
+const CACHE_NAME = "gps-app-v27";
 
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
   "./style.css",
   "./css/components/date-picker.css",
+  "./css/components/filter-pills.css",
+  "./css/components/search-box.css",
+  "./css/components/sync-button.css",
+  "./css/components/compact-tile.css",
+  "./css/components/detail-view.css",
+  "./css/components/stat-card.css",
   "./css/pages/add-sales.css",
   "./css/pages/profile.css",
   "./css/pages/view-sales.css",
@@ -15,6 +21,12 @@ const ASSETS_TO_CACHE = [
   "./js/data-store.js",
   "./js/notifications.js",
   "./js/components/date-picker.js",
+  "./js/components/filter-pills.js",
+  "./js/components/search-box.js",
+  "./js/components/sync-button.js",
+  "./js/components/compact-tile.js",
+  "./js/components/detail-view.js",
+  "./js/components/stat-card.js",
   "./js/app.js",
   "./js/pages/add-sales.js",
   "./js/pages/profile.js",
