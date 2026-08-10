@@ -110,11 +110,27 @@ document.addEventListener("DOMContentLoaded", () => {
   showPage(1);
 });
 
-// Register Service Worker for PWA / Standalone installability
+// Register Service Worker for PWA / Standalone installability with auto-update checking
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch((err) => {
-      console.log("ServiceWorker registration failed: ", err);
-    });
+    navigator.serviceWorker
+      .register("./sw.js")
+      .then((reg) => {
+        // Check for service worker updates on page load
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener("statechange", () => {
+              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                console.log("New version available! Refreshing automatically...");
+                window.location.reload();
+              }
+            });
+          }
+        });
+      })
+      .catch((err) => {
+        console.log("ServiceWorker registration failed: ", err);
+      });
   });
 }
