@@ -147,7 +147,12 @@ window.DataStore = (function () {
           headers: { "Content-Type": "text/plain" },
           body: JSON.stringify({ action: "add_sale", branch: branch, ...saleData })
         })
-          .then(() => console.log(`Background sync completed for ${branch}!`))
+          .then(() => {
+            console.log(`Background sync completed for ${branch}!`);
+            setTimeout(() => {
+              this.syncFromCloud(webAppUrl);
+            }, 2500);
+          })
           .catch((err) => console.error("Background sync error:", err));
       }
 
@@ -202,13 +207,19 @@ window.DataStore = (function () {
 
     // Sync Active Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
     syncFromCloud: function (webAppUrl) {
-      if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve();
+      if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
 
       const branch = getActiveBranch();
-      const syncUrl = `${webAppUrl}?branch=${encodeURIComponent(branch)}`;
+      const cacheBuster = `_t=${Date.now()}`;
+      const syncUrl = webAppUrl.includes("?")
+        ? `${webAppUrl}&branch=${encodeURIComponent(branch)}&${cacheBuster}`
+        : `${webAppUrl}?branch=${encodeURIComponent(branch)}&${cacheBuster}`;
 
-      return fetch(syncUrl)
-        .then((res) => res.json())
+      return fetch(syncUrl, { cache: "no-store" })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
         .then((data) => {
           if (data && data.status === "success") {
             // Override local inventory with Google Sheets data if data exists
@@ -216,13 +227,62 @@ window.DataStore = (function () {
               saveBranchData("inventory", data.inventory, branch);
             }
             if (Array.isArray(data.sales)) {
-              saveBranchData("sales", data.sales, branch);
+              const localSales = loadBranchSales(branch);
+              const fifteenMinsAgo = Date.now() - 15 * 60 * 1000;
+
+              // Preserve recent local sales not yet present in cloud response
+              const recentPendingSales = localSales.filter((ls) => {
+                const isRecent = ls.id && typeof ls.id === "number" && ls.id > fifteenMinsAgo;
+                if (!isRecent) return false;
+
+                const existsInCloud = data.sales.some((cs) => {
+                  const csName = String(cs.customerName || "").trim().toLowerCase();
+                  const lsName = String(ls.customerName || "").trim().toLowerCase();
+                  const csTotal = Number(cs.grandTotal) || 0;
+                  const lsTotal = Number(ls.grandTotal) || 0;
+                  return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001;
+                });
+                return !existsInCloud;
+              });
+
+              const mergedSales = [...recentPendingSales, ...data.sales];
+              saveBranchData("sales", mergedSales, branch);
             }
-            window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-            console.log(`Successfully synced real ${branch} Google Sheet data!`);
+            const syncTime = new Date().toISOString();
+            try {
+              localStorage.setItem(getStorageKey("lastSynced", branch), syncTime);
+            } catch (e) {}
+
+            window.dispatchEvent(new CustomEvent("inventoryDataChanged", { detail: { branch, syncTime } }));
+            console.log(`Successfully synced real ${branch} Google Sheet data at ${syncTime}!`);
+            return { success: true, branch, syncTime, data };
+          } else {
+            throw new Error(data ? data.message : "Invalid response");
           }
         })
-        .catch((err) => console.warn("Cloud sync check error:", err));
+        .catch((err) => {
+          console.warn("Cloud sync check error:", err);
+          return { success: false, error: err };
+        });
+    },
+
+    getLastSyncedTime: function (branch) {
+      const b = branch || getActiveBranch();
+      try {
+        return localStorage.getItem(getStorageKey("lastSynced", b)) || null;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    clearCacheAndSync: function (webAppUrl) {
+      const b = getActiveBranch();
+      try {
+        localStorage.removeItem(getStorageKey("inventory", b));
+        localStorage.removeItem(getStorageKey("sales", b));
+        localStorage.removeItem(getStorageKey("lastSynced", b));
+      } catch (e) {}
+      return this.syncFromCloud(webAppUrl);
     }
   };
 })();

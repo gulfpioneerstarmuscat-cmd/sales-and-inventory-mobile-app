@@ -45,28 +45,40 @@ window.initViewSales = (function () {
 
   // Normalize Date to YYYY-MM-DD for internal comparisons & filtering
   function getNormalizedYMD(rawDate) {
-    if (!rawDate || typeof rawDate !== "string") return "";
-    const str = rawDate.trim();
+    if (!rawDate) return "";
 
-    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+    if (typeof rawDate === "string") {
+      const str = rawDate.trim();
 
-    if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
-      const parts = str.split("-");
-      return `${parts[2]}-${parts[1]}-${parts[0]}`;
-    }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
-    if (str.includes("/")) {
-      const cleanStr = str.replace(/[^\d\/]/g, "");
-      const parts = cleanStr.split("/");
-      if (parts.length === 3) {
-        const d = parts[0].padStart(2, "0");
-        const m = parts[1].padStart(2, "0");
-        const y = parts[2].length === 2 ? "20" + parts[2] : parts[2];
-        return `${y}-${m}-${d}`;
+      if (/^\d{2}-\d{2}-\d{4}$/.test(str)) {
+        const parts = str.split("-");
+        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      }
+
+      if (str.includes("/")) {
+        const cleanStr = str.replace(/[^\d\/]/g, "");
+        const parts = cleanStr.split("/");
+        if (parts.length === 3) {
+          const d = parts[0].padStart(2, "0");
+          const m = parts[1].padStart(2, "0");
+          const y = parts[2].length === 2 ? "20" + parts[2] : parts[2];
+          return `${y}-${m}-${d}`;
+        }
       }
     }
 
-    return str.slice(0, 10);
+    // Fallback: Parse using JS Date constructor
+    const d = new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    }
+
+    return String(rawDate).slice(0, 10);
   }
 
   // Format Display Sale Date as DD-MM-YYYY (No Time, Staff Focused)
@@ -92,32 +104,37 @@ window.initViewSales = (function () {
     const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
     const rawSales = window.DataStore ? window.DataStore.getSales(branch) : [];
 
-    // Sort Sales by Sale Date Descending (Newest / Latest First at Top)
+    // Sort Sales strictly by Sale Date Descending (Newest Sale Date first). Tie-breaker: Entry ID
     const allSales = [...rawSales].sort((a, b) => {
-      const dateA = getNormalizedYMD(a.date || a.timestamp);
-      const dateB = getNormalizedYMD(b.date || b.timestamp);
-      return dateB.localeCompare(dateA);
+      const dateA = getNormalizedYMD(a.date);
+      const dateB = getNormalizedYMD(b.date);
+      const dateDiff = dateB.localeCompare(dateA);
+      if (dateDiff !== 0) return dateDiff;
+
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      return idB - idA;
     });
 
-    // Collect Unique Month Keys for Stat Card Selector
+    // Collect Unique Month Keys for Stat Card Selector using Sale Date
     const monthSet = new Set();
     monthSet.add(getCurrentMonthKey());
 
     allSales.forEach((s) => {
-      const ymd = getNormalizedYMD(s.date || s.timestamp);
+      const ymd = getNormalizedYMD(s.date);
       if (ymd && ymd.length >= 7) {
         monthSet.add(ymd.slice(0, 7));
       }
     });
     const availableMonthKeys = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
 
-    // Calculate Month-Specific Stats for Top Header Cards
+    // Calculate Month-Specific Stats using Sale Date
     let statsRevenue = 0;
     let statsSalesCount = 0;
     let statsPaidCount = 0;
 
     allSales.forEach((s) => {
-      const ymd = getNormalizedYMD(s.date || s.timestamp);
+      const ymd = getNormalizedYMD(s.date);
       const sMonthKey = ymd ? ymd.slice(0, 7) : "";
       const isMatchingMonth = selectedStatsMonth === "all" || sMonthKey === selectedStatsMonth;
 
@@ -131,53 +148,51 @@ window.initViewSales = (function () {
       }
     });
 
-    // Filter Calculations for Pills
+    // Filter Calculations for Pills based on Date Scope
     const todayStr = getTodayDateString();
-    const sixMonthsAgoMs = getSixMonthsAgoMs();
 
     let todayCount = 0;
-    let sixMonthsAllCount = 0;
-    let sixMonthsPaidCount = 0;
-    let sixMonthsUnpaidCount = 0;
+    let pillAllCount = 0;
+    let pillPaidCount = 0;
+    let pillUnpaidCount = 0;
 
     allSales.forEach((s) => {
-      const ymd = getNormalizedYMD(s.date || s.timestamp);
-      const sTimeMs = ymd ? new Date(ymd).getTime() : 0;
+      const ymd = getNormalizedYMD(s.date);
 
-      // Count Today
+      // 1. Today count ALWAYS reflects current day's sales count
       if (ymd === todayStr) {
         todayCount++;
       }
 
-      // Count 6 Months Window
-      if (sTimeMs === 0 || sTimeMs >= sixMonthsAgoMs) {
-        sixMonthsAllCount++;
-        if (s.paymentStatus === "paid") sixMonthsPaidCount++;
-        else sixMonthsUnpaidCount++;
+      // 2. Determine if sale matches the Date Filter (if selectedDate is set, match exact date; else match all)
+      const matchesPickedDate = !selectedDate || (ymd === selectedDate);
+
+      if (matchesPickedDate) {
+        pillAllCount++;
+        if (s.paymentStatus === "paid") {
+          pillPaidCount++;
+        } else if (s.paymentStatus === "not_paid") {
+          pillUnpaidCount++;
+        }
       }
     });
 
-    // Filter List Items
+    // Filter List Items strictly based on Sale Date and selected filters
     const filteredSales = allSales.filter((sale) => {
-      const ymd = getNormalizedYMD(sale.date || sale.timestamp);
-      const sTimeMs = ymd ? new Date(ymd).getTime() : 0;
+      const ymd = getNormalizedYMD(sale.date);
 
-      // 1. Status Filter Pills logic
-      if (statusFilter === "today") {
-        if (ymd !== todayStr) return false;
-      } else if (statusFilter === "all") {
-        if (sTimeMs > 0 && sTimeMs < sixMonthsAgoMs) return false;
-      } else if (statusFilter === "paid") {
-        if (sale.paymentStatus !== "paid") return false;
-        if (sTimeMs > 0 && sTimeMs < sixMonthsAgoMs) return false;
-      } else if (statusFilter === "not_paid") {
-        if (sale.paymentStatus !== "not_paid") return false;
-        if (sTimeMs > 0 && sTimeMs < sixMonthsAgoMs) return false;
-      }
-
-      // 2. Specific Date Picker Filter
+      // 1. Specific Date Picker Filter
       if (selectedDate && ymd !== selectedDate) {
         return false;
+      }
+
+      // 2. Status Filter Pills logic
+      if (statusFilter === "today") {
+        if (ymd !== todayStr) return false;
+      } else if (statusFilter === "paid") {
+        if (sale.paymentStatus !== "paid") return false;
+      } else if (statusFilter === "not_paid") {
+        if (sale.paymentStatus !== "not_paid") return false;
       }
 
       // 3. Search Query Filter
@@ -201,6 +216,10 @@ window.initViewSales = (function () {
         <div class="sales-page-header">
           <div class="header-titles">
             <h3 class="page-title">Sales History</h3>
+            <button type="button" class="btn-sync-cloud" id="btn-sync-sales" title="Sync Live Data from Google Sheets">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+              <span>Sync</span>
+            </button>
           </div>
 
           <div class="sales-stats-row">
@@ -233,7 +252,6 @@ window.initViewSales = (function () {
               <button type="button" class="btn-date-picker ${selectedDate ? "btn-date-picker--active" : ""}" id="btn-trigger-date" title="Filter by Date">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
               </button>
-              <input type="date" id="sales-date-picker-input" class="hidden-date-input" value="${selectedDate}" />
             </div>
           </div>
 
@@ -241,17 +259,17 @@ window.initViewSales = (function () {
             selectedDate
               ? `
             <div class="active-date-pill-row">
-              <span class="active-date-pill">📅 Date: ${formatDisplaySaleDate(selectedDate)} <button type="button" id="btn-clear-date">&times;</button></span>
+              <span class="active-date-pill">Date: ${formatDisplaySaleDate(selectedDate)} <button type="button" id="btn-clear-date">&times;</button></span>
             </div>
           `
               : ""
           }
 
           <div class="filter-pills-row">
-            <button type="button" class="filter-pill filter-pill--today ${statusFilter === "today" ? "filter-pill--active" : ""}" data-status="today">Today (${todayCount})</button>
-            <button type="button" class="filter-pill ${statusFilter === "all" ? "filter-pill--active" : ""}" data-status="all">All (${sixMonthsAllCount})</button>
-            <button type="button" class="filter-pill filter-pill--paid ${statusFilter === "paid" ? "filter-pill--active" : ""}" data-status="paid">Paid (${sixMonthsPaidCount})</button>
-            <button type="button" class="filter-pill filter-pill--unpaid ${statusFilter === "not_paid" ? "filter-pill--active" : ""}" data-status="not_paid">Unpaid (${sixMonthsUnpaidCount})</button>
+            <button type="button" class="filter-pill filter-pill--today ${statusFilter === "today" && !selectedDate ? "filter-pill--active" : ""} ${selectedDate ? "filter-pill--disabled" : ""}" data-status="today" ${selectedDate ? "disabled title='Clear date picker filter to enable Today button'" : ""}>Today (${todayCount})</button>
+            <button type="button" class="filter-pill ${statusFilter === "all" ? "filter-pill--active" : ""}" data-status="all">All (${pillAllCount})</button>
+            <button type="button" class="filter-pill filter-pill--paid ${statusFilter === "paid" ? "filter-pill--active" : ""}" data-status="paid">Paid (${pillPaidCount})</button>
+            <button type="button" class="filter-pill filter-pill--unpaid ${statusFilter === "not_paid" ? "filter-pill--active" : ""}" data-status="not_paid">Unpaid (${pillUnpaidCount})</button>
           </div>
         </div>
 
@@ -261,7 +279,6 @@ window.initViewSales = (function () {
             filteredSales.length === 0
               ? `
               <div class="empty-state">
-                <div class="empty-icon">🧾</div>
                 <h4>No Sales Found</h4>
                 <p>${
                   statusFilter === "today"
@@ -284,6 +301,21 @@ window.initViewSales = (function () {
     `;
 
     // Attach Event Listeners
+    const syncBtn = root.querySelector("#btn-sync-sales");
+    if (syncBtn) {
+      syncBtn.addEventListener("click", () => {
+        syncBtn.classList.add("is-spinning");
+        const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+        if (window.DataStore && webAppUrl) {
+          window.DataStore.syncFromCloud(webAppUrl).finally(() => {
+            setTimeout(() => syncBtn.classList.remove("is-spinning"), 300);
+          });
+        } else {
+          syncBtn.classList.remove("is-spinning");
+        }
+      });
+    }
+
     const card1 = root.querySelector("#btn-stats-month-1");
     const card2 = root.querySelector("#btn-stats-month-2");
 
@@ -342,20 +374,26 @@ window.initViewSales = (function () {
     }
 
     const triggerDateBtn = root.querySelector("#btn-trigger-date");
-    const dateInput = root.querySelector("#sales-date-picker-input");
-    if (triggerDateBtn && dateInput) {
+    if (triggerDateBtn) {
       triggerDateBtn.addEventListener("click", () => {
-        if (typeof dateInput.showPicker === "function") {
-          dateInput.showPicker();
-        } else {
-          dateInput.focus();
-          dateInput.click();
+        if (window.DatePicker) {
+          window.DatePicker.open({
+            title: "Filter by Date",
+            initialDate: selectedDate || getTodayDateString(),
+            onSelect: (chosenYMD) => {
+              selectedDate = chosenYMD;
+              if (selectedDate) {
+                statusFilter = "all"; // Auto switch to ALL status pill when picking a date
+              }
+              renderViewSalesUI();
+            },
+            onClear: () => {
+              selectedDate = "";
+              statusFilter = "today"; // Reset date filter & remove date pill when Today is pressed
+              renderViewSalesUI();
+            }
+          });
         }
-      });
-
-      dateInput.addEventListener("change", (e) => {
-        selectedDate = e.target.value;
-        renderViewSalesUI();
       });
     }
 
@@ -363,11 +401,12 @@ window.initViewSales = (function () {
     if (clearDateBtn) {
       clearDateBtn.addEventListener("click", () => {
         selectedDate = "";
+        statusFilter = "today"; // Auto switch back to TODAY status pill when removing date filter
         renderViewSalesUI();
       });
     }
 
-    const filterBtns = root.querySelectorAll(".filter-pill");
+    const filterBtns = root.querySelectorAll(".filter-pill:not([disabled])");
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         statusFilter = btn.dataset.status;
@@ -443,7 +482,7 @@ window.initViewSales = (function () {
       <div class="compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}" data-index="${index}">
         <div class="tile-left">
           <span class="tile-customer-name">${escapeHtml(sale.customerName || "Walk-in Customer")}</span>
-          <span class="tile-date">📅 ${escapeHtml(displayDateStr)}</span>
+          <span class="tile-date">${escapeHtml(displayDateStr)}</span>
         </div>
         <div class="tile-right">
           <span class="tile-amount">OMR ${grandTotal.toFixed(3)}</span>
@@ -495,10 +534,9 @@ window.initViewSales = (function () {
           <!-- Sale Customer Header -->
           <div class="detail-card detail-card--header">
             <div class="detail-header-top">
-              <span class="receipt-icon">🧾</span>
               <div class="header-main-meta">
                 <h3 class="detail-cust-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
-                <span class="detail-timestamp">📅 Sale Date: ${escapeHtml(displayDateStr)}</span>
+                <span class="detail-timestamp">Sale Date: ${escapeHtml(displayDateStr)}</span>
               </div>
             </div>
           </div>
@@ -509,11 +547,11 @@ window.initViewSales = (function () {
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-lbl">Phone Number</span>
-                <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">📞 ${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
+                <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link"> ${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
               </div>
               <div class="info-item">
                 <span class="info-lbl">Email Address</span>
-                <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link">✉️ ${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
+                <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link"> ${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
               </div>
             </div>
           </div>

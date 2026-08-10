@@ -108,6 +108,26 @@ document.addEventListener("DOMContentLoaded", () => {
   if (typeof window.initViewInventory === "function") window.initViewInventory();
 
   showPage(1);
+
+  // Trigger immediate background sync from Google Sheets on app startup
+  const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+  if (window.DataStore && webAppUrl) {
+    window.DataStore.syncFromCloud(webAppUrl);
+  }
+
+  // Re-sync on branch change
+  window.addEventListener("branchChanged", () => {
+    if (window.DataStore && webAppUrl) {
+      window.DataStore.syncFromCloud(webAppUrl);
+    }
+  });
+
+  // Background auto-sync interval (Every 60 seconds when active)
+  setInterval(() => {
+    if (document.visibilityState === "visible" && window.DataStore && webAppUrl) {
+      window.DataStore.syncFromCloud(webAppUrl);
+    }
+  }, 60000);
 });
 
 // Register Service Worker for PWA / Standalone installability with auto-update checking

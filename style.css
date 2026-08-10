@@ -1,6 +1,7 @@
 /* Main stylesheet entry point importing modular CSS files */
 
 @import "./css/base.css";
+@import "./css/components/date-picker.css";
 @import "./css/pages/add-sales.css";
 @import "./css/pages/profile.css";
 @import "./css/pages/view-sales.css";

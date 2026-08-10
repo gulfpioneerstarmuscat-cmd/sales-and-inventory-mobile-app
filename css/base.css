@@ -534,3 +534,25 @@ p {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Global Reset for Native Mobile Browser Date Indicators & Arrow-heads */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-inner-spin-button,
+input[type="date"]::-webkit-clear-button,
+input[type="date"]::-webkit-datetime-edit {
+  display: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+
+input[type="date"] {
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  appearance: none !important;
+}
+

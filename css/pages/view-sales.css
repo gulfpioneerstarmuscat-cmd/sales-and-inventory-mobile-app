@@ -33,6 +33,38 @@
   margin: 0;
 }
 
+.btn-sync-cloud {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(69, 103, 250, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.btn-sync-cloud:hover,
+.btn-sync-cloud:active {
+  background: rgba(69, 103, 250, 0.2);
+  transform: scale(1.03);
+}
+
+.btn-sync-cloud.is-spinning svg {
+  animation: sync-spin 0.8s linear infinite;
+}
+
+@keyframes sync-spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .sales-stats-row {
   display: flex;
   gap: 10px;
@@ -225,71 +257,86 @@
 /* Filter Pills with Green & Red Hues */
 .filter-pills-row {
   display: flex;
+  align-items: center;
   gap: 6px;
   overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .filter-pill {
-  padding: 5px 12px;
+  padding: 4px 10px;
   font-size: 12px;
-  font-weight: 600;
-  border-radius: 12px;
-  border: 1px solid rgba(69, 103, 250, 0.2);
-  background: rgba(255, 255, 255, 0.7);
-  color: #64748b;
+  font-weight: 700;
+  border-radius: 20px;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #475569;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
 }
 
 .filter-pill:hover {
-  background: rgba(69, 103, 250, 0.1);
-  color: var(--color-brand);
+  transform: translateY(-1px);
 }
 
 .filter-pill--active {
-  background: var(--color-brand, #4567fa);
-  color: #ffffff;
-  border-color: var(--color-brand);
+  background: var(--color-brand, #4567fa) !important;
+  color: #ffffff !important;
+  border-color: var(--color-brand, #4567fa) !important;
+  box-shadow: 0 3px 10px rgba(69, 103, 250, 0.25);
 }
 
 /* Today Filter Pill */
 .filter-pill--today {
-  border-color: rgba(69, 103, 250, 0.3);
-  color: #4567fa;
-  background: rgba(69, 103, 250, 0.1);
+  border: 1px solid #a5b4fc !important;
+  color: #4338ca !important;
+  background: #e0e7ff !important;
 }
 
 .filter-pill--today.filter-pill--active {
-  background: var(--color-brand, #4567fa);
-  color: #ffffff;
-  border-color: var(--color-brand, #4567fa);
+  background: var(--color-brand, #4567fa) !important;
+  color: #ffffff !important;
+  border-color: var(--color-brand, #4567fa) !important;
 }
 
-/* Paid Filter Pill (Green Hue) */
+.filter-pill[disabled],
+.filter-pill--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: rgba(226, 232, 240, 0.5) !important;
+  color: #94a3b8 !important;
+  border-color: rgba(203, 213, 225, 0.5) !important;
+  box-shadow: none !important;
+}
+
+/* Paid Filter Pill (Passive Rich Green) */
 .filter-pill--paid {
-  border-color: rgba(34, 197, 94, 0.3);
-  color: #15803d;
-  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid #86efac !important;
+  color: #15803d !important;
+  background: #dcfce7 !important;
 }
 
 .filter-pill--paid.filter-pill--active {
-  background: #16a34a;
-  color: #ffffff;
-  border-color: #16a34a;
+  background: #16a34a !important;
+  color: #ffffff !important;
+  border-color: #16a34a !important;
+  box-shadow: 0 3px 10px rgba(22, 163, 74, 0.25);
 }
 
-/* Unpaid Filter Pill (Red Hue) */
+/* Unpaid Filter Pill (Passive Rich Red) */
 .filter-pill--unpaid {
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #b91c1c;
-  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid #fca5a5 !important;
+  color: #b91c1c !important;
+  background: #fee2e2 !important;
 }
 
 .filter-pill--unpaid.filter-pill--active {
-  background: #dc2626;
-  color: #ffffff;
-  border-color: #dc2626;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+  box-shadow: 0 3px 10px rgba(220, 38, 38, 0.25);
 }
 
 /* Sales List Body */
@@ -379,13 +426,13 @@
 }
 
 .tile-badge--paid {
-  background: rgba(22, 163, 74, 0.18);
+  background: rgba(34, 197, 94, 0.15);
   color: #15803d;
 }
 
 .tile-badge--unpaid {
-  background: rgba(220, 38, 38, 0.18);
-  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
 }
 
 /* Month Selector Modal */
@@ -584,10 +631,6 @@
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.receipt-icon {
-  font-size: 28px;
 }
 
 .header-main-meta {
