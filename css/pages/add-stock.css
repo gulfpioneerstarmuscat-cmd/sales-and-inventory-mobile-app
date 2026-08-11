@@ -1,0 +1,442 @@
+/* css/pages/add-stock.css - Styling for Add Stock & Amend Stock Pages matching Add Sales section wizard theme */
+
+#add-stock-root,
+#amend-stock-root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.add-stock-container,
+.amend-stock-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  color: var(--color-text, #0f172a);
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(69, 103, 250, 0.2);
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.page-title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.page-title {
+  font-size: clamp(16px, 3.8vw, 20px);
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.page-subtitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+/* Form Section Wizard Container */
+.form-section {
+  display: none;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.form-section--active {
+  display: flex;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(69, 103, 250, 0.2);
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.2px;
+}
+
+.btn-clear {
+  background: rgba(239, 68, 68, 0.08);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.btn-clear:hover {
+  background: rgba(239, 68, 68, 0.16);
+  transform: translateY(-1px);
+}
+
+.form-body {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 10px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Form Container Card matching Add Sales .summary-card / .item-row-card */
+.form-card {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(69, 103, 250, 0.18);
+  border-radius: 14px;
+  padding: 16px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Segmented Control Toggle matching Add Sales segmented theme */
+.segmented-control {
+  display: flex;
+  background: rgba(69, 103, 250, 0.08);
+  border: 1px solid rgba(69, 103, 250, 0.18);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.segmented-btn {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+}
+
+.segmented-btn--active {
+  background: #ffffff;
+  color: var(--color-brand, #4567fa);
+  box-shadow: 0 2px 6px rgba(69, 103, 250, 0.15);
+}
+
+/* Form Groups & Inputs */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: relative;
+  text-align: left;
+}
+
+.form-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+}
+
+.required-star,
+.required-label::after {
+  content: " *";
+  color: #dc2626;
+  font-weight: bold;
+}
+
+.input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.form-input {
+  width: 100%;
+  height: clamp(38px, 5.5vh, 44px);
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(69, 103, 250, 0.22);
+  border-radius: 12px;
+  outline: none;
+  box-sizing: border-box;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: border-color var(--transition-fast, 0.15s ease), box-shadow var(--transition-fast, 0.15s ease), background var(--transition-fast, 0.15s ease);
+}
+
+.form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(69, 103, 250, 0.22);
+  border-radius: 12px;
+  outline: none;
+  box-sizing: border-box;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.02), 0 2px 6px rgba(0, 0, 0, 0.02);
+  transition: border-color var(--transition-fast, 0.15s ease), box-shadow var(--transition-fast, 0.15s ease), background var(--transition-fast, 0.15s ease);
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: #94a3b8;
+  opacity: 0.9;
+  font-weight: 500;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  border-color: var(--color-brand, #4567fa);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(69, 103, 250, 0.18), 0 4px 12px rgba(69, 103, 250, 0.08);
+}
+
+.form-input:disabled,
+.form-textarea:disabled {
+  background: rgba(241, 245, 249, 0.6);
+  border-color: rgba(0, 0, 0, 0.06);
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.form-input--number {
+  font-weight: 700;
+}
+
+.form-help-text {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* Readonly Badge Box matching stat-card style */
+.readonly-badge-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(69, 103, 250, 0.18);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+.readonly-badge-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-brand, #4567fa);
+}
+
+.readonly-badge-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Label Row with Counter */
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.char-counter {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* Section Navigation Bar matching Add Sales section-nav */
+.section-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(69, 103, 250, 0.2);
+  margin-top: auto;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.section-nav-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-brand, #4567fa);
+  text-align: center;
+  background: rgba(69, 103, 250, 0.08);
+  border: 1px solid rgba(69, 103, 250, 0.2);
+  padding: 6px 14px;
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  white-space: nowrap;
+}
+
+.section-nav-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast, 0.15s ease);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 80px;
+}
+
+.section-nav-btn--back {
+  background: rgba(69, 103, 250, 0.08);
+  border: 1px solid rgba(69, 103, 250, 0.22);
+  color: var(--color-brand, #4567fa);
+}
+
+.section-nav-btn--back:hover:not(:disabled) {
+  background: var(--color-brand, #4567fa);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.section-nav-btn--back:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: rgba(241, 245, 249, 0.5);
+  border-color: rgba(0, 0, 0, 0.06);
+  color: #94a3b8;
+}
+
+.section-nav-btn--next {
+  background: var(--color-brand, #4567fa);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(69, 103, 250, 0.3);
+}
+
+.section-nav-btn--next:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(69, 103, 250, 0.4);
+}
+
+.section-nav-btn--save {
+  background: linear-gradient(135deg, #4567fa, #2546db);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(69, 103, 250, 0.3);
+}
+
+.section-nav-btn--save:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(69, 103, 250, 0.4);
+}
+
+.section-nav-btn--danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
+}
+
+.section-nav-btn--danger:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+}
+
+/* Reusable Autocomplete Dropdown Styling matching Add Sales dropdown */
+.autocomplete-container {
+  position: relative;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #ffffff;
+  border: 1px solid rgba(69, 103, 250, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.12);
+  z-index: 100;
+}
+
+.autocomplete-item {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(69, 103, 250, 0.08);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item--active {
+  background: rgba(69, 103, 250, 0.08);
+}
+
+.autocomplete-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.autocomplete-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.autocomplete-stock strong {
+  color: var(--color-brand, #4567fa);
+}

@@ -1,6 +1,9 @@
 .vscode
 CNAME
 
+# Developer Testing & Telemetry Script (Hidden from Git)
+js/developer.js
+
 # Google Apps Script Source Code & Local IDE Configs (Hidden from GitHub)
 apps-script/
 google-apps-script/

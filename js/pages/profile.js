@@ -117,14 +117,30 @@ window.initProfilePage = (function () {
       });
     });
 
-    // Logout handler
+    // Logout handler (Use Case 1: Modal Dialog Box for Confirm Logout)
     const logoutBtn = document.getElementById("btn-logout");
     if (logoutBtn) {
       logoutBtn.addEventListener("click", () => {
-        if (window.Auth) window.Auth.logout();
-        renderProfileUI();
-        updateHeaderBranchPill();
-        if (window.UI) window.UI.toast("Logged out successfully", "info");
+        if (window.UI && typeof window.UI.modal === "function") {
+          window.UI.modal({
+            title: "Confirm Logout",
+            message: "Are you sure you want to log out of your active user account?",
+            type: "warning",
+            confirmText: "Log Out",
+            cancelText: "Cancel",
+            dangerConfirm: true,
+            onConfirm: () => {
+              if (window.Auth) window.Auth.logout();
+              renderProfileUI();
+              updateHeaderBranchPill();
+              if (window.UI) window.UI.toast("Logged out successfully", "info");
+            }
+          });
+        } else {
+          if (window.Auth) window.Auth.logout();
+          renderProfileUI();
+          updateHeaderBranchPill();
+        }
       });
     }
   }

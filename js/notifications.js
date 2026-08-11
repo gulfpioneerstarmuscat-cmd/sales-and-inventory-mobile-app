@@ -1,7 +1,10 @@
-// js/notifications.js - Reusable Notification System (Toast, Modal, Inline)
+// js/notifications.js - Reusable Notification System (1. Toast, 2. Modal Dialog, 3. Inline Error)
 
 window.UI = (function () {
-  // Ensure Toast Container exists
+  let activeToastTimer = null;
+  let activeDismissTimer = null;
+
+  // Ensure Toast Container exists on document.body
   function getToastContainer() {
     let container = document.getElementById("toast-container");
     if (!container) {
@@ -13,7 +16,7 @@ window.UI = (function () {
     return container;
   }
 
-  // Ensure Modal Container exists
+  // Ensure Modal Container exists on document.body
   function getModalContainer() {
     let container = document.getElementById("modal-overlay");
     if (!container) {
@@ -27,18 +30,46 @@ window.UI = (function () {
   }
 
   return {
-    // 1. Toast Notification (Auto-dismissing, no user interaction required)
+    // 1. Toast Notification (4 Types: message/info (blue), success (green), warning (yellow), error (red))
+    // Strictly for notifications that DO NOT require user input/confirmation (e.g. clear section, save success, sync, filter, post fail).
+    // Single Active Toast System: Replaces any previous active toast instantly instead of stacking multiple toasts.
     toast: function (message, type = "info", duration = 3000) {
-      const container = getToastContainer();
-      const toastEl = document.createElement("div");
-      toastEl.className = `toast-item toast-item--${type}`;
+      const normalizedType = type === "message" ? "info" : type;
+      if (window.DevLogger) window.DevLogger.notification(normalizedType, `Toast: ${message}`);
 
-      const iconSvg =
-        type === "success"
-          ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"></path></svg>`
-          : type === "error"
-          ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`
-          : `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      const container = getToastContainer();
+
+      // Clear pending timers for previous toast
+      if (activeToastTimer) {
+        clearTimeout(activeToastTimer);
+        activeToastTimer = null;
+      }
+      if (activeDismissTimer) {
+        clearTimeout(activeDismissTimer);
+        activeDismissTimer = null;
+      }
+
+      // Remove any existing active toast element instantly so only 1 toast is visible
+      const oldToasts = container.querySelectorAll(".toast-item");
+      oldToasts.forEach((oldEl) => oldEl.remove());
+
+      const toastEl = document.createElement("div");
+      toastEl.className = `toast-item toast-item--${normalizedType}`;
+
+      let iconSvg = "";
+      if (normalizedType === "success") {
+        // Green Checkmark SVG
+        iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"></path></svg>`;
+      } else if (normalizedType === "warning") {
+        // Yellow Triangle Alert SVG
+        iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`;
+      } else if (normalizedType === "error") {
+        // Red Octagon Error SVG
+        iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+      } else {
+        // Blue Info Circle SVG (Default Message)
+        iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      }
 
       toastEl.innerHTML = `
         <span class="toast-icon">${iconSvg}</span>
@@ -51,31 +82,49 @@ window.UI = (function () {
         toastEl.classList.add("toast-item--visible");
       });
 
-      setTimeout(() => {
+      activeToastTimer = setTimeout(() => {
         toastEl.classList.remove("toast-item--visible");
-        setTimeout(() => toastEl.remove(), 300);
+        activeDismissTimer = setTimeout(() => {
+          if (toastEl.parentNode) toastEl.remove();
+        }, 300);
       }, duration);
     },
 
-    // 2. Modal Dialog Notification (User interaction required to acknowledge)
-    modal: function ({ title = "Notification", message, type = "info", confirmText = "OK", onConfirm }) {
+    // 2. Modal Dialog Box (Strictly for 2 Use Cases: 1. Logout Confirmation, 2. Amend Review Confirmation)
+    modal: function ({
+      title = "Notification",
+      message = "",
+      bodyHtml = "",
+      type = "info",
+      confirmText = "OK",
+      cancelText = "",
+      dangerConfirm = false,
+      onConfirm,
+      onCancel
+    }) {
+      if (window.DevLogger) window.DevLogger.notification(type, `Modal Dialog Box: ${title}`);
+
       const overlay = getModalContainer();
-      const iconSvg =
-        type === "success"
-          ? `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><path d="M16 10l-5 5-3-3"></path></svg>`
-          : `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+      const contentHtml = bodyHtml || `<p class="modal-message">${(message || "").replace(/\n/g, "<br>")}</p>`;
+
+      const confirmBtnClass = dangerConfirm
+        ? "modal-btn modal-btn--danger"
+        : (type === "error" || type === "danger")
+        ? "modal-btn modal-btn--danger"
+        : "modal-btn modal-btn--confirm";
 
       overlay.innerHTML = `
         <div class="modal-card modal-card--${type}">
           <div class="modal-header">
-            <span class="modal-icon">${iconSvg}</span>
             <h3 class="modal-title">${title}</h3>
+            <button type="button" class="modal-close-btn" id="btn-modal-dialog-close">&times;</button>
           </div>
           <div class="modal-body">
-            <p class="modal-message">${message.replace(/\n/g, "<br>")}</p>
+            ${contentHtml}
           </div>
           <div class="modal-footer">
-            <button type="button" class="modal-btn modal-btn--confirm">${confirmText}</button>
+            ${cancelText ? `<button type="button" class="modal-btn modal-btn--secondary secondary-button" id="btn-modal-dialog-cancel">${cancelText}</button>` : ""}
+            <button type="button" class="${confirmBtnClass}" id="btn-modal-dialog-confirm">${confirmText}</button>
           </div>
         </div>
       `;
@@ -84,22 +133,39 @@ window.UI = (function () {
       overlay.hidden = false;
       requestAnimationFrame(() => overlay.classList.add("modal-overlay--visible"));
 
-      const confirmBtn = overlay.querySelector(".modal-btn--confirm");
-      confirmBtn.focus();
+      const closeBtn = overlay.querySelector("#btn-modal-dialog-close");
+      const cancelBtn = overlay.querySelector("#btn-modal-dialog-cancel");
+      const confirmBtn = overlay.querySelector("#btn-modal-dialog-confirm");
 
-      confirmBtn.onclick = () => {
+      if (confirmBtn) confirmBtn.focus();
+
+      const dismiss = (callback) => {
         overlay.classList.remove("modal-overlay--visible");
         setTimeout(() => {
           overlay.hidden = true;
           overlay.style.display = "none";
-          if (typeof onConfirm === "function") onConfirm();
+          if (typeof callback === "function") callback();
         }, 200);
       };
+
+      if (closeBtn) closeBtn.onclick = () => dismiss(onCancel);
+      if (cancelBtn) cancelBtn.onclick = () => dismiss(onCancel);
+      if (confirmBtn) confirmBtn.onclick = () => dismiss(onConfirm);
     },
 
-    // 3. Inline Error (Field specific errors users might miss)
+    closeModal: function () {
+      const overlay = getModalContainer();
+      overlay.classList.remove("modal-overlay--visible");
+      setTimeout(() => {
+        overlay.hidden = true;
+        overlay.style.display = "none";
+      }, 200);
+    },
+
+    // 3. Inline Error (Always RED - Triggered on input fields for invalid format, missing mandatory value, etc.)
     showInlineError: function (inputElement, errorMessage) {
       if (!inputElement) return;
+      if (window.DevLogger) window.DevLogger.warn("InlineError", `${errorMessage}`);
       this.clearInlineError(inputElement);
 
       inputElement.classList.add("form-input--error");
@@ -107,7 +173,7 @@ window.UI = (function () {
       const errorEl = document.createElement("div");
       errorEl.className = "inline-error";
       errorEl.innerHTML = `
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
         <span>${errorMessage}</span>
       `;
 
@@ -140,3 +206,10 @@ window.UI = (function () {
     }
   };
 })();
+
+// Global convenience wrapper for toast notifications
+window.showNotification = function (message, type = "info") {
+  if (window.UI && typeof window.UI.toast === "function") {
+    window.UI.toast(message, type);
+  }
+};

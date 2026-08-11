@@ -1,20 +1,49 @@
-// js/pages/view-inventory.js - View Stock Inventory Component (Refactored to consume Modular Components)
+// js/pages/view-inventory.js - View Stock Inventory Component with Smooth Target List Search & Modal Product Detail View
 
 window.initViewInventory = (function () {
   let initialized = false;
   let searchQuery = "";
   let statusFilter = "all"; // "all" | "in_stock" | "low_stock" | "no_stock"
-  let selectedItem = null; // Currently selected item for detailed sub-page view
+
+  function normalizeSearchText(val) {
+    if (val === null || val === undefined) return "";
+    return String(val).toLowerCase().trim().replace(/\s+/g, " ");
+  }
+
+  function getFilteredInventoryData() {
+    const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
+    const allInventory = window.DataStore ? window.DataStore.getInventory(branch) : [];
+
+    return allInventory.filter((item) => {
+      const alertThreshold = Number(item.alertLevel) || 5;
+      const qty = Number(item.qty) || 0;
+
+      const isNoStock = qty === 0;
+      const isLowStock = qty > 0 && qty <= alertThreshold;
+      const isInStock = qty > alertThreshold;
+
+      // 1. Status Filter Pills
+      if (statusFilter === "in_stock" && !isInStock) return false;
+      if (statusFilter === "low_stock" && !isLowStock) return false;
+      if (statusFilter === "no_stock" && !isNoStock) return false;
+
+      // 2. Normalized Case-Insensitive Search Query Filter (Product Name, SKU, Category)
+      if (searchQuery) {
+        const q = normalizeSearchText(searchQuery);
+        const matchName = normalizeSearchText(item.name).includes(q);
+        const matchSku = normalizeSearchText(item.sku).includes(q);
+        const matchCat = normalizeSearchText(item.category).includes(q);
+
+        if (!matchName && !matchSku && !matchCat) return false;
+      }
+
+      return true;
+    });
+  }
 
   function renderViewInventoryUI() {
     const root = document.getElementById("view-inventory-root");
     if (!root) return;
-
-    // Render Detailed Sub-Page View if an inventory item tile was clicked
-    if (selectedItem) {
-      renderDetailSubPageUI(selectedItem);
-      return;
-    }
 
     const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
     const allInventory = window.DataStore ? window.DataStore.getInventory(branch) : [];
@@ -37,31 +66,7 @@ window.initViewInventory = (function () {
       }
     });
 
-    // Filter Inventory Items based on Search Query & Status Filter
-    const filteredInventory = allInventory.filter((item) => {
-      const alertThreshold = Number(item.alertLevel) || 5;
-      const qty = Number(item.qty) || 0;
-
-      const isNoStock = qty === 0;
-      const isLowStock = qty > 0 && qty <= alertThreshold;
-      const isInStock = qty > alertThreshold;
-
-      // 1. Status Filter Pills
-      if (statusFilter === "in_stock" && !isInStock) return false;
-      if (statusFilter === "low_stock" && !isLowStock) return false;
-      if (statusFilter === "no_stock" && !isNoStock) return false;
-
-      // 2. Search Query Filter
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const matchName = (item.name || "").toLowerCase().includes(q);
-        const matchSku = (item.sku || "").toLowerCase().includes(q);
-        const matchCat = (item.category || "").toLowerCase().includes(q);
-        if (!matchName && !matchSku && !matchCat) return false;
-      }
-
-      return true;
-    });
+    const filteredInventory = getFilteredInventoryData();
 
     // Component Configurations
     const syncButtonHtml = window.renderSyncButtonHtml ? window.renderSyncButtonHtml("btn-sync-inventory") : "";
@@ -111,33 +116,39 @@ window.initViewInventory = (function () {
 
         <!-- Inventory Compact Cards List -->
         <div class="inv-list-body">
-          ${
-            filteredInventory.length === 0
-              ? `
-              <div class="empty-state">
-                <h4>No Products Found</h4>
-                <p>${searchQuery || statusFilter !== "all" ? "No products match your search filters." : "No inventory items recorded yet."}</p>
-              </div>
-            `
-              : filteredInventory
-                  .map((item, idx) => renderCompactInventoryTileHtml(item, idx))
-                  .join("")
-          }
+          ${renderInventoryListItemsHtml(filteredInventory)}
         </div>
       </div>
     `;
 
-    // Attach Component Event Handlers
+    bindInventoryEvents(root);
+  }
+
+  function renderInventoryListItemsHtml(filteredInventory) {
+    if (filteredInventory.length === 0) {
+      return `
+        <div class="empty-state">
+          <h4>No Products Found</h4>
+          <p>${searchQuery || statusFilter !== "all" ? "No products match your search filters." : "No inventory items recorded yet."}</p>
+        </div>
+      `;
+    }
+
+    return filteredInventory.map((item, idx) => renderCompactInventoryTileHtml(item, idx)).join("");
+  }
+
+  function bindInventoryEvents(root) {
     const syncBtn = root.querySelector("#btn-sync-inventory");
     if (syncBtn && window.bindSyncButtonEvent) {
       window.bindSyncButtonEvent(syncBtn);
     }
 
+    // TARGETED SEARCH: Updates ONLY list body so input focus is NEVER destroyed!
     const searchIn = root.querySelector("#inv-search-input");
     if (searchIn) {
       searchIn.addEventListener("input", (e) => {
         searchQuery = e.target.value;
-        renderViewInventoryUI();
+        updateInventoryListBodyOnly(root);
       });
     }
 
@@ -145,7 +156,8 @@ window.initViewInventory = (function () {
     if (clearSearchBtn) {
       clearSearchBtn.addEventListener("click", () => {
         searchQuery = "";
-        renderViewInventoryUI();
+        if (searchIn) searchIn.value = "";
+        updateInventoryListBodyOnly(root);
       });
     }
 
@@ -153,22 +165,134 @@ window.initViewInventory = (function () {
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         statusFilter = btn.dataset.status;
+        const filterName = btn.innerText.trim().replace(/\n/g, " ");
+        if (window.UI) window.UI.toast(`Filtered inventory by "${filterName}"`, "info");
         renderViewInventoryUI();
       });
     });
 
-    // Compact Tile Click Handlers -> Navigates to Detailed Sub-Page View
+    bindTileClickEvents(root);
+  }
+
+  function updateInventoryListBodyOnly(root) {
+    const listBody = root.querySelector(".inv-list-body");
+    if (!listBody) {
+      renderViewInventoryUI();
+      return;
+    }
+
+    const filteredInventory = getFilteredInventoryData();
+    listBody.innerHTML = renderInventoryListItemsHtml(filteredInventory);
+    bindTileClickEvents(root, filteredInventory);
+  }
+
+  function bindTileClickEvents(root, customFilteredInventory) {
+    const filteredInventory = customFilteredInventory || getFilteredInventoryData();
     const compactTiles = root.querySelectorAll(".compact-tile, .compact-inv-tile");
     compactTiles.forEach((tile) => {
       tile.addEventListener("click", () => {
         const idx = Number(tile.dataset.index);
         const targetItem = filteredInventory[idx];
         if (targetItem) {
-          selectedItem = targetItem;
-          renderViewInventoryUI();
+          openInventoryDetailModal(targetItem);
         }
       });
     });
+  }
+
+  // Top-Level Viewport Inventory Product Detailed View Modal Overlay
+  function openInventoryDetailModal(item) {
+    const existing = document.querySelector(".inv-detail-modal-backdrop");
+    if (existing) existing.remove();
+
+    const alertThreshold = Number(item.alertLevel) || 5;
+    const qty = Number(item.qty) || 0;
+    const isLow = qty <= alertThreshold;
+    const unitPrice = Number(item.unitPrice || item.price || 0);
+    const totalVal = qty * unitPrice;
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "dp-modal-backdrop inv-detail-modal-backdrop";
+
+    backdrop.innerHTML = `
+      <div class="dp-modal-card" style="max-width: 440px; width: 92vw;">
+        <!-- Header Bar -->
+        <div class="dp-header">
+          <div class="dp-title-bar">
+            <span class="dp-title-text">PRODUCT DETAILS</span>
+            <button type="button" class="dp-btn-close" id="btn-close-inv-detail">&times;</button>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+            <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${escapeHtml(item.name || "Unnamed Product")}</h3>
+            <span class="tile-badge ${isLow ? "tile-badge--unpaid" : "tile-badge--paid"}">
+              ${isLow ? "⚠️ Low Stock" : "✓ In Stock"}
+            </span>
+          </div>
+          <span style="font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">SKU: ${escapeHtml(item.sku || "N/A")} • Category: ${escapeHtml(item.category || "General")}</span>
+        </div>
+
+        <!-- Body Container -->
+        <div class="dp-body" style="max-height: 380px; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+          <!-- Stock Status Card -->
+          <div class="detail-card">
+            <h4 class="card-section-label">Stock Status</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Available Units</span>
+                <span class="info-val info-val--highlight">${qty} Units</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Min Alert Threshold</span>
+                <span class="info-val">${alertThreshold} Units</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Stock Health</span>
+                <span class="info-val ${isLow ? "text-danger" : "text-success"}">${isLow ? "Low Stock Warning" : "Optimal Stock"}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pricing & Valuation Card -->
+          <div class="detail-card">
+            <h4 class="card-section-label">Pricing & Valuation</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Unit Price</span>
+                <span class="info-val">OMR ${unitPrice.toFixed(3)}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Total Inventory Value</span>
+                <span class="info-val info-val--highlight">OMR ${totalVal.toFixed(3)}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- System Metadata Card -->
+          <div class="detail-card">
+            <h4 class="card-section-label">Product SKU / ID</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">Product SKU / ID</span>
+                <span class="info-val">${escapeHtml(item.sku || item.id || "N/A")}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="dp-footer" style="justify-content: flex-end;">
+          <button type="button" class="dp-btn-confirm" id="btn-close-inv-modal">Close</button>
+        </div>
+      </div>
+    `;
+
+    backdrop.querySelector("#btn-close-inv-detail").addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector("#btn-close-inv-modal").addEventListener("click", () => backdrop.remove());
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) backdrop.remove();
+    });
+
+    document.body.appendChild(backdrop);
   }
 
   // Compact Inventory Tile Renderer using Component helper
@@ -208,101 +332,6 @@ window.initViewInventory = (function () {
     `;
   }
 
-  // Detailed Sub-Page View using Detail View Component Wrapper
-  function renderDetailSubPageUI(item) {
-    const root = document.getElementById("view-inventory-root");
-    if (!root) return;
-
-    const alertThreshold = Number(item.alertLevel) || 5;
-    const qty = Number(item.qty) || 0;
-    const isLow = qty <= alertThreshold;
-    const unitPrice = Number(item.unitPrice || item.price || 0);
-    const totalVal = qty * unitPrice;
-
-    const badgeHtml = `
-      <span class="tile-badge ${isLow ? "tile-badge--unpaid" : "tile-badge--paid"}">
-        ${isLow ? "⚠️ Low Stock" : "✓ In Stock"}
-      </span>
-    `;
-
-    const contentCardsHtml = `
-      <!-- Product Name Header Card -->
-      <div class="detail-card detail-card--header">
-        <div class="detail-header-top">
-          <div class="header-main-meta">
-            <h3 class="detail-cust-title">${escapeHtml(item.name || "Unnamed Product")}</h3>
-            <span class="detail-timestamp">Category: ${escapeHtml(item.category || "General")} • SKU: ${escapeHtml(item.sku || "N/A")}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stock Level & Quantity Card -->
-      <div class="detail-card">
-        <h4 class="card-section-label">Stock Status</h4>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Available Units</span>
-            <span class="info-val info-val--highlight">${qty} Units</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Min Alert Threshold</span>
-            <span class="info-val">${alertThreshold} Units</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Stock Health</span>
-            <span class="info-val ${isLow ? "text-danger" : "text-success"}">${isLow ? "Low Stock Warning" : "Optimal Stock"}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Pricing & Valuation Card -->
-      <div class="detail-card">
-        <h4 class="card-section-label">Pricing & Valuation</h4>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Unit Price</span>
-            <span class="info-val">OMR ${unitPrice.toFixed(3)}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-label">Total Inventory Value</span>
-            <span class="info-val info-val--highlight">OMR ${totalVal.toFixed(3)}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- System Metadata Card -->
-      <div class="detail-card">
-        <h4 class="card-section-label">System Metadata</h4>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-label">Product SKU / ID</span>
-            <span class="info-val">${escapeHtml(item.sku || item.id || "N/A")}</span>
-          </div>
-        </div>
-      </div>
-    `;
-
-    const subPageHtml = window.renderDetailSubPageWrapperHtml
-      ? window.renderDetailSubPageWrapperHtml({
-          backBtnId: "btn-back-to-inventory",
-          backLabel: "Back to Inventory",
-          badgeHtml: badgeHtml,
-          contentCardsHtml: contentCardsHtml
-        })
-      : "";
-
-    root.innerHTML = `<div class="view-inventory-container">${subPageHtml}</div>`;
-
-    // Back to Inventory Button Event Listener
-    const backBtn = root.querySelector("#btn-back-to-inventory");
-    if (backBtn) {
-      backBtn.addEventListener("click", () => {
-        selectedItem = null;
-        renderViewInventoryUI();
-      });
-    }
-  }
-
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -314,7 +343,6 @@ window.initViewInventory = (function () {
     if (!initialized) {
       initialized = true;
       window.addEventListener("branchChanged", () => {
-        selectedItem = null;
         renderViewInventoryUI();
       });
       window.addEventListener("inventoryDataChanged", () => renderViewInventoryUI());

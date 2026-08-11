@@ -13,6 +13,8 @@
 
 /* Pages */
 @import "./css/pages/add-sales.css";
+@import "./css/pages/add-stock.css";
+@import "./css/pages/amend-stock.css";
 @import "./css/pages/profile.css";
 @import "./css/pages/view-sales.css";
 @import "./css/pages/view-inventory.css";

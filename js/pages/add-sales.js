@@ -1,31 +1,31 @@
-// js/pages/add-sales.js
+// js/pages/add-sales.js - Add Sales Multi-Section Form Component with Dynamic Calculation
 
-// =========================================================================
-// FORM DEFAULTS CONFIGURATION
-// Centralized location for all default input values & initial form settings.
-// Modify any values here to change application defaults in one place.
-// =========================================================================
 const FORM_DEFAULTS = {
-  // Google Sheets Web App Deployment URL (Loaded from local config.js)
-  googleSheetWebAppUrl: (window.APP_CONFIG && window.APP_CONFIG.googleSheetWebAppUrl) || "",
-
-  // Payment Details Defaults
-  vatBill: "no",        // "yes" (5% VAT) | "no" (0% VAT)
-  paymentStatus: "paid", // "paid" | "not_paid"
-  paymentMethod: "cash", // "cash" | "card" | "both"
-
-  // Item Row Defaults
-  item: {
-    qty: 1,              // Default item quantity
-    unitPrice: 0,        // Default unit price (OMR)
-    name: ""             // Default item name/SKU
-  }
+  vatBill: "no",
+  paymentStatus: "paid",
+  paymentMethod: "cash",
+  item: { name: "", category: "General", qty: 1, unitPrice: 0 },
+  googleSheetWebAppUrl: window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : ""
 };
+
+function formatOMR(val) {
+  const num = Number(val) || 0;
+  return `OMR ${num.toFixed(3)}`;
+}
+
+function getTodayString() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function createDefaultItem() {
   return {
-    id: Date.now(),
+    id: Date.now() + Math.random(),
     name: FORM_DEFAULTS.item.name,
+    category: FORM_DEFAULTS.item.category,
     qty: FORM_DEFAULTS.item.qty,
     unitPrice: FORM_DEFAULTS.item.unitPrice
   };
@@ -39,11 +39,17 @@ window.initAddSales = (function () {
   <!-- Section 1: Customer Details -->
   <div class="form-section form-section--active" data-section="1">
     <div class="section-header">
-      <h3 class="section-title">Customer Details</h3>
-      <button type="button" class="btn-clear" data-action="clear-section" data-section="1">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        Clear Section
-      </button>
+      <h3 class="section-title">Add Sales</h3>
+      <div class="header-actions">
+        <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="1">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Clear Section
+        </button>
+        <button type="button" class="btn-clear btn-clear--form" data-action="clear-form">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          Clear Form
+        </button>
+      </div>
     </div>
 
     <div class="form-body">
@@ -75,7 +81,7 @@ window.initAddSales = (function () {
 
     <div class="section-nav">
       <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
-      <span class="section-nav-title">Customer Details</span>
+      <span class="section-nav-title">1 / 3: Customer Info</span>
       <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next">Next &gt;</button>
     </div>
   </div>
@@ -83,11 +89,17 @@ window.initAddSales = (function () {
   <!-- Section 2: Item Details -->
   <div class="form-section" data-section="2" hidden>
     <div class="section-header">
-      <h3 class="section-title">Item Details</h3>
-      <button type="button" class="btn-clear" data-action="clear-section" data-section="2">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        Clear Section
-      </button>
+      <h3 class="section-title">Add Sales</h3>
+      <div class="header-actions">
+        <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Clear Section
+        </button>
+        <button type="button" class="btn-clear btn-clear--form" data-action="clear-form">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          Clear Form
+        </button>
+      </div>
     </div>
 
     <div class="form-body">
@@ -99,26 +111,32 @@ window.initAddSales = (function () {
       </button>
 
       <div class="summary-card">
-        <span class="summary-label">Subtotal (View Only):</span>
+        <span class="summary-label">Total:</span>
         <span class="summary-value" id="items-subtotal-display">OMR 0.000</span>
       </div>
     </div>
 
     <div class="section-nav">
       <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back">&lt; Back</button>
-      <span class="section-nav-title">Item Details</span>
-      <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next">Next &gt;</button>
+      <span class="section-nav-title">2 / 3: Items Info</span>
+      <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next">&gt; Next</button>
     </div>
   </div>
 
   <!-- Section 3: Payment Details -->
   <div class="form-section" data-section="3" hidden>
     <div class="section-header">
-      <h3 class="section-title">Payment Details</h3>
-      <button type="button" class="btn-clear" data-action="clear-section" data-section="3">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-        Clear Section
-      </button>
+      <h3 class="section-title">Add Sales</h3>
+      <div class="header-actions">
+        <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="3">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Clear Section
+        </button>
+        <button type="button" class="btn-clear btn-clear--form" data-action="clear-form">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+          Clear Form
+        </button>
+      </div>
     </div>
 
     <div class="form-body">
@@ -143,359 +161,275 @@ window.initAddSales = (function () {
         <div class="toggle-group" id="payment-method-toggle">
           <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "cash" ? "toggle-btn--active" : ""}" data-value="cash">Cash</button>
           <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "card" ? "toggle-btn--active" : ""}" data-value="card">Card</button>
-          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "both" ? "toggle-btn--active" : ""}" data-value="both">Both</button>
+          <button type="button" class="toggle-btn ${FORM_DEFAULTS.paymentMethod === "both" ? "toggle-btn--active" : ""}" data-value="both">Both (Split)</button>
         </div>
       </div>
 
       <div class="form-group" id="cash-amount-group">
-        <label class="form-label" for="cash-amount">Cash Amount <span class="required-star">*</span></label>
-        <input type="number" id="cash-amount" class="form-input" min="0" step="0.001" placeholder="0.000" />
+        <label class="form-label" for="cash-amount">Cash Amount (OMR) <span class="required-star">*</span></label>
+        <input type="number" id="cash-amount" class="form-input" placeholder="0.000" step="0.001" min="0" />
       </div>
 
       <div class="form-group" id="card-amount-group">
-        <label class="form-label" for="card-amount">Card Amount <span class="required-star">*</span></label>
-        <input type="number" id="card-amount" class="form-input" min="0" step="0.001" placeholder="0.000" disabled />
+        <label class="form-label" for="card-amount">Card Amount (OMR) <span class="required-star">*</span></label>
+        <input type="number" id="card-amount" class="form-input" placeholder="0.000" step="0.001" min="0" />
       </div>
 
-      <div class="summary-card summary-card--grand">
+      <div class="summary-card summary-card--final">
         <div class="summary-row">
-          <span>Subtotal:</span>
-          <span id="final-subtotal-display">OMR 0.000</span>
+          <span class="summary-label">Subtotal:</span>
+          <span class="summary-value" id="final-subtotal-display">OMR 0.000</span>
         </div>
         <div class="summary-row">
-          <span>VAT (5%):</span>
-          <span id="final-vat-display">OMR 0.000</span>
+          <span class="summary-label">VAT (5%):</span>
+          <span class="summary-value" id="final-vat-display">OMR 0.000</span>
         </div>
         <div class="summary-row summary-row--total">
-          <span>Total (View Only):</span>
-          <span id="final-grand-total-display">OMR 0.000</span>
+          <span class="summary-label">Grand Total:</span>
+          <span class="summary-value" id="final-grandtotal-display">OMR 0.000</span>
         </div>
       </div>
     </div>
 
     <div class="section-nav">
       <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back">&lt; Back</button>
-      <span class="section-nav-title">Payment Details</span>
-      <button type="button" class="section-nav-btn section-nav-btn--save" data-action="save">Save &gt;</button>
+      <span class="section-nav-title">3 / 3: Payment Info</span>
+      <button type="button" class="section-nav-btn section-nav-btn--save" data-action="save">Save Sale</button>
     </div>
   </div>
 </div>
 `;
 
-  return function initAddSales() {
+  return function initAddSales(onSaveSuccess) {
     if (initialized) return;
-    initialized = true;
 
     const root = document.getElementById("add-sales-root");
     if (!root) return;
 
+    initialized = true;
     root.innerHTML = htmlTemplate;
 
-    // State Variables
-    let currentSection = 1;
     let items = [createDefaultItem()];
     let vatBill = FORM_DEFAULTS.vatBill;
     let paymentStatus = FORM_DEFAULTS.paymentStatus;
     let paymentMethod = FORM_DEFAULTS.paymentMethod;
+    let currentSection = 1;
 
-    // DOM Elements
-    const dateInput = document.getElementById("sale-date");
-    const nameInput = document.getElementById("customer-name");
-    const numberInput = document.getElementById("customer-number");
-    const emailInput = document.getElementById("customer-email");
+    // Elements
+    const sections = root.querySelectorAll(".form-section");
+    const dateInput = root.querySelector("#sale-date");
+    const nameInput = root.querySelector("#customer-name");
+    const numberInput = root.querySelector("#customer-number");
+    const emailInput = root.querySelector("#customer-email");
+    const itemsListContainer = root.querySelector("#items-list");
+    const addItemBtn = root.querySelector("#btn-add-item-row");
+    const vatToggle = root.querySelector("#vat-bill-toggle");
+    const statusToggle = root.querySelector("#payment-status-toggle");
+    const methodToggle = root.querySelector("#payment-method-toggle");
+    const methodGroup = root.querySelector("#payment-method-group");
+    const cashInput = root.querySelector("#cash-amount");
+    const cashGroup = root.querySelector("#cash-amount-group");
+    const cardInput = root.querySelector("#card-amount");
+    const cardGroup = root.querySelector("#card-amount-group");
 
-    const itemsListContainer = document.getElementById("items-list");
-    const addItemBtn = document.getElementById("btn-add-item-row");
-    const itemsSubtotalDisplay = document.getElementById("items-subtotal-display");
-
-    const vatToggle = document.getElementById("vat-bill-toggle");
-    const statusToggle = document.getElementById("payment-status-toggle");
-    const methodToggle = document.getElementById("payment-method-toggle");
-    const methodGroup = document.getElementById("payment-method-group");
-
-    const cashGroup = document.getElementById("cash-amount-group");
-    const cardGroup = document.getElementById("card-amount-group");
-    const cashInput = document.getElementById("cash-amount");
-    const cardInput = document.getElementById("card-amount");
-
-    const finalSubtotalDisplay = document.getElementById("final-subtotal-display");
-    const finalVatDisplay = document.getElementById("final-vat-display");
-    const finalGrandTotalDisplay = document.getElementById("final-grand-total-display");
-
-    // Initialize Date to Today
-    function getTodayString() {
-      const d = new Date();
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    }
-
-    if (dateInput) {
+    // Default Date Initialization
+    if (dateInput && !dateInput.value) {
       dateInput.value = getTodayString();
-    }
-
-    // Currency Formatter Helper
-    function formatOMR(amount) {
-      const num = Number(amount) || 0;
-      return "OMR " + num.toFixed(3);
     }
 
     // Section Switching Logic
     function showSection(sectionNum) {
       currentSection = sectionNum;
-      const sections = root.querySelectorAll(".form-section");
       sections.forEach((sec) => {
-        const secIndex = Number(sec.dataset.section);
-        const isActive = secIndex === sectionNum;
-        sec.hidden = !isActive;
-        sec.classList.toggle("form-section--active", isActive);
+        const isTarget = Number(sec.dataset.section) === sectionNum;
+        sec.hidden = !isTarget;
+        sec.classList.toggle("form-section--active", isTarget);
       });
-
-      // Recalculate totals if moving to section 2 or 3
-      calculateTotals();
+      if (sectionNum === 3) {
+        updatePaymentInputStates();
+        calculateTotals();
+      }
     }
 
-    // Item List Rendering with Autocomplete & Live Stock Badge
+    // Dynamic Row Rendering
     function renderItems() {
       if (!itemsListContainer) return;
       itemsListContainer.innerHTML = "";
 
       items.forEach((item, index) => {
-        const row = document.createElement("div");
-        row.className = "item-row-card";
-        
-        // Find existing matching inventory item to display stock info
-        const existingInv = window.DataStore ? window.DataStore.findItemByName(item.name) : null;
-        const stockBadgeHtml = existingInv
-          ? `<div class="stock-badge ${existingInv.qty <= (existingInv.alertLevel || 5) ? "stock-badge--low" : ""}">In Stock: ${existingInv.qty} units</div>`
-          : "";
+        const rowEl = document.createElement("div");
+        rowEl.className = "item-row-card";
+        rowEl.dataset.id = item.id;
 
-        row.innerHTML = `
+        const isOnlyOne = items.length === 1;
+
+        rowEl.innerHTML = `
           <div class="item-row-header">
             <span class="item-row-number">Item #${index + 1}</span>
-            ${
-              items.length > 1
-                ? `<button type="button" class="btn-remove-item" data-id="${item.id}" aria-label="Remove Item">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
-                   </button>`
-                : ""
-            }
+            <button type="button" class="btn-remove-item btn-delete-row" data-index="${index}" ${isOnlyOne ? "disabled style='opacity:0.3; pointer-events:none;'" : ""} title="Remove Item">
+              &times;
+            </button>
           </div>
-          <div class="form-group form-group-relative">
-            <label class="form-label">Item Name / SKU / Model <span class="required-star">*</span></label>
-            <input type="text" class="form-input item-name-input" value="${item.name}" placeholder="e.g. Beninca 600KG / Pupilla" autocomplete="off" required />
-            <div class="stock-badge-container">${stockBadgeHtml}</div>
-            <div class="autocomplete-dropdown" hidden></div>
+
+          <!-- Line 1: Item Name (Most space) + Qty (Compact 3-digit gap) -->
+          <div class="item-row-line1">
+            <div class="form-group item-name-group" style="flex: 1;">
+              <label class="form-label">Item Name <span class="required-star">*</span></label>
+              <input type="text" class="form-input item-name-input" data-index="${index}" placeholder="Search or type item..." value="${item.name}" required />
+            </div>
+            <div class="form-group item-qty-group" style="width: 76px; flex-shrink: 0;">
+              <label class="form-label">Qty <span class="required-star">*</span></label>
+              <input type="number" class="form-input item-qty-input" data-index="${index}" min="1" max="999" step="1" value="${item.qty}" required />
+            </div>
           </div>
+
+          <!-- Line 2: Unit Price (OMR) + Subtotal (OMR) (Equal 50%/50% Width) -->
           <div class="form-row-2col">
             <div class="form-group">
-              <label class="form-label">Qty <span class="required-star">*</span></label>
-              <input type="number" class="form-input item-qty-input" min="1" value="${item.qty}" required />
+              <label class="form-label">Unit Price (OMR) <span class="required-star">*</span></label>
+              <input type="number" class="form-input item-price-input" data-index="${index}" min="0" step="0.001" placeholder="0.000" value="${item.unitPrice || ""}" required />
             </div>
             <div class="form-group">
-              <label class="form-label">Unit Price (OMR)</label>
-              <input type="number" class="form-input item-price-input" min="0" step="0.001" value="${item.unitPrice}" placeholder="0.000" />
+              <label class="form-label">Subtotal (OMR)</label>
+              <input type="text" class="form-input form-input--readonly item-total-input" readonly value="${formatOMR(item.qty * item.unitPrice)}" />
             </div>
           </div>
         `;
 
-        const nameIn = row.querySelector(".item-name-input");
-        const qtyIn = row.querySelector(".item-qty-input");
-        const priceIn = row.querySelector(".item-price-input");
-        const removeBtn = row.querySelector(".btn-remove-item");
-        const dropdown = row.querySelector(".autocomplete-dropdown");
-        const badgeContainer = row.querySelector(".stock-badge-container");
+        itemsListContainer.appendChild(rowEl);
 
-        function updateStockBadge(invItem) {
-          if (invItem && badgeContainer) {
-            const isLow = invItem.qty <= (invItem.alertLevel || 5);
-            badgeContainer.innerHTML = `<div class="stock-badge ${isLow ? "stock-badge--low" : ""}">In Stock: ${invItem.qty} units</div>`;
-          } else if (badgeContainer) {
-            badgeContainer.innerHTML = "";
-          }
-        }
-
-        function showSuggestions(val) {
-          if (!window.DataStore || !dropdown) return;
-          const matches = window.DataStore.searchItems(val);
-          if (matches.length === 0) {
-            dropdown.hidden = true;
-            dropdown.innerHTML = "";
-            return;
-          }
-
-          dropdown.innerHTML = matches
-            .map(
-              (m) => `
-            <div class="autocomplete-item" data-name="${m.name}">
-              <span class="autocomplete-name">${m.name}</span>
-              <span class="autocomplete-meta">
-                <span>Stock: ${m.qty}</span>
-              </span>
-            </div>`
-            )
-            .join("");
-          dropdown.hidden = false;
-        }
-
-        nameIn.addEventListener("input", (e) => {
-          item.name = e.target.value;
-          const invItem = window.DataStore ? window.DataStore.findItemByName(item.name) : null;
-          updateStockBadge(invItem);
-          showSuggestions(e.target.value);
-        });
-
-        nameIn.addEventListener("focus", (e) => {
-          showSuggestions(e.target.value || "");
-        });
-
-        dropdown.addEventListener("click", (e) => {
-          const clickedItem = e.target.closest(".autocomplete-item");
-          if (!clickedItem) return;
-
-          const selName = clickedItem.dataset.name;
-
-          item.name = selName;
-          nameIn.value = selName;
-
-          const invItem = window.DataStore ? window.DataStore.findItemByName(selName) : null;
-          updateStockBadge(invItem);
-
-          dropdown.hidden = true;
-          calculateTotals();
-        });
-
-        document.addEventListener("click", (e) => {
-          if (!row.contains(e.target)) {
-            dropdown.hidden = true;
-          }
-        });
-
-        qtyIn.addEventListener("input", (e) => {
-          item.qty = Math.max(1, parseInt(e.target.value) || 1);
-          calculateTotals();
-        });
-
-        priceIn.addEventListener("input", (e) => {
-          item.unitPrice = Math.max(0, parseFloat(e.target.value) || 0);
-          calculateTotals();
-        });
-
-        if (removeBtn) {
-          removeBtn.addEventListener("click", () => {
-            items = items.filter((it) => it.id !== item.id);
-            renderItems();
-            calculateTotals();
+        const nameInputEl = rowEl.querySelector(".item-name-input");
+        if (window.ItemAutocomplete && nameInputEl) {
+          window.ItemAutocomplete.attach({
+            input: nameInputEl,
+            container: rowEl.querySelector(".item-name-group"),
+            onSelect: (selectedProduct) => {
+              items[index].name = selectedProduct.name;
+              items[index].category = selectedProduct.category || "General";
+              if (selectedProduct.unitPrice || selectedProduct.price) {
+                items[index].unitPrice = Number(selectedProduct.unitPrice || selectedProduct.price);
+              }
+              renderItems();
+              calculateTotals();
+            }
           });
         }
-
-        itemsListContainer.appendChild(row);
       });
 
+      bindItemRowEvents();
       calculateTotals();
+    }
+
+    function bindItemRowEvents() {
+      itemsListContainer.querySelectorAll(".item-name-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const idx = Number(e.target.dataset.index);
+          items[idx].name = e.target.value;
+        });
+      });
+
+      itemsListContainer.querySelectorAll(".item-qty-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const idx = Number(e.target.dataset.index);
+          const val = parseInt(e.target.value, 10);
+          items[idx].qty = isNaN(val) ? 0 : Math.max(0, val);
+
+          const rowEl = e.target.closest(".item-row");
+          if (rowEl) {
+            const totInp = rowEl.querySelector(".item-total-input");
+            if (totInp) totInp.value = formatOMR(items[idx].qty * items[idx].unitPrice);
+          }
+          calculateTotals();
+        });
+      });
+
+      itemsListContainer.querySelectorAll(".item-price-input").forEach((inp) => {
+        inp.addEventListener("input", (e) => {
+          const idx = Number(e.target.dataset.index);
+          const val = parseFloat(e.target.value);
+          items[idx].unitPrice = isNaN(val) ? 0 : Math.max(0, val);
+
+          const rowEl = e.target.closest(".item-row");
+          if (rowEl) {
+            const totInp = rowEl.querySelector(".item-total-input");
+            if (totInp) totInp.value = formatOMR(items[idx].qty * items[idx].unitPrice);
+          }
+          calculateTotals();
+        });
+      });
+
+      itemsListContainer.querySelectorAll(".btn-delete-row").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          if (items.length <= 1) return;
+          const idx = Number(e.currentTarget.dataset.index);
+          items.splice(idx, 1);
+          renderItems();
+          UI.toast("Item row removed", "info");
+        });
+      });
     }
 
     if (addItemBtn) {
       addItemBtn.addEventListener("click", () => {
         items.push(createDefaultItem());
         renderItems();
+        UI.toast("Added new item row", "info");
       });
     }
 
-    // Calculate Subtotal, VAT, Grand Total
     function calculateTotals() {
       let subtotal = 0;
       items.forEach((item) => {
-        const qty = Number(item.qty) || 0;
-        const price = Number(item.unitPrice) || 0;
-        subtotal += qty * price;
+        subtotal += (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
       });
-
-      if (itemsSubtotalDisplay) {
-        itemsSubtotalDisplay.textContent = formatOMR(subtotal);
-      }
 
       const vatRate = vatBill === "yes" ? 0.05 : 0;
       const vatAmount = subtotal * vatRate;
       const grandTotal = subtotal + vatAmount;
 
-      if (finalSubtotalDisplay) finalSubtotalDisplay.textContent = formatOMR(subtotal);
-      if (finalVatDisplay) finalVatDisplay.textContent = formatOMR(vatAmount);
-      if (finalGrandTotalDisplay) finalGrandTotalDisplay.textContent = formatOMR(grandTotal);
+      const subtotalDisplay = root.querySelector("#items-subtotal-display");
+      if (subtotalDisplay) subtotalDisplay.textContent = formatOMR(subtotal);
 
-      // Auto-populate amounts if default/empty
-      updatePaymentInputStates(grandTotal);
+      const finalSubtotal = root.querySelector("#final-subtotal-display");
+      if (finalSubtotal) finalSubtotal.textContent = formatOMR(subtotal);
+
+      const finalVat = root.querySelector("#final-vat-display");
+      if (finalVat) finalVat.textContent = formatOMR(vatAmount);
+
+      const finalGrandTotal = root.querySelector("#final-grandtotal-display");
+      if (finalGrandTotal) finalGrandTotal.textContent = formatOMR(grandTotal);
+
+      autoFillPaymentAmounts(grandTotal);
     }
 
-    // Update Section 3 conditional inputs (Payment Method & Amounts)
-    function updatePaymentInputStates(grandTotal) {
-      const totalVal = grandTotal !== undefined ? grandTotal : getGrandTotalValue();
-      const isPaid = paymentStatus === "paid";
-
-      // Enable/Disable Payment Method toggle
-      if (methodGroup) {
-        methodGroup.classList.toggle("form-group--disabled", !isPaid);
-        const btns = methodToggle ? methodToggle.querySelectorAll(".toggle-btn") : [];
-        btns.forEach((btn) => (btn.disabled = !isPaid));
-      }
-
-      // Cash / Card Amount input enablement
-      const isCashActive = isPaid && (paymentMethod === "cash" || paymentMethod === "both");
-      const isCardActive = isPaid && (paymentMethod === "card" || paymentMethod === "both");
-
-      if (cashGroup && cashInput) {
-        cashGroup.classList.toggle("form-group--disabled", !isCashActive);
-        cashInput.disabled = !isCashActive;
-        if (!isCashActive) cashInput.value = "";
-        else if (paymentMethod === "cash") {
-          cashInput.value = totalVal.toFixed(3);
-        }
-      }
-
-      if (cardGroup && cardInput) {
-        cardGroup.classList.toggle("form-group--disabled", !isCardActive);
-        cardInput.disabled = !isCardActive;
-        if (!isCardActive) cardInput.value = "";
-        else if (paymentMethod === "card") {
-          cardInput.value = totalVal.toFixed(3);
-        }
-      }
-
-      if (isPaid && paymentMethod === "both") {
-        if (!cashInput.value && !cardInput.value) {
-          const half = (totalVal / 2).toFixed(3);
-          cashInput.value = half;
-          cardInput.value = (totalVal - parseFloat(half)).toFixed(3);
-        }
+    function autoFillPaymentAmounts(grandTotal) {
+      if (paymentStatus !== "paid") return;
+      if (paymentMethod === "cash" && cashInput) {
+        cashInput.value = grandTotal > 0 ? grandTotal.toFixed(3) : "";
+      } else if (paymentMethod === "card" && cardInput) {
+        cardInput.value = grandTotal > 0 ? grandTotal.toFixed(3) : "";
       }
     }
 
-    // Auto-balance calculation when typing in "both" payment method mode
-    if (cashInput && cardInput) {
-      cashInput.addEventListener("input", () => {
-        if (paymentStatus === "paid" && paymentMethod === "both") {
-          const grandTotal = getGrandTotalValue();
-          const cashVal = parseFloat(cashInput.value) || 0;
-          if (cashVal >= 0 && cashVal <= grandTotal) {
-            cardInput.value = (grandTotal - cashVal).toFixed(3);
-            UI.clearInlineError(cardInput);
-            UI.clearInlineError(cashInput);
-          }
+    function updatePaymentInputStates() {
+      if (paymentStatus === "not_paid") {
+        if (methodGroup) methodGroup.hidden = true;
+        if (cashGroup) cashGroup.hidden = true;
+        if (cardGroup) cardGroup.hidden = true;
+      } else {
+        if (methodGroup) methodGroup.hidden = false;
+        if (paymentMethod === "cash") {
+          if (cashGroup) cashGroup.hidden = false;
+          if (cardGroup) cardGroup.hidden = true;
+        } else if (paymentMethod === "card") {
+          if (cashGroup) cashGroup.hidden = true;
+          if (cardGroup) cardGroup.hidden = false;
+        } else if (paymentMethod === "both") {
+          if (cashGroup) cashGroup.hidden = false;
+          if (cardGroup) cashGroup.hidden = false;
         }
-      });
-
-      cardInput.addEventListener("input", () => {
-        if (paymentStatus === "paid" && paymentMethod === "both") {
-          const grandTotal = getGrandTotalValue();
-          const cardVal = parseFloat(cardInput.value) || 0;
-          if (cardVal >= 0 && cardVal <= grandTotal) {
-            cashInput.value = (grandTotal - cardVal).toFixed(3);
-            UI.clearInlineError(cardInput);
-            UI.clearInlineError(cashInput);
-          }
-        }
-      });
+      }
+      calculateTotals();
     }
 
     function getGrandTotalValue() {
@@ -507,7 +441,6 @@ window.initAddSales = (function () {
       return subtotal + subtotal * vatRate;
     }
 
-    // Toggle Group Event Listeners
     function setupToggleGroup(container, onSelect) {
       if (!container) return;
       const btns = container.querySelectorAll(".toggle-btn");
@@ -554,47 +487,99 @@ window.initAddSales = (function () {
       updatePaymentInputStates();
     });
 
-    // Clear Section Handlers
+    // Clear Handlers: Clear Section & Clear Form
     root.addEventListener("click", (e) => {
-      const clearBtn = e.target.closest('[data-action="clear-section"]');
-      if (!clearBtn) return;
+      const clearSectionBtn = e.target.closest('[data-action="clear-section"]');
+      const clearFormBtn = e.target.closest('[data-action="clear-form"]');
 
-      const secNum = Number(clearBtn.dataset.section);
-      UI.clearAllInlineErrors(root);
+      if (clearSectionBtn) {
+        const secNum = Number(clearSectionBtn.dataset.section);
+        UI.clearAllInlineErrors(root);
 
-      if (secNum === 1) {
-        if (dateInput) dateInput.value = getTodayString();
-        if (nameInput) nameInput.value = "";
-        if (numberInput) numberInput.value = "";
-        if (emailInput) emailInput.value = "";
-        UI.toast("Customer details cleared", "info");
-      } else if (secNum === 2) {
-        items = [createDefaultItem()];
-        renderItems();
-        UI.toast("Item details cleared", "info");
-      } else if (secNum === 3) {
-        vatBill = FORM_DEFAULTS.vatBill;
-        paymentStatus = FORM_DEFAULTS.paymentStatus;
-        paymentMethod = FORM_DEFAULTS.paymentMethod;
+        if (secNum === 1) {
+          if (dateInput) dateInput.value = getTodayString();
+          if (nameInput) nameInput.value = "";
+          if (numberInput) numberInput.value = "";
+          if (emailInput) emailInput.value = "";
+          UI.toast("Customer details cleared", "info");
+        } else if (secNum === 2) {
+          items = [createDefaultItem()];
+          renderItems();
+          UI.toast("Item details cleared", "info");
+        } else if (secNum === 3) {
+          vatBill = FORM_DEFAULTS.vatBill;
+          paymentStatus = FORM_DEFAULTS.paymentStatus;
+          paymentMethod = FORM_DEFAULTS.paymentMethod;
 
-        const resetToggle = (container, val) => {
-          if (!container) return;
-          container.querySelectorAll(".toggle-btn").forEach((btn) => {
-            btn.classList.toggle("toggle-btn--active", btn.dataset.value === val);
+          const resetToggle = (container, val) => {
+            if (!container) return;
+            container.querySelectorAll(".toggle-btn").forEach((btn) => {
+              btn.classList.toggle("toggle-btn--active", btn.dataset.value === val);
+            });
+          };
+
+          resetToggle(vatToggle, FORM_DEFAULTS.vatBill);
+          resetToggle(statusToggle, FORM_DEFAULTS.paymentStatus);
+          resetToggle(methodToggle, FORM_DEFAULTS.paymentMethod);
+
+          if (cashInput) cashInput.value = "";
+          if (cardInput) cardInput.value = "";
+
+          calculateTotals();
+          UI.toast("Payment details cleared", "info");
+        }
+      }
+
+      if (clearFormBtn) {
+        if (window.UI && typeof window.UI.modal === "function") {
+          window.UI.modal({
+            title: "Clear Entire Form?",
+            message: "Are you sure you want to clear all data entered across all sections of this sale form?",
+            type: "warning",
+            confirmText: "Clear Form",
+            cancelText: "Cancel",
+            dangerConfirm: true,
+            onConfirm: () => {
+              clearEntireForm();
+            }
           });
-        };
-
-        resetToggle(vatToggle, FORM_DEFAULTS.vatBill);
-        resetToggle(statusToggle, FORM_DEFAULTS.paymentStatus);
-        resetToggle(methodToggle, FORM_DEFAULTS.paymentMethod);
-
-        if (cashInput) cashInput.value = "";
-        if (cardInput) cardInput.value = "";
-
-        calculateTotals();
-        UI.toast("Payment details cleared", "info");
+        } else {
+          clearEntireForm();
+        }
       }
     });
+
+    function clearEntireForm() {
+      UI.clearAllInlineErrors(root);
+      if (dateInput) dateInput.value = getTodayString();
+      if (nameInput) nameInput.value = "";
+      if (numberInput) numberInput.value = "";
+      if (emailInput) emailInput.value = "";
+
+      items = [createDefaultItem()];
+      renderItems();
+
+      vatBill = FORM_DEFAULTS.vatBill;
+      paymentStatus = FORM_DEFAULTS.paymentStatus;
+      paymentMethod = FORM_DEFAULTS.paymentMethod;
+
+      const resetToggle = (container, val) => {
+        if (!container) return;
+        container.querySelectorAll(".toggle-btn").forEach((btn) => {
+          btn.classList.toggle("toggle-btn--active", btn.dataset.value === val);
+        });
+      };
+
+      resetToggle(vatToggle, FORM_DEFAULTS.vatBill);
+      resetToggle(statusToggle, FORM_DEFAULTS.paymentStatus);
+      resetToggle(methodToggle, FORM_DEFAULTS.paymentMethod);
+
+      if (cashInput) cashInput.value = "";
+      if (cardInput) cardInput.value = "";
+
+      showSection(1);
+      UI.toast("Entire sale form cleared", "info");
+    }
 
     // Navigation (Back, Next, Save) Handlers
     root.addEventListener("click", (e) => {
@@ -615,7 +600,7 @@ window.initAddSales = (function () {
       }
     });
 
-    // Section Validation using Inline Errors & Modals
+    // Section Validation
     function validateSection(sectionNum) {
       UI.clearAllInlineErrors(root);
 
@@ -644,11 +629,7 @@ window.initAddSales = (function () {
 
       if (sectionNum === 2) {
         if (items.length === 0) {
-          UI.modal({
-            title: "Missing Items",
-            message: "Please add at least one item to proceed.",
-            type: "error"
-          });
+          UI.toast("Please add at least one item to proceed.", "warning");
           return false;
         }
         const nameInputs = root.querySelectorAll(".item-name-input");
@@ -726,14 +707,12 @@ window.initAddSales = (function () {
               cardInput.focus();
               return false;
             }
-            const combinedVal = Math.round((cashVal + cardVal) * 1000) / 1000;
-            if (combinedVal < grandTotal - 0.0001) {
-              UI.showInlineError(cardInput, `Combined paid (${formatOMR(combinedVal)}) is lower than Total (${formatOMR(grandTotal)}).`);
-              cardInput.focus();
-              return false;
-            }
-            if (combinedVal > grandTotal + 0.0001) {
-              UI.showInlineError(cardInput, `Combined paid (${formatOMR(combinedVal)}) is higher than Total (${formatOMR(grandTotal)}).`);
+            const splitSum = Math.round((cashVal + cardVal) * 1000) / 1000;
+            if (Math.abs(splitSum - grandTotal) > 0.0001) {
+              UI.showInlineError(
+                cardInput,
+                `Split sum (${formatOMR(splitSum)}) does not match Grand Total (${formatOMR(grandTotal)}).`
+              );
               cardInput.focus();
               return false;
             }
@@ -745,7 +724,7 @@ window.initAddSales = (function () {
       return true;
     }
 
-    // Save Sale Action with Confirmation Modal
+    // Save Sale Logic
     function saveSale() {
       const grandTotalVal = getGrandTotalValue();
       const cashVal = parseFloat(cashInput.value) || 0;
@@ -765,40 +744,18 @@ window.initAddSales = (function () {
         grandTotal: grandTotalVal,
       };
 
-      let paymentSummaryStr = "";
-      if (paymentStatus === "not_paid") {
-        paymentSummaryStr = "Payment Status: Not Paid";
-      } else if (paymentMethod === "cash") {
-        paymentSummaryStr = `Paid: ${formatOMR(cashVal)} (Cash)`;
-      } else if (paymentMethod === "card") {
-        paymentSummaryStr = `Paid: ${formatOMR(cardVal)} (Card)`;
-      } else if (paymentMethod === "both") {
-        paymentSummaryStr = `Paid: ${formatOMR(cashVal)} (Cash) + ${formatOMR(cardVal)} (Card)`;
+      // Fire event & callback
+      if (typeof onSaveSuccess === "function") {
+        onSaveSuccess(saleData);
       }
-
-      console.log("Sale Saved Successfully:", saleData);
-
-      // Record Sale in DataStore (Instant 0ms Local Stock Deduction + Background Sync to Google Sheets)
       if (window.DataStore) {
         window.DataStore.recordSale(saleData, FORM_DEFAULTS.googleSheetWebAppUrl);
       }
 
-      UI.modal({
-        title: "Sale Recorded Successfully",
-        message: `Customer: ${saleData.customerName}\n${paymentSummaryStr}\nGrand Total: ${formatOMR(saleData.grandTotal)}`,
-        type: "success",
-        confirmText: "Done",
-        onConfirm: () => {
-          items = [createDefaultItem()];
-          if (nameInput) nameInput.value = "";
-          if (numberInput) numberInput.value = "";
-          if (emailInput) emailInput.value = "";
-          if (dateInput) dateInput.value = getTodayString();
-          renderItems();
-          showSection(1);
-          UI.toast("Form reset for next sale", "info");
-        }
-      });
+      UI.toast(`Sale recorded successfully! Total: ${formatOMR(saleData.grandTotal)}`, "success");
+
+      // Reset form for next sale & return to Section 1
+      clearEntireForm();
     }
 
     // Re-render & cloud sync on branch change
@@ -808,11 +765,6 @@ window.initAddSales = (function () {
         window.DataStore.syncFromCloud(FORM_DEFAULTS.googleSheetWebAppUrl);
       }
     });
-
-    // Background cloud sync on initial load
-    if (window.DataStore) {
-      window.DataStore.syncFromCloud(FORM_DEFAULTS.googleSheetWebAppUrl);
-    }
 
     // Initial render
     renderItems();

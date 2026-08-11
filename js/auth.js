@@ -71,6 +71,10 @@ window.Auth = (function () {
       return currentUser ? { ...currentUser } : null;
     },
 
+    getCurrentUser: function () {
+      return currentUser ? { ...currentUser } : null;
+    },
+
     getActiveBranch: function () {
       return activeBranch || "alkhoud";
     },

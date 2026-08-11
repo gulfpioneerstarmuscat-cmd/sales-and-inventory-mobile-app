@@ -159,6 +159,136 @@ window.DataStore = (function () {
       return { success: true };
     },
 
+    // Add Stock Quantity (increments existing stock or creates new item)
+    addStockQuantity: function (payload, webAppUrl) {
+      const branch = getActiveBranch();
+      const inventory = loadBranchInventory(branch);
+      const name = (payload.name || "").trim();
+      const addQty = Number(payload.addQty) || 0;
+
+      if (!name) return { success: false, message: "Item name required" };
+
+      const index = inventory.findIndex(
+        (inv) => inv.name.trim().toLowerCase() === name.toLowerCase()
+      );
+
+      if (index >= 0) {
+        inventory[index].qty = (Number(inventory[index].qty) || 0) + addQty;
+        if (payload.category) inventory[index].category = payload.category;
+        if (payload.alertLevel) inventory[index].alertLevel = Number(payload.alertLevel);
+        if (payload.remarks) inventory[index].lastRemark = payload.remarks;
+        inventory[index].lastUpdated = new Date().toLocaleTimeString();
+      } else {
+        inventory.push({
+          sku: payload.sku || "SKU-" + Date.now().toString().slice(-5),
+          name: name,
+          category: payload.category || "General",
+          qty: addQty,
+          alertLevel: Number(payload.alertLevel) || 5,
+          lastRemark: payload.remarks || "",
+          lastUpdated: new Date().toLocaleTimeString()
+        });
+      }
+
+      saveBranchData("inventory", inventory, branch);
+      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+
+      if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
+        fetch(webAppUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "add_stock_qty", branch: branch, ...payload })
+        }).catch((err) => console.error("Add stock sync error:", err));
+      }
+
+      return { success: true };
+    },
+
+    // Amend Stock Item with Selective Updating and Deep Audit Trail Tracking
+    amendStockItem: function (amendData, webAppUrl) {
+      const branch = getActiveBranch();
+      const inventory = loadBranchInventory(branch);
+      const { originalItem, updatedFields, diffs } = amendData;
+      const origName = (originalItem.name || "").trim().toLowerCase();
+
+      const index = inventory.findIndex(
+        (inv) => inv.name.trim().toLowerCase() === origName
+      );
+
+      if (index < 0) return { success: false, message: "Target item not found in inventory." };
+
+      const currentItem = inventory[index];
+
+      const getCurrentUserSafe = () => {
+        if (!window.Auth) return null;
+        if (typeof window.Auth.getUser === "function") return window.Auth.getUser();
+        if (typeof window.Auth.getCurrentUser === "function") return window.Auth.getCurrentUser();
+        return null;
+      };
+
+      const currentUser = getCurrentUserSafe();
+
+      // Update selectively only changed fields
+      inventory[index] = {
+        ...currentItem,
+        name: updatedFields.name || currentItem.name,
+        category: updatedFields.category || currentItem.category,
+        qty: Number(updatedFields.qty) ?? currentItem.qty,
+        alertLevel: Number(updatedFields.alertLevel) ?? currentItem.alertLevel,
+        lastRemark: updatedFields.lastRemark !== undefined ? updatedFields.lastRemark : (currentItem.lastRemark || currentItem.remark || ""),
+        lastAmendedBy: currentUser ? currentUser.name : "Staff",
+        lastAmendedRemark: updatedFields.amendReason || updatedFields.remarks || "",
+        lastUpdated: new Date().toLocaleTimeString()
+      };
+
+      saveBranchData("inventory", inventory, branch);
+
+      // Record Audit Trail locally
+      const auditLogKey = getStorageKey("amend_logs", branch);
+      let logs = [];
+      try {
+        const storedLogs = localStorage.getItem(auditLogKey);
+        logs = storedLogs ? JSON.parse(storedLogs) : [];
+      } catch (e) {
+        logs = [];
+      }
+
+      const auditRecord = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        user: currentUser ? currentUser.email : "Staff",
+        userName: currentUser ? currentUser.name : "Staff",
+        branch: branch,
+        sku: currentItem.sku || "N/A",
+        originalName: originalItem.name,
+        amendedName: updatedFields.name,
+        originalQty: originalItem.qty,
+        amendedQty: updatedFields.qty,
+        qtyDelta: Number(updatedFields.qty) - Number(originalItem.qty),
+        diffs: diffs,
+        remarks: updatedFields.remarks
+      };
+
+      logs.unshift(auditRecord);
+      try {
+        localStorage.setItem(auditLogKey, JSON.stringify(logs));
+      } catch (e) {}
+
+      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+
+      if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
+        fetch(webAppUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ action: "amend_stock", branch: branch, auditRecord: auditRecord })
+        }).catch((err) => console.error("Amend stock sync error:", err));
+      }
+
+      return { success: true, auditRecord: auditRecord };
+    },
+
     // Add or Update Stock Item for Active Branch
     updateStockItem: function (itemData, webAppUrl) {
       const branch = getActiveBranch();

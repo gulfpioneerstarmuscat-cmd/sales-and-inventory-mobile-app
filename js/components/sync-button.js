@@ -14,12 +14,26 @@ window.bindSyncButtonEvent = function (buttonElement) {
   if (!buttonElement) return;
   buttonElement.addEventListener("click", () => {
     buttonElement.classList.add("is-spinning");
+    if (window.UI) window.UI.toast("Syncing live data with Google Sheets...", "info");
+
     const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
     if (window.DataStore && webAppUrl) {
-      window.DataStore.syncFromCloud(webAppUrl).finally(() => {
-        setTimeout(() => buttonElement.classList.remove("is-spinning"), 300);
-      });
+      window.DataStore.syncFromCloud(webAppUrl)
+        .then((res) => {
+          if (res && res.success) {
+            if (window.UI) window.UI.toast("Live Google Sheets cloud data synced successfully!", "success");
+          } else {
+            if (window.UI) window.UI.toast("Cloud sync updated using cached local data.", "warning");
+          }
+        })
+        .catch(() => {
+          if (window.UI) window.UI.toast("Cloud sync failed. Operating in offline mode.", "error");
+        })
+        .finally(() => {
+          setTimeout(() => buttonElement.classList.remove("is-spinning"), 300);
+        });
     } else {
+      if (window.UI) window.UI.toast("Offline mode: Configured local storage data.", "warning");
       buttonElement.classList.remove("is-spinning");
     }
   });

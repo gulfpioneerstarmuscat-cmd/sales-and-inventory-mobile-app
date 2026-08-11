@@ -50,6 +50,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (String(pageKey) === "3" && typeof window.initAddSales === "function") {
       window.initAddSales();
     }
+    if (String(pageKey) === "4" && typeof window.initAddStock === "function") {
+      window.initAddStock();
+    }
+    if (String(pageKey) === "5" && typeof window.initAmendStock === "function") {
+      window.initAmendStock();
+    }
     if (String(pageKey) === "profile" && typeof window.initProfilePage === "function") {
       window.initProfilePage();
     }

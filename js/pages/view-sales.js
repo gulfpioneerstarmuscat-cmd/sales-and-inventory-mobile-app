@@ -1,15 +1,13 @@
-// js/pages/view-sales.js - View Sales History Component with Component Helpers
+// js/pages/view-sales.js - View Sales History Component with Smooth Target List Search & Modal Detail View
 
 window.initViewSales = (function () {
   let initialized = false;
   let searchQuery = "";
   let statusFilter = "today"; // Default filter pill: "today"
   let selectedDate = "";
-  let selectedSale = null;
 
   // Month Stats Filter State (Default: Current Month YYYY-MM)
   let selectedStatsMonth = getCurrentMonthKey();
-  let isMonthPickerOpen = false;
 
   function getCurrentMonthKey() {
     const d = new Date();
@@ -35,6 +33,11 @@ window.initViewSales = (function () {
     const d = new Date(Number(year), monthIndex, 1);
     const monthName = d.toLocaleString("en-US", { month: "short" }).toUpperCase();
     return `${monthName} ${year}`;
+  }
+
+  function normalizeSearchText(val) {
+    if (val === null || val === undefined) return "";
+    return String(val).toLowerCase().trim().replace(/\s+/g, " ");
   }
 
   // Normalize Date to YYYY-MM-DD for internal comparisons & filtering
@@ -83,14 +86,67 @@ window.initViewSales = (function () {
     return rawDate || "N/A";
   }
 
+  function getFilteredSalesData() {
+    const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
+    const rawSales = window.DataStore ? window.DataStore.getSales(branch) : [];
+
+    const allSales = [...rawSales].sort((a, b) => {
+      const dateA = getNormalizedYMD(a.date);
+      const dateB = getNormalizedYMD(b.date);
+      const dateDiff = dateB.localeCompare(dateA);
+      if (dateDiff !== 0) return dateDiff;
+
+      const idA = Number(a.id) || 0;
+      const idB = Number(b.id) || 0;
+      return idB - idA;
+    });
+
+    const todayStr = getTodayDateString();
+
+    return allSales.filter((sale) => {
+      const ymd = getNormalizedYMD(sale.date);
+
+      if (selectedDate && ymd !== selectedDate) {
+        return false;
+      }
+
+      if (statusFilter === "today") {
+        if (ymd !== todayStr) return false;
+      } else if (statusFilter === "paid") {
+        if (sale.paymentStatus !== "paid") return false;
+      } else if (statusFilter === "not_paid") {
+        if (sale.paymentStatus !== "not_paid") return false;
+      }
+
+      if (searchQuery) {
+        const q = normalizeSearchText(searchQuery);
+        const matchCust = normalizeSearchText(sale.customerName).includes(q);
+        const matchPhone = normalizeSearchText(sale.customerNumber).includes(q);
+        const matchEmail = normalizeSearchText(sale.customerEmail).includes(q);
+        const matchItemsText = normalizeSearchText(sale.itemsDetail).includes(q);
+
+        let matchItemArray = false;
+        if (Array.isArray(sale.items)) {
+          matchItemArray = sale.items.some((it) => {
+            const nMatch = normalizeSearchText(it.name).includes(q);
+            const sMatch = normalizeSearchText(it.sku).includes(q);
+            const cMatch = normalizeSearchText(it.category).includes(q);
+            return nMatch || sMatch || cMatch;
+          });
+        }
+
+        if (!matchCust && !matchPhone && !matchEmail && !matchItemsText && !matchItemArray) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
   function renderViewSalesUI() {
     const root = document.getElementById("view-sales-root");
     if (!root) return;
-
-    if (selectedSale) {
-      renderDetailSubPageUI(selectedSale);
-      return;
-    }
 
     const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
     const rawSales = window.DataStore ? window.DataStore.getSales(branch) : [];
@@ -162,33 +218,7 @@ window.initViewSales = (function () {
       }
     });
 
-    const filteredSales = allSales.filter((sale) => {
-      const ymd = getNormalizedYMD(sale.date);
-
-      if (selectedDate && ymd !== selectedDate) {
-        return false;
-      }
-
-      if (statusFilter === "today") {
-        if (ymd !== todayStr) return false;
-      } else if (statusFilter === "paid") {
-        if (sale.paymentStatus !== "paid") return false;
-      } else if (statusFilter === "not_paid") {
-        if (sale.paymentStatus !== "not_paid") return false;
-      }
-
-      if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        const matchCust = (sale.customerName || "").toLowerCase().includes(q);
-        const matchPhone = (sale.customerNumber || "").toLowerCase().includes(q);
-        const matchEmail = (sale.customerEmail || "").toLowerCase().includes(q);
-        const matchItem = (sale.itemsDetail || "").toLowerCase().includes(q);
-        if (!matchCust && !matchPhone && !matchEmail && !matchItem) return false;
-      }
-
-      return true;
-    });
-
+    const filteredSales = getFilteredSalesData();
     const activeMonthLabel = formatMonthLabel(selectedStatsMonth);
 
     // Component Helper Configurations
@@ -234,7 +264,7 @@ window.initViewSales = (function () {
     const searchBoxHtml = window.renderSearchBoxHtml
       ? window.renderSearchBoxHtml({
           id: "sales-search-input",
-          placeholder: "Search customer, phone, or item...",
+          placeholder: "Search customer, item/SKU, phone, or email...",
           value: searchQuery,
           clearBtnId: "btn-clear-sales-search",
           extraRightHtml: dateTriggerExtraHtml
@@ -289,32 +319,34 @@ window.initViewSales = (function () {
 
         <!-- Sales Compact Cards List (Newest Sales Top) -->
         <div class="sales-list-body">
-          ${
-            filteredSales.length === 0
-              ? `
-              <div class="empty-state">
-                <h4>No Sales Found</h4>
-                <p>${
-                  statusFilter === "today"
-                    ? "No sales recorded yet today."
-                    : searchQuery || selectedDate || statusFilter !== "all"
-                    ? "No sales match your search filters."
-                    : `No sales recorded in the past 6 months.`
-                }</p>
-              </div>
-            `
-              : filteredSales
-                  .map((sale, idx) => renderCompactSaleTileHtml(sale, idx))
-                  .join("")
-          }
+          ${renderSalesListItemsHtml(filteredSales)}
         </div>
-
-        <!-- Period Selector Modal -->
-        ${isMonthPickerOpen ? renderMonthPickerModalHtml(availableMonthKeys) : ""}
       </div>
     `;
 
-    // Attach Event Listeners
+    bindSalesEvents(root, availableMonthKeys);
+  }
+
+  function renderSalesListItemsHtml(filteredSales) {
+    if (filteredSales.length === 0) {
+      return `
+        <div class="empty-state">
+          <h4>No Sales Found</h4>
+          <p>${
+            statusFilter === "today"
+              ? "No sales recorded yet today."
+              : searchQuery || selectedDate || statusFilter !== "all"
+              ? "No sales match your search filters."
+              : `No sales recorded in the past 6 months.`
+          }</p>
+        </div>
+      `;
+    }
+
+    return filteredSales.map((sale, idx) => renderCompactSaleTileHtml(sale, idx)).join("");
+  }
+
+  function bindSalesEvents(root, availableMonthKeys) {
     const syncBtn = root.querySelector("#btn-sync-sales");
     if (syncBtn && window.bindSyncButtonEvent) {
       window.bindSyncButtonEvent(syncBtn);
@@ -323,49 +355,23 @@ window.initViewSales = (function () {
     const card1 = root.querySelector("#btn-stats-month-1");
     const card2 = root.querySelector("#btn-stats-month-2");
 
-    function toggleMonthPicker() {
-      isMonthPickerOpen = !isMonthPickerOpen;
-      renderViewSalesUI();
-    }
-
-    if (card1) card1.addEventListener("click", toggleMonthPicker);
-    if (card2) card2.addEventListener("click", toggleMonthPicker);
-
-    // Month Selector Modal Events
-    if (isMonthPickerOpen) {
-      const modalBackdrop = root.querySelector(".month-modal-backdrop");
-      const closeBtn = root.querySelector("#btn-close-month-modal");
-      const optBtns = root.querySelectorAll(".month-opt-btn");
-
-      if (modalBackdrop) {
-        modalBackdrop.addEventListener("click", (e) => {
-          if (e.target === modalBackdrop) {
-            isMonthPickerOpen = false;
-            renderViewSalesUI();
-          }
-        });
-      }
-      if (closeBtn) {
-        closeBtn.addEventListener("click", () => {
-          isMonthPickerOpen = false;
-          renderViewSalesUI();
-        });
-      }
-
-      optBtns.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          selectedStatsMonth = btn.dataset.month;
-          isMonthPickerOpen = false;
-          renderViewSalesUI();
-        });
+    function handleStatsMonthClick() {
+      openMonthPickerModal(availableMonthKeys, selectedStatsMonth, (chosenMonth) => {
+        selectedStatsMonth = chosenMonth;
+        if (window.UI) window.UI.toast(`Stats period updated to "${formatMonthLabel(chosenMonth)}"`, "info");
+        renderViewSalesUI();
       });
     }
 
+    if (card1) card1.addEventListener("click", handleStatsMonthClick);
+    if (card2) card2.addEventListener("click", handleStatsMonthClick);
+
+    // TARGETED SEARCH: Updates ONLY list body so input focus is NEVER destroyed!
     const searchIn = root.querySelector("#sales-search-input");
     if (searchIn) {
       searchIn.addEventListener("input", (e) => {
         searchQuery = e.target.value;
-        renderViewSalesUI();
+        updateSalesListBodyOnly(root);
       });
     }
 
@@ -373,7 +379,8 @@ window.initViewSales = (function () {
     if (clearSearchBtn) {
       clearSearchBtn.addEventListener("click", () => {
         searchQuery = "";
-        renderViewSalesUI();
+        if (searchIn) searchIn.value = "";
+        updateSalesListBodyOnly(root);
       });
     }
 
@@ -414,63 +421,247 @@ window.initViewSales = (function () {
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         statusFilter = btn.dataset.status;
+        const filterName = btn.innerText.trim().replace(/\n/g, " ");
+        if (window.UI) window.UI.toast(`Filtered sales by "${filterName}"`, "info");
         renderViewSalesUI();
       });
     });
 
+    bindTileClickEvents(root);
+  }
+
+  function updateSalesListBodyOnly(root) {
+    const listBody = root.querySelector(".sales-list-body");
+    if (!listBody) {
+      renderViewSalesUI();
+      return;
+    }
+
+    const filteredSales = getFilteredSalesData();
+    listBody.innerHTML = renderSalesListItemsHtml(filteredSales);
+    bindTileClickEvents(root, filteredSales);
+  }
+
+  function bindTileClickEvents(root, customFilteredSales) {
+    const filteredSales = customFilteredSales || getFilteredSalesData();
     const compactTiles = root.querySelectorAll(".compact-sale-tile, .compact-tile");
     compactTiles.forEach((tile) => {
       tile.addEventListener("click", () => {
         const idx = Number(tile.dataset.index);
         const targetSale = filteredSales[idx];
         if (targetSale) {
-          selectedSale = targetSale;
-          renderViewSalesUI();
+          openSaleDetailModal(targetSale);
         }
       });
     });
   }
 
-  function renderMonthPickerModalHtml(availableMonthKeys) {
+  // Top-Level Viewport Month Picker Modal Overlay
+  function openMonthPickerModal(availableMonthKeys, selectedMonth, onSelect) {
+    const existing = document.querySelector(".dp-modal-backdrop");
+    if (existing) existing.remove();
+
+    let tempSelected = selectedMonth;
     const currentKey = getCurrentMonthKey();
 
-    return `
-      <div class="month-modal-backdrop">
-        <div class="month-modal-card">
-          <div class="month-modal-header">
-            <h4 class="month-modal-title">Select Time Period</h4>
-            <button type="button" class="btn-close-month-modal" id="btn-close-month-modal">&times;</button>
+    const backdrop = document.createElement("div");
+    backdrop.className = "dp-modal-backdrop";
+
+    function renderModalContent() {
+      backdrop.innerHTML = `
+        <div class="dp-modal-card" style="max-width: 360px;">
+          <!-- Header Bar -->
+          <div class="dp-header">
+            <div class="dp-title-bar">
+              <span class="dp-title-text">SELECT TIME PERIOD</span>
+              <button type="button" class="dp-btn-close" id="dp-btn-close">&times;</button>
+            </div>
           </div>
 
-          <div class="month-modal-body">
-            <button type="button" class="month-opt-btn ${selectedStatsMonth === "all" ? "month-opt-btn--selected" : ""}" data-month="all">
-              <span class="opt-label">ALL TIME</span>
-              <span class="opt-desc">Total Revenue & Sales across all time</span>
-              ${selectedStatsMonth === "all" ? `<span class="opt-check">✓</span>` : ""}
-            </button>
+          <!-- Body Container -->
+          <div class="dp-body" style="min-height: 200px; max-height: 320px; overflow-y: auto; padding: 12px 14px;">
+            <div class="dp-months-grid" style="grid-template-columns: 1fr; gap: 8px;">
+              <button type="button" class="dp-month-option ${tempSelected === "all" ? "dp-month-option--selected" : ""}" data-month="all" style="text-align: left; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+                <div>
+                  <strong style="display: block; font-size: 13px;">ALL TIME</strong>
+                  <span style="font-size: 11px; opacity: 0.8; font-weight: 500;">Total Revenue & Sales across all time</span>
+                </div>
+                ${tempSelected === "all" ? `<span style="font-weight: 800; font-size: 14px;">✓</span>` : ""}
+              </button>
 
-            <div class="month-opts-divider">MONTHLY PERIODS</div>
-
-            ${availableMonthKeys
-              .map((mKey) => {
-                const label = formatMonthLabel(mKey);
-                const isCurrent = mKey === currentKey;
-                const isSelected = selectedStatsMonth === mKey;
-                return `
-                <button type="button" class="month-opt-btn ${isSelected ? "month-opt-btn--selected" : ""}" data-month="${mKey}">
-                  <div class="opt-left">
-                    <span class="opt-label">${escapeHtml(label)}</span>
-                    ${isCurrent ? `<span class="opt-tag-current">Current Month</span>` : ""}
-                  </div>
-                  ${isSelected ? `<span class="opt-check">✓</span>` : ""}
-                </button>
-              `;
-              })
-              .join("")}
+              ${availableMonthKeys
+                .map((mKey) => {
+                  const label = formatMonthLabel(mKey);
+                  const isCurrent = mKey === currentKey;
+                  const isSelected = tempSelected === mKey;
+                  return `
+                    <button type="button" class="dp-month-option ${isSelected ? "dp-month-option--selected" : ""}" data-month="${mKey}" style="text-align: left; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between;">
+                      <div>
+                        <strong style="display: block; font-size: 13px;">${escapeHtml(label)} ${isCurrent ? `<span style="font-size: 10px; background: rgba(69, 103, 250, 0.15); color: #4567fa; padding: 2px 6px; border-radius: 6px; margin-left: 6px;">Current</span>` : ""}</strong>
+                        <span style="font-size: 11px; opacity: 0.8; font-weight: 500;">Filter stats for ${escapeHtml(label)}</span>
+                      </div>
+                      ${isSelected ? `<span style="font-weight: 800; font-size: 14px;">✓</span>` : ""}
+                    </button>
+                  `;
+                })
+                .join("")}
+            </div>
           </div>
+
+          <!-- Footer Bar -->
+          <div class="dp-footer" style="justify-content: flex-end;">
+            <button type="button" class="dp-btn-cancel" id="dp-btn-cancel">Cancel</button>
+            <button type="button" class="dp-btn-confirm" id="dp-btn-confirm">Set</button>
+          </div>
+        </div>
+      `;
+
+      // Events
+      const closeBtn = backdrop.querySelector("#dp-btn-close");
+      const cancelBtn = backdrop.querySelector("#dp-btn-cancel");
+      const confirmBtn = backdrop.querySelector("#dp-btn-confirm");
+
+      if (closeBtn) closeBtn.addEventListener("click", () => backdrop.remove());
+      if (cancelBtn) cancelBtn.addEventListener("click", () => backdrop.remove());
+
+      backdrop.addEventListener("click", (e) => {
+        if (e.target === backdrop) backdrop.remove();
+      });
+
+      backdrop.querySelectorAll(".dp-month-option").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          tempSelected = btn.dataset.month;
+          renderModalContent();
+        });
+      });
+
+      if (confirmBtn) {
+        confirmBtn.addEventListener("click", () => {
+          if (typeof onSelect === "function") {
+            onSelect(tempSelected);
+          }
+          backdrop.remove();
+        });
+      }
+    }
+
+    renderModalContent();
+    document.body.appendChild(backdrop);
+  }
+
+  // Top-Level Viewport Sale Detailed View Modal Overlay
+  function openSaleDetailModal(sale) {
+    const existing = document.querySelector(".sale-detail-modal-backdrop");
+    if (existing) existing.remove();
+
+    const isPaid = sale.paymentStatus === "paid";
+    const displayDateStr = formatDisplaySaleDate(sale.date);
+
+    const grandTotal = Number(sale.grandTotal) || 0;
+    const cashAmt = Number(sale.cashAmount) || 0;
+    const cardAmt = Number(sale.cardAmount) || 0;
+    const isVat = sale.vatBill === "yes";
+
+    let pMethodLabel = "Cash";
+    if (sale.paymentMethod === "card") pMethodLabel = "Card";
+    else if (sale.paymentMethod === "both") pMethodLabel = "Both (Cash + Card)";
+
+    const itemsFormatted = (sale.itemsDetail || "")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "dp-modal-backdrop sale-detail-modal-backdrop";
+
+    backdrop.innerHTML = `
+      <div class="dp-modal-card" style="max-width: 440px; width: 92vw;">
+        <!-- Header Bar -->
+        <div class="dp-header">
+          <div class="dp-title-bar">
+            <span class="dp-title-text">SALE DETAILS</span>
+            <button type="button" class="dp-btn-close" id="btn-close-sale-detail">&times;</button>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
+            <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
+            <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
+              ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
+            </span>
+          </div>
+          <span style="font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">Sale Date: ${escapeHtml(displayDateStr)}</span>
+        </div>
+
+        <!-- Body Container -->
+        <div class="dp-body" style="max-height: 380px; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+          <!-- Customer Info Card -->
+          <div class="detail-card">
+            <h4 class="card-section-label">Customer Info</h4>
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-lbl">Phone Number</span>
+                <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-lbl">Email Address</span>
+                <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link">${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Purchased Items Breakdown -->
+          <div class="detail-card">
+            <h4 class="card-section-label">Purchased Items (${itemsFormatted.length})</h4>
+            <div class="purchased-items-list">
+              ${
+                itemsFormatted.length > 0
+                  ? itemsFormatted.map((it) => `<div class="purchased-item-row"><span class="bullet">•</span> <span>${escapeHtml(it)}</span></div>`).join("")
+                  : `<div class="purchased-item-row">• General Sale Item</div>`
+              }
+            </div>
+          </div>
+
+          <!-- Payment Breakdown -->
+          <div class="detail-card detail-card--payment">
+            <h4 class="card-section-label">Payment Breakdown</h4>
+            <div class="pay-row">
+              <span class="pay-lbl">VAT Status</span>
+              <span class="pay-val">${isVat ? "Yes (5% VAT)" : "No VAT (0%)"}</span>
+            </div>
+            <div class="pay-row">
+              <span class="pay-lbl">Payment Method</span>
+              <span class="pay-val">${escapeHtml(pMethodLabel)}</span>
+            </div>
+            ${
+              sale.paymentMethod === "both" || cashAmt > 0
+                ? `<div class="pay-row"><span class="pay-lbl">Cash Paid</span><span class="pay-val">OMR ${cashAmt.toFixed(3)}</span></div>`
+                : ""
+            }
+            ${
+              sale.paymentMethod === "both" || cardAmt > 0
+                ? `<div class="pay-row"><span class="pay-lbl">Card Paid</span><span class="pay-val">OMR ${cardAmt.toFixed(3)}</span></div>`
+                : ""
+            }
+            <div class="pay-row pay-row--total">
+              <span class="pay-lbl bold">Grand Total</span>
+              <span class="pay-val total-amount-big">OMR ${grandTotal.toFixed(3)}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="dp-footer" style="justify-content: flex-end;">
+          <button type="button" class="dp-btn-confirm" id="btn-close-sale-modal">Close</button>
         </div>
       </div>
     `;
+
+    backdrop.querySelector("#btn-close-sale-detail").addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector("#btn-close-sale-modal").addEventListener("click", () => backdrop.remove());
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) backdrop.remove();
+    });
+
+    document.body.appendChild(backdrop);
   }
 
   function renderCompactSaleTileHtml(sale, index) {
@@ -509,132 +700,6 @@ window.initViewSales = (function () {
     `;
   }
 
-  function renderDetailSubPageUI(sale) {
-    const root = document.getElementById("view-sales-root");
-    if (!root) return;
-
-    const isPaid = sale.paymentStatus === "paid";
-    const displayDateStr = formatDisplaySaleDate(sale.date);
-
-    const grandTotal = Number(sale.grandTotal) || 0;
-    const cashAmt = Number(sale.cashAmount) || 0;
-    const cardAmt = Number(sale.cardAmount) || 0;
-    const isVat = sale.vatBill === "yes";
-
-    let pMethodLabel = "Cash";
-    if (sale.paymentMethod === "card") pMethodLabel = "Card";
-    else if (sale.paymentMethod === "both") pMethodLabel = "Both (Cash + Card)";
-
-    const itemsFormatted = (sale.itemsDetail || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    const badgeHtml = `
-      <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
-        ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
-      </span>
-    `;
-
-    const contentCardsHtml = `
-      <!-- Sale Customer Header -->
-      <div class="detail-card detail-card--header">
-        <div class="detail-header-top">
-          <div class="header-main-meta">
-            <h3 class="detail-cust-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
-            <span class="detail-timestamp">Sale Date: ${escapeHtml(displayDateStr)}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Customer Contact Details -->
-      <div class="detail-card">
-        <h4 class="card-section-label">Customer Info</h4>
-        <div class="info-grid">
-          <div class="info-item">
-            <span class="info-lbl">Phone Number</span>
-            <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
-          </div>
-          <div class="info-item">
-            <span class="info-lbl">Email Address</span>
-            <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link">${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Purchased Items Breakdown -->
-      <div class="detail-card">
-        <h4 class="card-section-label">Purchased Items (${itemsFormatted.length})</h4>
-        <div class="purchased-items-list">
-          ${
-            itemsFormatted.length > 0
-              ? itemsFormatted.map((it) => `<div class="purchased-item-row"><span class="bullet">•</span> <span>${escapeHtml(it)}</span></div>`).join("")
-              : `<div class="purchased-item-row">• General Sale Item</div>`
-          }
-        </div>
-      </div>
-
-      <!-- Payment Breakdown -->
-      <div class="detail-card detail-card--payment">
-        <h4 class="card-section-label">Payment Breakdown</h4>
-        <div class="pay-row">
-          <span class="pay-lbl">VAT Status</span>
-          <span class="pay-val">${isVat ? "Yes (5% VAT)" : "No VAT (0%)"}</span>
-        </div>
-        <div class="pay-row">
-          <span class="pay-lbl">Payment Method</span>
-          <span class="pay-val">${escapeHtml(pMethodLabel)}</span>
-        </div>
-
-        ${
-          sale.paymentMethod === "both" || cashAmt > 0
-            ? `
-          <div class="pay-row">
-            <span class="pay-lbl">Cash Paid</span>
-            <span class="pay-val">OMR ${cashAmt.toFixed(3)}</span>
-          </div>
-        `
-            : ""
-        }
-
-        ${
-          sale.paymentMethod === "both" || cardAmt > 0
-            ? `
-          <div class="pay-row">
-            <span class="pay-lbl">Card Paid</span>
-            <span class="pay-val">OMR ${cardAmt.toFixed(3)}</span>
-          </div>
-        `
-            : ""
-        }
-
-        <div class="pay-row pay-row--total">
-          <span class="pay-lbl bold">Grand Total</span>
-          <span class="pay-val total-amount-big">OMR ${grandTotal.toFixed(3)}</span>
-        </div>
-      </div>
-    `;
-
-    const subPageHtml = window.renderDetailSubPageWrapperHtml
-      ? window.renderDetailSubPageWrapperHtml({
-          backBtnId: "btn-back-to-sales",
-          backLabel: "Back to Sales",
-          badgeHtml: badgeHtml,
-          contentCardsHtml: contentCardsHtml
-        })
-      : "";
-
-    root.innerHTML = `<div class="view-sales-container">${subPageHtml}</div>`;
-
-    const backBtn = root.querySelector("#btn-back-to-sales");
-    if (backBtn) {
-      backBtn.addEventListener("click", () => {
-        selectedSale = null;
-        renderViewSalesUI();
-      });
-    }
-  }
-
   function escapeHtml(str) {
     return String(str || "")
       .replace(/&/g, "&amp;")
@@ -646,7 +711,6 @@ window.initViewSales = (function () {
     if (!initialized) {
       initialized = true;
       window.addEventListener("branchChanged", () => {
-        selectedSale = null;
         statusFilter = "today";
         selectedStatsMonth = getCurrentMonthKey();
         renderViewSalesUI();

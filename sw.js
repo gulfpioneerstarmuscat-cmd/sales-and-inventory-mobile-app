@@ -1,10 +1,11 @@
 // sw.js - Robust Service Worker with Network-First Strategy & Resilient PWA Pre-caching
-const CACHE_NAME = "gps-app-v27";
+const CACHE_NAME = "gps-app-v28";
 
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
   "./style.css",
+  "./css/base.css",
   "./css/components/date-picker.css",
   "./css/components/filter-pills.css",
   "./css/components/search-box.css",
@@ -13,6 +14,8 @@ const ASSETS_TO_CACHE = [
   "./css/components/detail-view.css",
   "./css/components/stat-card.css",
   "./css/pages/add-sales.css",
+  "./css/pages/add-stock.css",
+  "./css/pages/amend-stock.css",
   "./css/pages/profile.css",
   "./css/pages/view-sales.css",
   "./css/pages/view-inventory.css",
@@ -27,8 +30,11 @@ const ASSETS_TO_CACHE = [
   "./js/components/compact-tile.js",
   "./js/components/detail-view.js",
   "./js/components/stat-card.js",
+  "./js/components/item-suggestions.js",
   "./js/app.js",
   "./js/pages/add-sales.js",
+  "./js/pages/add-stock.js",
+  "./js/pages/amend-stock.js",
   "./js/pages/profile.js",
   "./js/pages/view-sales.js",
   "./js/pages/view-inventory.js",
@@ -52,7 +58,7 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Activate: Immediately purge old caches (v1) and claim clients
+// Activate: Immediately purge old caches and claim clients
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
