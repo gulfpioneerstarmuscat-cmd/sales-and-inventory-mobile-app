@@ -322,39 +322,33 @@ window.initAddSales = (function () {
 
     function bindItemRowEvents() {
       itemsListContainer.querySelectorAll(".item-name-input").forEach((inp) => {
-        inp.addEventListener("input", (e) => {
-          const idx = Number(e.target.dataset.index);
-          items[idx].name = e.target.value;
+        ["input", "change", "blur"].forEach((evt) => {
+          inp.addEventListener(evt, (e) => {
+            const idx = Number(e.target.dataset.index);
+            items[idx].name = e.target.value;
+          });
         });
       });
 
       itemsListContainer.querySelectorAll(".item-qty-input").forEach((inp) => {
-        inp.addEventListener("input", (e) => {
-          const idx = Number(e.target.dataset.index);
-          const val = parseInt(e.target.value, 10);
-          items[idx].qty = isNaN(val) ? 0 : Math.max(0, val);
-
-          const rowEl = e.target.closest(".item-row");
-          if (rowEl) {
-            const totInp = rowEl.querySelector(".item-total-input");
-            if (totInp) totInp.value = formatOMR(items[idx].qty * items[idx].unitPrice);
-          }
-          calculateTotals();
+        ["input", "change", "keyup", "blur"].forEach((evt) => {
+          inp.addEventListener(evt, (e) => {
+            const idx = Number(e.target.dataset.index);
+            const val = parseInt(e.target.value, 10);
+            items[idx].qty = isNaN(val) ? 0 : Math.max(0, val);
+            calculateTotals();
+          });
         });
       });
 
       itemsListContainer.querySelectorAll(".item-price-input").forEach((inp) => {
-        inp.addEventListener("input", (e) => {
-          const idx = Number(e.target.dataset.index);
-          const val = parseFloat(e.target.value);
-          items[idx].unitPrice = isNaN(val) ? 0 : Math.max(0, val);
-
-          const rowEl = e.target.closest(".item-row");
-          if (rowEl) {
-            const totInp = rowEl.querySelector(".item-total-input");
-            if (totInp) totInp.value = formatOMR(items[idx].qty * items[idx].unitPrice);
-          }
-          calculateTotals();
+        ["input", "change", "keyup", "blur"].forEach((evt) => {
+          inp.addEventListener(evt, (e) => {
+            const idx = Number(e.target.dataset.index);
+            const val = parseFloat(e.target.value);
+            items[idx].unitPrice = isNaN(val) ? 0 : Math.max(0, val);
+            calculateTotals();
+          });
         });
       });
 
@@ -379,8 +373,19 @@ window.initAddSales = (function () {
 
     function calculateTotals() {
       let subtotal = 0;
-      items.forEach((item) => {
-        subtotal += (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
+
+      // Update each item card's individual Subtotal (OMR) field in DOM
+      const rowCards = itemsListContainer ? itemsListContainer.querySelectorAll(".item-row-card") : [];
+      items.forEach((item, idx) => {
+        const itemSubtotal = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
+        subtotal += itemSubtotal;
+
+        if (rowCards[idx]) {
+          const totInp = rowCards[idx].querySelector(".item-total-input");
+          if (totInp) {
+            totInp.value = formatOMR(itemSubtotal);
+          }
+        }
       });
 
       const vatRate = vatBill === "yes" ? 0.05 : 0;
@@ -406,9 +411,56 @@ window.initAddSales = (function () {
       if (paymentStatus !== "paid") return;
       if (paymentMethod === "cash" && cashInput) {
         cashInput.value = grandTotal > 0 ? grandTotal.toFixed(3) : "";
+        if (cardInput) cardInput.value = "";
       } else if (paymentMethod === "card" && cardInput) {
         cardInput.value = grandTotal > 0 ? grandTotal.toFixed(3) : "";
+        if (cashInput) cashInput.value = "";
+      } else if (paymentMethod === "both") {
+        if (grandTotal > 0) {
+          const cashVal = parseFloat(cashInput ? cashInput.value : "");
+          const cardVal = parseFloat(cardInput ? cardInput.value : "");
+          if (isNaN(cashVal) && isNaN(cardVal)) {
+            const half = grandTotal / 2;
+            if (cashInput) cashInput.value = half.toFixed(3);
+            if (cardInput) cardInput.value = half.toFixed(3);
+          } else if (!isNaN(cashVal)) {
+            const newCard = Math.max(0, grandTotal - cashVal);
+            if (cardInput) cardInput.value = newCard.toFixed(3);
+          } else if (!isNaN(cardVal)) {
+            const newCash = Math.max(0, grandTotal - cardVal);
+            if (cashInput) cashInput.value = newCash.toFixed(3);
+          }
+        } else {
+          if (cashInput) cashInput.value = "";
+          if (cardInput) cardInput.value = "";
+        }
       }
+    }
+
+    if (cashInput) {
+      cashInput.addEventListener("input", () => {
+        if (paymentMethod === "both" && paymentStatus === "paid") {
+          const grandTotal = getGrandTotalValue();
+          const cashVal = parseFloat(cashInput.value) || 0;
+          const cardVal = Math.max(0, grandTotal - cashVal);
+          if (cardInput) {
+            cardInput.value = cardVal.toFixed(3);
+          }
+        }
+      });
+    }
+
+    if (cardInput) {
+      cardInput.addEventListener("input", () => {
+        if (paymentMethod === "both" && paymentStatus === "paid") {
+          const grandTotal = getGrandTotalValue();
+          const cardVal = parseFloat(cardInput.value) || 0;
+          const cashVal = Math.max(0, grandTotal - cardVal);
+          if (cashInput) {
+            cashInput.value = cashVal.toFixed(3);
+          }
+        }
+      });
     }
 
     function updatePaymentInputStates() {

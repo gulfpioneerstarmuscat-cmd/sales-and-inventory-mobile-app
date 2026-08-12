@@ -336,7 +336,7 @@ window.DataStore = (function () {
     },
 
     // Sync Active Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
-    syncFromCloud: function (webAppUrl) {
+    syncFromCloud: function (webAppUrl, isRetry) {
       if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
 
       const branch = getActiveBranch();
@@ -391,6 +391,13 @@ window.DataStore = (function () {
           }
         })
         .catch((err) => {
+          // If first attempt failed with transient cold-start timeout / 404, retry once in 1.5s on warm container
+          if (!isRetry) {
+            console.log("Cloud sync cold-start notice, retrying once in 1.5s...");
+            return new Promise((resolve) => setTimeout(resolve, 1500)).then(() =>
+              this.syncFromCloud(webAppUrl, true)
+            );
+          }
           console.warn("Cloud sync check error:", err);
           return { success: false, error: err };
         });
