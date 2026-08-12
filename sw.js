@@ -1,5 +1,6 @@
 // sw.js - Robust Service Worker with Network-First Strategy & Resilient PWA Pre-caching
-const CACHE_NAME = "gps-app-v43";
+const CACHE_NAME = "gps-app-v52";
+
 
 const ASSETS_TO_CACHE = [
   "./",
@@ -39,15 +40,15 @@ const ASSETS_TO_CACHE = [
   "./js/pages/view-sales.js",
   "./js/pages/view-inventory.js",
   "./manifest.json",
-  "./manifest.json?v=43",
+  "./manifest.json?v=52",
   "./assets/logo/gps_logo_2000x2000_white_over_black.svg",
-  "./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=43",
+  "./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=52",
   "./assets/logo/gps_logo_2000x2000_color_over_white.svg",
-  "./assets/logo/gps_logo_2000x2000_color_over_white.svg?v=43",
+  "./assets/logo/gps_logo_2000x2000_color_over_white.svg?v=52",
   "./assets/logo/icon-192.png",
-  "./assets/logo/icon-192.png?v=43",
+  "./assets/logo/icon-192.png?v=52",
   "./assets/logo/icon-512.png",
-  "./assets/logo/icon-512.png?v=43"
+  "./assets/logo/icon-512.png?v=52"
 ];
 
 // Install: Pre-cache essential assets safely (Promise.allSettled guarantees PWA installability even if 1 asset fails)

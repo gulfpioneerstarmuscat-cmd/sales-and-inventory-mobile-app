@@ -115,13 +115,37 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showPage(1);
 
-  // Trigger immediate background sync from Google Sheets on app startup
+  // Cold Start Loading Screen Overlay Management
+  const coldStartOverlay = document.getElementById("cold-start-overlay");
+
+  function hideColdStartOverlay() {
+    if (coldStartOverlay && !coldStartOverlay.classList.contains("is-hidden")) {
+      coldStartOverlay.classList.add("is-hidden");
+      setTimeout(() => {
+        coldStartOverlay.style.display = "none";
+      }, 600);
+    }
+  }
+
+  // Safety fallback: Hide overlay after max 35s even if offline
+  const maxOverlayTimeout = setTimeout(hideColdStartOverlay, 35000);
+
+  // Trigger immediate initial cloud sync from Google Sheets on app startup
   const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
-  // Initial cloud sync & countdown timer startup
+  if (window.DataStore && webAppUrl) {
+    window.DataStore.syncFromCloud(webAppUrl)
+      .finally(() => {
+        clearTimeout(maxOverlayTimeout);
+        hideColdStartOverlay();
+      });
+  } else {
+    clearTimeout(maxOverlayTimeout);
+    hideColdStartOverlay();
+  }
+
+  // Initial 60s countdown timer startup
   if (window.SyncCountdownManager) {
     window.SyncCountdownManager.start();
-  } else if (window.DataStore && webAppUrl) {
-    window.DataStore.syncFromCloud(webAppUrl);
   }
 
   // Re-sync and reset countdown on branch change

@@ -24,6 +24,18 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
+    <!-- Cold Start Loading Screen Overlay -->
+    <div id="cold-start-overlay" class="cold-start-overlay" aria-label="Loading latest data">
+      <div class="cold-start-content">
+        <div class="cold-start-logo-wrapper">
+          <div class="cold-start-spinner-ring"></div>
+          <img src="./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=50" alt="GPS Logo" class="cold-start-logo" />
+        </div>
+        <div class="cold-start-title">Syncing Live Data...</div>
+        <div class="cold-start-subtitle">Fetching latest inventory & sales from cloud</div>
+      </div>
+    </div>
+
     <div class="bg">
       <div class="glass-blur">
         <div class="top-panel" aria-label="Header">

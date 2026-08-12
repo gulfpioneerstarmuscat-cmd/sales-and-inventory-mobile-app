@@ -336,9 +336,10 @@ window.DataStore = (function () {
     },
 
     // Sync Active Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
-    syncFromCloud: function (webAppUrl, isRetry) {
+    syncFromCloud: function (webAppUrl, retryCount) {
       if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
 
+      const retriesSoFar = typeof retryCount === "number" ? retryCount : (retryCount ? 1 : 0);
       const branch = getActiveBranch();
       const cacheBuster = `_t=${Date.now()}`;
       const syncUrl = webAppUrl.includes("?")
@@ -346,7 +347,7 @@ window.DataStore = (function () {
         : `${webAppUrl}?branch=${encodeURIComponent(branch)}&${cacheBuster}`;
 
       const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 40000) : null;
 
       return fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
         .then((res) => {
@@ -396,11 +397,11 @@ window.DataStore = (function () {
         })
         .catch((err) => {
           if (timeoutId) clearTimeout(timeoutId);
-          // If first attempt failed with transient cold-start timeout / 404, retry once in 1.5s on warm container
-          if (!isRetry && err.name !== "AbortError") {
-            console.log("Cloud sync cold-start notice, retrying once in 1.5s...");
-            return new Promise((resolve) => setTimeout(resolve, 1500)).then(() =>
-              this.syncFromCloud(webAppUrl, true)
+          // If attempt failed with transient cold-start 404 / timeout, retry up to 2 times giving container 6s to complete boot
+          if (retriesSoFar < 2) {
+            console.log(`Cloud sync cold-start notice (attempt ${retriesSoFar + 1} failed: ${err.message}), retrying in 6s...`);
+            return new Promise((resolve) => setTimeout(resolve, 6000)).then(() =>
+              this.syncFromCloud(webAppUrl, retriesSoFar + 1)
             );
           }
           console.log("PWA Background sync notice (using local storage data):", err.message || err);
