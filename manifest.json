@@ -9,7 +9,7 @@
   "theme_color": "#4567fa",
   "icons": [
     {
-      "src": "./assets/logo/logo_short_blue_black_onwhite.svg",
+      "src": "./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=30",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
