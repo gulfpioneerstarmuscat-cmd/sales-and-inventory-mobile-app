@@ -502,6 +502,10 @@ p {
   pointer-events: auto;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .modal-overlay[hidden] {
   display: none !important;
   pointer-events: none !important;

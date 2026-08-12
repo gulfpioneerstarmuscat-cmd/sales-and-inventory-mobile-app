@@ -345,8 +345,12 @@ window.DataStore = (function () {
         ? `${webAppUrl}&branch=${encodeURIComponent(branch)}&${cacheBuster}`
         : `${webAppUrl}?branch=${encodeURIComponent(branch)}&${cacheBuster}`;
 
-      return fetch(syncUrl, { cache: "no-store" })
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 15000) : null;
+
+      return fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
         .then((res) => {
+          if (timeoutId) clearTimeout(timeoutId);
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         })
@@ -391,14 +395,15 @@ window.DataStore = (function () {
           }
         })
         .catch((err) => {
+          if (timeoutId) clearTimeout(timeoutId);
           // If first attempt failed with transient cold-start timeout / 404, retry once in 1.5s on warm container
-          if (!isRetry) {
+          if (!isRetry && err.name !== "AbortError") {
             console.log("Cloud sync cold-start notice, retrying once in 1.5s...");
             return new Promise((resolve) => setTimeout(resolve, 1500)).then(() =>
               this.syncFromCloud(webAppUrl, true)
             );
           }
-          console.warn("Cloud sync check error:", err);
+          console.log("PWA Background sync notice (using local storage data):", err.message || err);
           return { success: false, error: err };
         });
     },

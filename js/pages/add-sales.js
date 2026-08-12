@@ -464,21 +464,40 @@ window.initAddSales = (function () {
     }
 
     function updatePaymentInputStates() {
+      const setGroupState = (groupEl, inputEl, isEnabled) => {
+        if (!groupEl) return;
+        groupEl.classList.toggle("form-group--disabled", !isEnabled);
+        if (inputEl) {
+          inputEl.disabled = !isEnabled;
+          if (!isEnabled) {
+            inputEl.value = "";
+          }
+        }
+      };
+
+      const setToggleState = (groupEl, isEnabled) => {
+        if (!groupEl) return;
+        groupEl.classList.toggle("form-group--disabled", !isEnabled);
+        groupEl.querySelectorAll(".toggle-btn").forEach((btn) => {
+          btn.disabled = !isEnabled;
+        });
+      };
+
       if (paymentStatus === "not_paid") {
-        if (methodGroup) methodGroup.hidden = true;
-        if (cashGroup) cashGroup.hidden = true;
-        if (cardGroup) cardGroup.hidden = true;
+        setToggleState(methodGroup, false);
+        setGroupState(cashGroup, cashInput, false);
+        setGroupState(cardGroup, cardInput, false);
       } else {
-        if (methodGroup) methodGroup.hidden = false;
+        setToggleState(methodGroup, true);
         if (paymentMethod === "cash") {
-          if (cashGroup) cashGroup.hidden = false;
-          if (cardGroup) cardGroup.hidden = true;
+          setGroupState(cashGroup, cashInput, true);
+          setGroupState(cardGroup, cardInput, false);
         } else if (paymentMethod === "card") {
-          if (cashGroup) cashGroup.hidden = true;
-          if (cardGroup) cardGroup.hidden = false;
+          setGroupState(cashGroup, cashInput, false);
+          setGroupState(cardGroup, cardInput, true);
         } else if (paymentMethod === "both") {
-          if (cashGroup) cashGroup.hidden = false;
-          if (cardGroup) cashGroup.hidden = false;
+          setGroupState(cashGroup, cashInput, true);
+          setGroupState(cardGroup, cardInput, true);
         }
       }
       calculateTotals();
@@ -782,12 +801,26 @@ window.initAddSales = (function () {
       const cashVal = parseFloat(cashInput.value) || 0;
       const cardVal = parseFloat(cardInput.value) || 0;
 
+      let itemsDetailStr = "";
+      if (Array.isArray(items)) {
+        itemsDetailStr = items
+          .map((it) => {
+            const name = (it.name || "").trim();
+            const qty = Number(it.qty) || 1;
+            const price = Number(it.unitPrice || 0);
+            return `${name} (Qty: ${qty}${price > 0 ? ` @ ${price.toFixed(3)}` : ""})`;
+          })
+          .filter(Boolean)
+          .join("\n");
+      }
+
       const saleData = {
         date: dateInput.value,
         customerName: nameInput.value.trim(),
         customerNumber: numberInput.value.trim(),
         customerEmail: emailInput.value.trim(),
         items: items,
+        itemsDetail: itemsDetailStr,
         vatBill: vatBill,
         paymentStatus: paymentStatus,
         paymentMethod: paymentStatus === "paid" ? paymentMethod : "n/a",

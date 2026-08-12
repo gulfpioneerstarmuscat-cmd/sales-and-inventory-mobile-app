@@ -566,10 +566,24 @@ window.initViewSales = (function () {
     if (sale.paymentMethod === "card") pMethodLabel = "Card";
     else if (sale.paymentMethod === "both") pMethodLabel = "Both (Cash + Card)";
 
-    const itemsFormatted = (sale.itemsDetail || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
+    let itemsFormatted = [];
+    if (Array.isArray(sale.items) && sale.items.length > 0) {
+      itemsFormatted = sale.items
+        .map((it) => {
+          const name = (it.name || "").trim();
+          if (!name) return null;
+          const qty = Number(it.qty) || 1;
+          const price = Number(it.unitPrice || it.price || 0);
+          return `${name} (Qty: ${qty}${price > 0 ? ` @ ${price.toFixed(3)}` : ""})`;
+        })
+        .filter(Boolean);
+    }
+    if (itemsFormatted.length === 0 && typeof sale.itemsDetail === "string" && sale.itemsDetail.trim()) {
+      itemsFormatted = sale.itemsDetail
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+    }
 
     const backdrop = document.createElement("div");
     backdrop.className = "dp-modal-backdrop sale-detail-modal-backdrop";
