@@ -66,7 +66,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   if (profileButton) {
-    profileButton.addEventListener("click", () => showPage("profile"));
+    profileButton.addEventListener("click", () => {
+      if (typeof window.openProfileModal === "function") {
+        window.openProfileModal();
+      } else {
+        showPage("profile");
+      }
+    });
   }
 
   // Auto-select entire input content on click/focus for fast overwriting

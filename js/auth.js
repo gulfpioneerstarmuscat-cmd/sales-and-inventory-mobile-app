@@ -183,6 +183,19 @@ window.Auth = (function () {
       return currentUser && currentUser.role === "admin";
     },
 
+    updateUsername: function (newName) {
+      const trimmed = String(newName || "").trim();
+      if (!trimmed || !currentUser) return false;
+      currentUser.name = trimmed;
+      try {
+        localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser));
+      } catch (e) {}
+      window.dispatchEvent(
+        new CustomEvent("userUpdated", { detail: { user: { ...currentUser } } })
+      );
+      return true;
+    },
+
     getDemoAccounts: function () {
       return [...DEMO_USERS];
     }

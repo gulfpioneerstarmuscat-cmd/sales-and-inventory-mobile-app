@@ -147,45 +147,24 @@ a {
   cursor: pointer;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   overflow: hidden;
-}
-
-.profile-button img {
-  width: 60%;
-  height: 60%;
-  object-fit: contain;
-  display: block;
-}
-
-.profile-icon {
-  width: 62%;
-  height: 62%;
-  border-radius: 50%;
-  border: 2px solid #ffffff;
   position: relative;
+  background: transparent;
+  transition: transform var(--transition-fast, 0.15s ease), border 0.15s ease, box-shadow 0.15s ease;
 }
 
-.profile-icon::before {
-  content: "";
-  position: absolute;
-  top: 14%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 35%;
-  height: 35%;
+.top-profile-badge {
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: #ffffff;
-}
-
-.profile-icon::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 10%;
-  transform: translateX(-50%);
-  width: 70%;
-  height: 38%;
-  border-radius: 50% 50% 28% 28%;
-  background: #ffffff;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: clamp(14px, 3.2vw, 17px);
+  color: #ffffff;
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  letter-spacing: 0.5px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
 
 /* Form panel */
@@ -352,13 +331,8 @@ p {
     inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
-.profile-button.is-active .profile-icon {
-  border-color: #0d2f73;
-}
-
-.profile-button.is-active .profile-icon::before,
-.profile-button.is-active .profile-icon::after {
-  background: #0d2f73;
+.profile-button.is-active .top-profile-badge {
+  background: linear-gradient(135deg, #0d2f73 0%, #2563eb 100%);
 }
 
 /* Responsive tweaks */
