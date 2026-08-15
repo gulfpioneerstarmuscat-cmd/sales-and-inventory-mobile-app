@@ -335,19 +335,25 @@ window.DataStore = (function () {
       return { success: true };
     },
 
-    // Sync Active Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
-    syncFromCloud: function (webAppUrl, retryCount) {
+    // Sync Active or Target Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
+    syncFromCloud: function (webAppUrl, retryCount, targetBranch) {
       if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
 
       const retriesSoFar = typeof retryCount === "number" ? retryCount : (retryCount ? 1 : 0);
-      const branch = getActiveBranch();
+      const branch = targetBranch || getActiveBranch();
       const cacheBuster = `_t=${Date.now()}`;
-      const syncUrl = webAppUrl.includes("?")
-        ? `${webAppUrl}&branch=${encodeURIComponent(branch)}&${cacheBuster}`
-        : `${webAppUrl}?branch=${encodeURIComponent(branch)}&${cacheBuster}`;
+      
+      const lastSynced = this.getLastSyncedTime(branch);
+      const sinceParam = lastSynced ? `&since=${encodeURIComponent(lastSynced)}` : "";
 
+      const syncUrl = webAppUrl.includes("?")
+        ? `${webAppUrl}&branch=${encodeURIComponent(branch)}${sinceParam}&${cacheBuster}`
+        : `${webAppUrl}?branch=${encodeURIComponent(branch)}${sinceParam}&${cacheBuster}`;
+
+      // Adaptive Timeouts: Attempt 1 gets 15s (serverless cold-start window), Retries get 10s (warm container window)
+      const timeoutMs = retriesSoFar === 0 ? 15000 : 10000;
       const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timeoutId = controller ? setTimeout(() => controller.abort(), 40000) : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
       return fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
         .then((res) => {
@@ -357,9 +363,16 @@ window.DataStore = (function () {
         })
         .then((data) => {
           if (data && data.status === "success") {
-            // Override local inventory with Google Sheets data if data exists
+            // Override local inventory with Google Sheets data if data exists or if local is empty
             if (Array.isArray(data.inventory)) {
-              saveBranchData("inventory", data.inventory, branch);
+              if (data.inventory.length > 0) {
+                saveBranchData("inventory", data.inventory, branch);
+              } else {
+                const existing = loadBranchInventory(branch);
+                if (!existing || existing.length === 0) {
+                  saveBranchData("inventory", data.inventory, branch);
+                }
+              }
             }
             if (Array.isArray(data.sales)) {
               const localSales = loadBranchSales(branch);
@@ -389,7 +402,11 @@ window.DataStore = (function () {
             } catch (e) {}
 
             window.dispatchEvent(new CustomEvent("inventoryDataChanged", { detail: { branch, syncTime } }));
-            console.log(`Successfully synced real ${branch} Google Sheet data at ${syncTime}!`);
+            if (window.DevLogger) {
+              window.DevLogger.success("DataStore", `Successfully synced real ${branch} Google Sheet data at ${syncTime}!`, { branch, syncTime });
+            } else {
+              console.log(`Successfully synced real ${branch} Google Sheet data at ${syncTime}!`);
+            }
             return { success: true, branch, syncTime, data };
           } else {
             throw new Error(data ? data.message : "Invalid response");
@@ -397,16 +414,39 @@ window.DataStore = (function () {
         })
         .catch((err) => {
           if (timeoutId) clearTimeout(timeoutId);
-          // If attempt failed with transient cold-start 404 / timeout, retry up to 2 times giving container 6s to complete boot
+          // If attempt failed or timed out, fast-retry on warm container up to 2 times after 1s delay
           if (retriesSoFar < 2) {
-            console.log(`Cloud sync cold-start notice (attempt ${retriesSoFar + 1} failed: ${err.message}), retrying in 6s...`);
-            return new Promise((resolve) => setTimeout(resolve, 6000)).then(() =>
-              this.syncFromCloud(webAppUrl, retriesSoFar + 1)
+            if (window.DevLogger) {
+              window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1s...`, { branch, attempt: retriesSoFar + 1, error: err.message }, 3);
+            } else {
+              console.log(`Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1s...`);
+            }
+            return new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
+              this.syncFromCloud(webAppUrl, retriesSoFar + 1, branch)
             );
           }
-          console.log("PWA Background sync notice (using local storage data):", err.message || err);
+          if (window.DevLogger) {
+            window.DevLogger.warn("DataStore", `PWA Background sync notice for ${branch} (using local storage data): ${err.message || err}`, { branch, error: err.message || err }, 2);
+          } else {
+            console.log(`PWA Background sync notice for ${branch} (using local storage data):`, err.message || err);
+          }
           return { success: false, error: err };
         });
+    },
+
+    // Sync all authorized branches sequentially to pre-warm local cache for 0ms branch switching
+    syncAllBranches: function (webAppUrl) {
+      if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false });
+      const user = window.Auth ? window.Auth.getUser() : null;
+      const allowed = (user && Array.isArray(user.allowedBranches) && user.allowedBranches.length > 0)
+        ? user.allowedBranches
+        : ["alkhoud", "ghala"];
+
+      return Promise.all(
+        allowed.map((b) => this.syncFromCloud(webAppUrl, 0, b))
+      ).then((results) => {
+        return { success: results.some((r) => r && r.success) };
+      });
     },
 
     getLastSyncedTime: function (branch) {

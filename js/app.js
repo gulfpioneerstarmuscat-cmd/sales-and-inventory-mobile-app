@@ -130,14 +130,17 @@ document.addEventListener("DOMContentLoaded", () => {
   // Safety fallback: Hide overlay after max 35s even if offline
   const maxOverlayTimeout = setTimeout(hideColdStartOverlay, 35000);
 
-  // Trigger immediate initial cloud sync from Google Sheets on app startup
+  // Trigger immediate initial cloud sync for all authorized branches on app startup
   const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
   if (window.DataStore && webAppUrl) {
-    window.DataStore.syncFromCloud(webAppUrl)
-      .finally(() => {
-        clearTimeout(maxOverlayTimeout);
-        hideColdStartOverlay();
-      });
+    const syncPromise = typeof window.DataStore.syncAllBranches === "function"
+      ? window.DataStore.syncAllBranches(webAppUrl)
+      : window.DataStore.syncFromCloud(webAppUrl);
+
+    syncPromise.finally(() => {
+      clearTimeout(maxOverlayTimeout);
+      hideColdStartOverlay();
+    });
   } else {
     clearTimeout(maxOverlayTimeout);
     hideColdStartOverlay();

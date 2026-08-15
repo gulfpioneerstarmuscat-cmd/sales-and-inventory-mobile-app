@@ -39,14 +39,22 @@
               window.UI.toast("Live Google Sheets cloud data synced successfully!", "success");
             }
           } else {
-            if (window.UI && manualButton) {
-              window.UI.toast("Cloud sync updated using cached local data.", "warning");
+            if (window.UI) {
+              if (manualButton) {
+                window.UI.toast("Cloud sync updated using cached local data.", "warning");
+              } else {
+                window.UI.toast("Sync failed. Waiting for next retry...", "warning");
+              }
             }
           }
         })
         .catch(() => {
-          if (window.UI && manualButton) {
-            window.UI.toast("Cloud sync failed. Operating in offline mode.", "error");
+          if (window.UI) {
+            if (manualButton) {
+              window.UI.toast("Cloud sync failed. Operating in offline mode.", "error");
+            } else {
+              window.UI.toast("Sync failed. Waiting for next retry...", "warning");
+            }
           }
         })
         .finally(() => {
@@ -55,8 +63,12 @@
           updateAllButtonLabels();
         });
     } else {
-      if (window.UI && manualButton) {
-        window.UI.toast("Offline mode: Configured local storage data.", "warning");
+      if (window.UI) {
+        if (manualButton) {
+          window.UI.toast("Offline mode: Configured local storage data.", "warning");
+        } else {
+          window.UI.toast("Sync failed. Waiting for next retry...", "warning");
+        }
       }
       isSyncing = false;
       remainingSeconds = SYNC_INTERVAL_SEC;

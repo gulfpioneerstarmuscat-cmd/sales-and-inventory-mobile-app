@@ -125,7 +125,10 @@ window.Auth = (function () {
           assignedBranch: demoMatch.assignedBranch,
           allowedBranches: demoMatch.allowedBranches
         };
-        const initBranch = demoMatch.assignedBranch === "all" ? "alkhoud" : demoMatch.assignedBranch;
+        const storedBranch = loadActiveBranch();
+        const initBranch = demoMatch.assignedBranch === "all"
+          ? (["alkhoud", "ghala"].includes(storedBranch) ? storedBranch : "alkhoud")
+          : demoMatch.assignedBranch;
         saveSession(userObj, initBranch);
         window.dispatchEvent(new CustomEvent("userLoggedIn", { detail: userObj }));
         return Promise.resolve({ success: true, user: userObj });
@@ -143,7 +146,10 @@ window.Auth = (function () {
           .then((data) => {
             if (data && data.status === "success" && data.user) {
               const u = data.user;
-              const initBranch = u.assignedBranch === "all" ? "alkhoud" : u.assignedBranch;
+              const storedBranch = loadActiveBranch();
+              const initBranch = u.assignedBranch === "all"
+                ? (["alkhoud", "ghala"].includes(storedBranch) ? storedBranch : "alkhoud")
+                : u.assignedBranch;
               saveSession(u, initBranch);
               window.dispatchEvent(new CustomEvent("userLoggedIn", { detail: u }));
               return { success: true, user: u };
