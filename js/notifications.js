@@ -82,6 +82,119 @@ window.UI = (function () {
         toastEl.classList.add("toast-item--visible");
       });
 
+      // Touch & Drag Swipe-to-Dismiss Gesture Logic (Straight Line Lock: Up, Left, or Right)
+      let startX = 0;
+      let startY = 0;
+      let currentX = 0;
+      let currentY = 0;
+      let isDragging = false;
+      let swipeDirection = null; // 'x' for horizontal, 'y' for vertical top swipe
+
+      function dismissToastWithAnimation(direction) {
+        if (activeToastTimer) clearTimeout(activeToastTimer);
+        if (activeDismissTimer) clearTimeout(activeDismissTimer);
+
+        toastEl.style.transition = "transform 0.22s ease-out, opacity 0.22s ease-out";
+        
+        if (direction === "up") {
+          toastEl.style.transform = "translate3d(0, -220px, 0)";
+        } else if (direction === "right") {
+          toastEl.style.transform = "translate3d(360px, 0, 0)";
+        } else if (direction === "left") {
+          toastEl.style.transform = "translate3d(-360px, 0, 0)";
+        }
+        toastEl.style.opacity = "0";
+
+        activeDismissTimer = setTimeout(() => {
+          if (toastEl.parentNode) toastEl.remove();
+        }, 220);
+      }
+
+      function onPointerDown(e) {
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        startX = clientX;
+        startY = clientY;
+        currentX = startX;
+        currentY = startY;
+        isDragging = true;
+        swipeDirection = null;
+        toastEl.style.transition = "none";
+      }
+
+      function onPointerMove(e) {
+        if (!isDragging) return;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        currentX = clientX;
+        currentY = clientY;
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+
+        // Determine dominant direction on initial movement threshold (> 5px)
+        if (!swipeDirection) {
+          const absX = Math.abs(deltaX);
+          const absY = Math.abs(deltaY);
+          if (absX > 5 || absY > 5) {
+            if (absY > absX && deltaY < 0) {
+              swipeDirection = "y"; // Lock to straight vertical UP movement
+            } else if (absX >= absY) {
+              swipeDirection = "x"; // Lock to straight horizontal LEFT/RIGHT movement
+            }
+          }
+        }
+
+        if (swipeDirection === "x") {
+          // Straight horizontal movement only
+          const opacity = Math.max(0.15, 1 - Math.abs(deltaX) / 180);
+          toastEl.style.transform = `translate3d(${deltaX}px, 0, 0)`;
+          toastEl.style.opacity = opacity;
+        } else if (swipeDirection === "y" && deltaY < 0) {
+          // Straight vertical upward movement only
+          const opacity = Math.max(0.15, 1 - Math.abs(deltaY) / 140);
+          toastEl.style.transform = `translate3d(0, ${deltaY}px, 0)`;
+          toastEl.style.opacity = opacity;
+        }
+      }
+
+      function onPointerUp() {
+        if (!isDragging) return;
+        isDragging = false;
+        const deltaX = currentX - startX;
+        const deltaY = currentY - startY;
+        const threshold = 35; // Pixels threshold to trigger dismiss
+
+        if (swipeDirection === "y" && deltaY < -threshold) {
+          dismissToastWithAnimation("up");
+        } else if (swipeDirection === "x" && deltaX > threshold) {
+          dismissToastWithAnimation("right");
+        } else if (swipeDirection === "x" && deltaX < -threshold) {
+          dismissToastWithAnimation("left");
+        } else {
+          // Snap back straight to center
+          toastEl.style.transition = "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease";
+          toastEl.style.transform = "translate3d(0, 0, 0)";
+          toastEl.style.opacity = "1";
+        }
+        swipeDirection = null;
+      }
+
+      toastEl.addEventListener("touchstart", onPointerDown, { passive: true });
+      toastEl.addEventListener("touchmove", onPointerMove, { passive: true });
+      toastEl.addEventListener("touchend", onPointerUp, { passive: true });
+
+      toastEl.addEventListener("mousedown", onPointerDown);
+      const mouseMoveHandler = (e) => { if (isDragging) onPointerMove(e); };
+      const mouseUpHandler = () => {
+        if (isDragging) {
+          onPointerUp();
+          window.removeEventListener("mousemove", mouseMoveHandler);
+          window.removeEventListener("mouseup", mouseUpHandler);
+        }
+      };
+      window.addEventListener("mousemove", mouseMoveHandler);
+      window.addEventListener("mouseup", mouseUpHandler);
+
       activeToastTimer = setTimeout(() => {
         toastEl.classList.remove("toast-item--visible");
         activeDismissTimer = setTimeout(() => {
