@@ -280,6 +280,48 @@ window.Auth = (function () {
       return Promise.resolve({ success: false, message: "Backend Web App URL not configured" });
     },
 
+    loginWithEmergencyCode: function (code, webAppUrl) {
+      const codeVal = String(code || "").trim();
+      if (!codeVal) {
+        return Promise.resolve({ success: false, message: "Please enter Emergency Backup Code" });
+      }
+
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null);
+
+      if (targetUrl && targetUrl.startsWith("http")) {
+        return fetch(targetUrl, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "emergency_login",
+            code: codeVal,
+            deviceId: getDeviceId(),
+            deviceName: getDeviceName()
+          })
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.status === "success" && data.user) {
+              const u = data.user;
+              const storedBranch = loadActiveBranch();
+              const initBranch = u.assignedBranch === "all"
+                ? (["alkhoud", "ghala"].includes(storedBranch) ? storedBranch : "alkhoud")
+                : u.assignedBranch;
+              saveSession(u, initBranch, data.session);
+              window.dispatchEvent(new CustomEvent("userLoggedIn", { detail: u }));
+              return { success: true, user: u, session: data.session };
+            }
+            return { success: false, message: data.message || "Invalid Emergency Backup Code." };
+          })
+          .catch((err) => {
+            return { success: false, message: "Network error verifying Emergency Code" };
+          });
+      }
+
+      return Promise.resolve({ success: false, message: "Backend Web App URL not configured" });
+    },
+
     _googleInitialized: false,
     _googleTokenClient: null,
     _activeGoogleSuccessCallback: null,

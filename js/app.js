@@ -200,44 +200,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 400);
   }
 
-  // 2. Handle Login Submit: Logged Out Screen -> Authenticating Email & PIN Loading Screen -> App / Logged Out Screen
+  // 2. Emergency Access Panel Toggle Handler
+  const btnToggleEmergency = document.getElementById("btn-toggle-emergency");
+  const emergencyPanel = document.getElementById("emergency-access-panel");
+
+  if (btnToggleEmergency && emergencyPanel) {
+    btnToggleEmergency.addEventListener("click", () => {
+      const isHidden = emergencyPanel.hidden;
+      emergencyPanel.hidden = !isHidden;
+      btnToggleEmergency.classList.toggle("is-open", isHidden);
+      if (isHidden) {
+        const codeInput = document.getElementById("auth-emergency-code-input");
+        if (codeInput) codeInput.focus();
+      }
+    });
+  }
+
+  // 3. Handle Emergency Code Login Form Submit
   if (loginForm) {
     loginForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const uIn = document.getElementById("auth-username-input");
-      const pIn = document.getElementById("auth-pin-input");
-      const uVal = uIn ? uIn.value : "";
-      const pVal = pIn ? pIn.value : "";
+      const codeIn = document.getElementById("auth-emergency-code-input");
+      const codeVal = codeIn ? codeIn.value : "";
+
+      if (!codeVal) {
+        if (authErrorBanner) {
+          authErrorBanner.textContent = "Please enter an Emergency Backup Code.";
+          authErrorBanner.hidden = false;
+        }
+        return;
+      }
 
       if (authErrorBanner) authErrorBanner.hidden = true;
       if (authBtnSpinner) authBtnSpinner.hidden = false;
 
-      // Show Full-Screen Loading State: "Authenticating Email & PIN..."
-      showLoadingScreen("Authenticating Email & PIN...");
+      // Show Full-Screen Loading State: "Verifying Emergency Backup Code..."
+      showLoadingScreen("Verifying Emergency Backup Code...");
 
       const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
-      if (window.Auth) {
-        window.Auth.login(uVal, pVal, webAppUrl).then((res) => {
+      if (window.Auth && typeof window.Auth.loginWithEmergencyCode === "function") {
+        window.Auth.loginWithEmergencyCode(codeVal, webAppUrl).then((res) => {
           if (authBtnSpinner) authBtnSpinner.hidden = true;
           if (res.success) {
-            showLoadingScreen("Credentials Validated! Loading App...");
+            showLoadingScreen("Emergency Code Verified! Loading App...");
             showFullApp();
-            if (window.UI) window.UI.toast(`Welcome back, ${res.user.name || res.user.email}!`, "success");
-            if (uIn) uIn.value = "";
-            if (pIn) pIn.value = "";
+            if (window.UI) window.UI.toast(`Emergency Access Granted (${res.user.name || "Admin"})`, "success");
+            if (codeIn) codeIn.value = "";
           } else {
             showLoggedOutScreen();
             if (authErrorBanner) {
-              authErrorBanner.textContent = res.message || "Invalid Username/Email or PIN Code";
+              authErrorBanner.textContent = res.message || "Invalid Emergency Backup Code";
               authErrorBanner.hidden = false;
             }
-            if (window.UI) window.UI.toast(res.message || "Login failed", "error");
+            if (window.UI) window.UI.toast(res.message || "Emergency Code Verification Failed", "error");
           }
         }).catch(() => {
           if (authBtnSpinner) authBtnSpinner.hidden = true;
           showLoggedOutScreen();
           if (authErrorBanner) {
-            authErrorBanner.textContent = "Network error. Please check your connection.";
+            authErrorBanner.textContent = "Network error verifying Emergency Code. Please check your connection.";
             authErrorBanner.hidden = false;
           }
         });

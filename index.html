@@ -50,30 +50,10 @@
           <p class="auth-subtitle">Sales & Inventory Management System</p>
         </div>
 
-        <form id="logged-out-login-form" class="auth-form" autocomplete="on">
+        <form id="logged-out-login-form" class="auth-form" autocomplete="off">
           <div class="auth-error-banner" id="auth-error-banner" hidden></div>
 
-          <div class="auth-field-group">
-            <label for="auth-username-input" class="auth-field-label">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              Username / Email
-            </label>
-            <input type="text" id="auth-username-input" class="auth-input" placeholder="Enter Username or Email" required autocomplete="username" />
-          </div>
-
-          <div class="auth-field-group">
-            <label for="auth-pin-input" class="auth-field-label">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              PIN Code
-            </label>
-            <input type="password" id="auth-pin-input" class="auth-input" placeholder="Enter PIN Code" maxlength="8" required autocomplete="current-password" />
-          </div>
-
-          <button type="submit" id="btn-auth-login" class="auth-submit-btn">
-            <span class="btn-text">Sign In to Account</span>
-            <div class="btn-spinner" id="auth-btn-spinner" hidden></div>
-          </button>
-
+          <!-- Primary Sign-In Method -->
           <button type="button" id="btn-auth-google" class="auth-google-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
@@ -83,6 +63,29 @@
             </svg>
             <span>Sign in with Google</span>
           </button>
+
+          <!-- Emergency Access Toggle Button -->
+          <button type="button" id="btn-toggle-emergency" class="auth-emergency-toggle-btn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <span>Emergency Access</span>
+            <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+
+          <!-- Dropdown Emergency Access Panel -->
+          <div id="emergency-access-panel" class="emergency-access-panel" hidden>
+            <div class="auth-field-group">
+              <label for="auth-emergency-code-input" class="auth-field-label">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Emergency Backup Code
+              </label>
+              <input type="password" id="auth-emergency-code-input" class="auth-input" placeholder="Enter Emergency Backup Code" autocomplete="off" />
+            </div>
+
+            <button type="submit" id="btn-auth-emergency-submit" class="auth-submit-btn auth-emergency-submit-btn">
+              <span class="btn-text">Verify & Sign In</span>
+              <div class="btn-spinner" id="auth-btn-spinner" hidden></div>
+            </button>
+          </div>
         </form>
       </div>
     </div>
