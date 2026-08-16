@@ -10,6 +10,10 @@ window.Auth = (function () {
   let currentUser = loadUserSession();
   let activeBranch = loadActiveBranch();
 
+  function getApiKey() {
+    return window.APP_CONFIG && window.APP_CONFIG.apiKey ? window.APP_CONFIG.apiKey : "";
+  }
+
   function getDeviceId() {
     let devId = null;
     try {
@@ -99,6 +103,15 @@ window.Auth = (function () {
 
     getDeviceId: getDeviceId,
     getDeviceName: getDeviceName,
+    getApiKey: getApiKey,
+    getAuthPayload: function () {
+      const sess = loadSessionToken();
+      return {
+        apiKey: getApiKey(),
+        sessionId: sess ? sess.sessionId : "",
+        deviceId: getDeviceId()
+      };
+    },
 
     validateSession: function () {
       currentUser = loadUserSession();
@@ -131,6 +144,7 @@ window.Auth = (function () {
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({
           action: "verify_session",
+          apiKey: getApiKey(),
           sessionId: sess.sessionId,
           deviceId: devId
         })
@@ -210,6 +224,7 @@ window.Auth = (function () {
           headers: { "Content-Type": "text/plain" },
           body: JSON.stringify({
             action: "login",
+            apiKey: getApiKey(),
             email: inputVal,
             pin: pinVal,
             deviceId: getDeviceId(),
@@ -253,6 +268,7 @@ window.Auth = (function () {
           headers: { "Content-Type": "text/plain" },
           body: JSON.stringify({
             action: "google_login",
+            apiKey: getApiKey(),
             email: emailVal,
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
@@ -295,6 +311,7 @@ window.Auth = (function () {
           headers: { "Content-Type": "text/plain" },
           body: JSON.stringify({
             action: "emergency_login",
+            apiKey: getApiKey(),
             code: codeVal,
             deviceId: getDeviceId(),
             deviceName: getDeviceName()

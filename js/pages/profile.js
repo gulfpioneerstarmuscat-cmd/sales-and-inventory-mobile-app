@@ -365,8 +365,13 @@
       return;
     }
 
+    const auth = window.Auth && typeof window.Auth.getAuthPayload === "function"
+      ? window.Auth.getAuthPayload()
+      : { apiKey: window.APP_CONFIG ? window.APP_CONFIG.apiKey || "" : "", sessionId: "" };
+    const authParams = `&apiKey=${encodeURIComponent(auth.apiKey)}` + (auth.sessionId ? `&sessionId=${encodeURIComponent(auth.sessionId)}` : "");
+
     // Benchmark Read (GET)
-    fetch(url + "?branch=" + (window.Auth ? window.Auth.getActiveBranch() : "alkhoud"), { method: "GET" })
+    fetch(url + "?branch=" + (window.Auth ? window.Auth.getActiveBranch() : "alkhoud") + authParams, { method: "GET" })
       .then((res) => {
         const readTime = (performance.now() - startTime).toFixed(0);
         // Benchmark Write (POST)
@@ -375,7 +380,7 @@
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "ping", branch: window.Auth ? window.Auth.getActiveBranch() : "alkhoud" })
+          body: JSON.stringify({ action: "ping", ...auth, branch: window.Auth ? window.Auth.getActiveBranch() : "alkhoud" })
         }).then(() => {
           const writeTime = (performance.now() - writeStart).toFixed(0);
           window.UI.toast(`⚡ Latency Result: Cloud Read: ${readTime}ms | Cloud Write: ${writeTime}ms`, "success");

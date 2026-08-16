@@ -2,6 +2,8 @@
 // Keep your private Google Apps Script Web App URL and API keys here.
 
 window.APP_CONFIG = {
+  // Shared API Secret Key for dual-layer authentication
+  apiKey: "GPS-SECURE-API-KEY-2026-V1",
   // Google Sheets Web App Deployment URL
   googleSheetWebAppUrl: "https://script.google.com/macros/s/AKfycbzUOx8artEo038yUshbf6PQlVXFbxNpSRVNyUztrj9BQTwJXqLe9ykxxmhpstKHwhyH/exec",
   // Google OAuth 2.0 Web Client ID (Replace with your Client ID from Google Cloud Console)

@@ -42,6 +42,22 @@ window.DataStore = (function () {
     }
   }
 
+  function getAuthPayload() {
+    if (window.Auth && typeof window.Auth.getAuthPayload === "function") {
+      return window.Auth.getAuthPayload();
+    }
+    const apiKey = window.APP_CONFIG && window.APP_CONFIG.apiKey ? window.APP_CONFIG.apiKey : "";
+    let sessionId = "";
+    try {
+      const stored = localStorage.getItem("gps_session_token_v1");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.sessionId) sessionId = parsed.sessionId;
+      }
+    } catch (e) {}
+    return { apiKey: apiKey, sessionId: sessionId };
+  }
+
   // Auto re-sync when user switches branch
   window.addEventListener("branchChanged", function () {
     window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
@@ -126,11 +142,12 @@ window.DataStore = (function () {
 
       // 3. Background Sync to Google Sheets API with branch target
       if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
+        const auth = getAuthPayload();
         fetch(webAppUrl, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "add_sale", branch: branch, ...saleData })
+          body: JSON.stringify({ action: "add_sale", branch: branch, ...auth, ...saleData })
         })
           .then(() => {
             console.log(`Background sync completed for ${branch}!`);
@@ -179,11 +196,12 @@ window.DataStore = (function () {
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
       if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
+        const auth = getAuthPayload();
         fetch(webAppUrl, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "add_stock_qty", branch: branch, ...payload })
+          body: JSON.stringify({ action: "add_stock_qty", branch: branch, ...auth, ...payload })
         }).catch((err) => console.error("Add stock sync error:", err));
       }
 
@@ -263,11 +281,12 @@ window.DataStore = (function () {
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
       if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
+        const auth = getAuthPayload();
         fetch(webAppUrl, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "amend_stock", branch: branch, auditRecord: auditRecord })
+          body: JSON.stringify({ action: "amend_stock", branch: branch, ...auth, auditRecord: auditRecord })
         }).catch((err) => console.error("Amend stock sync error:", err));
       }
 
@@ -309,11 +328,12 @@ window.DataStore = (function () {
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
       if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
+        const auth = getAuthPayload();
         fetch(webAppUrl, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "update_stock", branch: branch, item: itemData })
+          body: JSON.stringify({ action: "update_stock", branch: branch, ...auth, item: itemData })
         }).catch((err) => console.error("Stock update error:", err));
       }
 
@@ -330,10 +350,12 @@ window.DataStore = (function () {
       
       const lastSynced = this.getLastSyncedTime(branch);
       const sinceParam = lastSynced ? `&since=${encodeURIComponent(lastSynced)}` : "";
+      const auth = getAuthPayload();
+      const authParams = `&apiKey=${encodeURIComponent(auth.apiKey)}` + (auth.sessionId ? `&sessionId=${encodeURIComponent(auth.sessionId)}` : "");
 
       const syncUrl = webAppUrl.includes("?")
-        ? `${webAppUrl}&branch=${encodeURIComponent(branch)}${sinceParam}&${cacheBuster}`
-        : `${webAppUrl}?branch=${encodeURIComponent(branch)}${sinceParam}&${cacheBuster}`;
+        ? `${webAppUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`
+        : `${webAppUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`;
 
       // Adaptive Timeouts: Attempt 1 gets 15s (serverless cold-start window), Retries get 10s (warm container window)
       const timeoutMs = retriesSoFar === 0 ? 15000 : 10000;
