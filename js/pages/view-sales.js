@@ -222,6 +222,7 @@ window.initViewSales = (function () {
     const activeMonthLabel = formatMonthLabel(selectedStatsMonth);
 
     // Component Helper Configurations
+    const syncBtnHtml = window.renderSyncButtonHtml ? window.renderSyncButtonHtml("btn-sync-sales") : "";
     const isAdmin = window.Auth ? window.Auth.isAdmin() : false;
 
     const statCardsHtml = isAdmin
