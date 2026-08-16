@@ -222,9 +222,10 @@ window.initViewSales = (function () {
     const activeMonthLabel = formatMonthLabel(selectedStatsMonth);
 
     // Component Helper Configurations
-    const syncBtnHtml = window.renderSyncButtonHtml ? window.renderSyncButtonHtml("btn-sync-sales") : "";
+    const isAdmin = window.Auth ? window.Auth.isAdmin() : false;
 
-    const statCardsHtml = `
+    const statCardsHtml = isAdmin
+      ? `
       <div class="sales-stats-row">
         ${
           window.renderStatCardHtml
@@ -251,7 +252,8 @@ window.initViewSales = (function () {
             : ""
         }
       </div>
-    `;
+    `
+      : "";
 
     const dateTriggerExtraHtml = `
       <div class="date-picker-trigger-wrapper">

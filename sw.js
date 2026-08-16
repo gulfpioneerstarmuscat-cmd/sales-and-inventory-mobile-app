@@ -1,5 +1,5 @@
 // sw.js - Robust Service Worker with Network-First Strategy & Resilient PWA Pre-caching
-const CACHE_NAME = "gps-app-v63";
+const CACHE_NAME = "gps-app-v64";
 
 
 const ASSETS_TO_CACHE = [
