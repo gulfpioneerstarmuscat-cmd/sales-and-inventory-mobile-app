@@ -382,3 +382,10 @@ if ("serviceWorker" in navigator) {
       });
   });
 }
+
+// PWA Install Prompt Capture (Forces WebAPK generation instead of browser shortcut)
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  window.deferredPwaPrompt = e;
+  console.log("WebAPK Install Prompt captured");
+});
