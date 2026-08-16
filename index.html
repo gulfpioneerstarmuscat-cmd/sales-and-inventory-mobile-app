@@ -24,15 +24,62 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- Cold Start Loading Screen Overlay -->
-    <div id="cold-start-overlay" class="cold-start-overlay" aria-label="Loading latest data">
-      <div class="cold-start-content">
-        <div class="cold-start-logo-wrapper">
-          <div class="cold-start-spinner-ring"></div>
-          <img src="./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=50" alt="GPS Logo" class="cold-start-logo" />
+    <!-- 1. App Startup Splash Loading Screen -->
+    <div id="app-splash-screen" class="app-splash-screen" aria-label="Loading Application">
+      <div class="splash-content">
+        <div class="splash-logo-wrapper">
+          <div class="splash-spinner-ring"></div>
+          <img src="./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=50" alt="GPS Logo" class="splash-logo" />
         </div>
-        <div class="cold-start-title">Syncing Live Data...</div>
-        <div class="cold-start-subtitle">Fetching latest inventory & sales from cloud</div>
+        <div class="splash-title">Gulf Pioneer Star</div>
+        <div class="splash-subtitle" id="splash-status-text">Verifying Session & Loading Data...</div>
+      </div>
+    </div>
+
+    <!-- 2. Full-Screen Logged Out Protection Screen -->
+    <div id="logged-out-screen" class="logged-out-screen is-hidden" aria-label="Authentication Required">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-logo-badge">
+            <img src="./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=50" alt="GPS Logo" />
+          </div>
+          <h2 class="auth-title">Gulf Pioneer Star</h2>
+          <p class="auth-subtitle">Sales & Inventory Management System</p>
+        </div>
+
+        <form id="logged-out-login-form" class="auth-form" autocomplete="on">
+          <div class="auth-error-banner" id="auth-error-banner" hidden></div>
+
+          <div class="auth-field-group">
+            <label for="auth-username-input" class="auth-field-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              Username / Email
+            </label>
+            <input type="text" id="auth-username-input" class="auth-input" placeholder="Enter Username or Email" required autocomplete="username" />
+          </div>
+
+          <div class="auth-field-group">
+            <label for="auth-pin-input" class="auth-field-label">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              PIN Code
+            </label>
+            <input type="password" id="auth-pin-input" class="auth-input" placeholder="Enter PIN Code" maxlength="8" required autocomplete="current-password" />
+          </div>
+
+          <button type="submit" id="btn-auth-login" class="auth-submit-btn">
+            <span class="btn-text">Sign In to Account</span>
+            <div class="btn-spinner" id="auth-btn-spinner" hidden></div>
+          </button>
+        </form>
+
+        <div class="auth-quick-chips">
+          <span class="quick-chips-title">⚡ Instant Test Login:</span>
+          <div class="chips-flex">
+            <button type="button" class="auth-chip" data-user="admin@gps.om" data-pin="1234">👑 Boss (1234)</button>
+            <button type="button" class="auth-chip" data-user="alkhoud@gps.om" data-pin="1111">📍 Al Khoud (1111)</button>
+            <button type="button" class="auth-chip" data-user="ghala@gps.om" data-pin="2222">📍 Ghala (2222)</button>
+          </div>
+        </div>
       </div>
     </div>
 

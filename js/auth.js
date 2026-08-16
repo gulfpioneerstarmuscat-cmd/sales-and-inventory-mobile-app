@@ -1,47 +1,62 @@
-// js/auth.js - Multi-Branch Authentication & Session Management
+// js/auth.js - Multi-Branch Authentication & Session Management with Device ID & Cloud Sessions
 
 window.Auth = (function () {
   const STORAGE_KEY_USER = "gps_user_session_v1";
   const STORAGE_KEY_BRANCH = "gps_active_branch_v1";
+  const STORAGE_KEY_SESSION = "gps_session_token_v1";
+  const STORAGE_KEY_DEVICE = "gps_device_id_v1";
 
-  // Pre-configured test accounts for instant offline/local testing
-  const DEMO_USERS = [
-    {
-      email: "admin@gps.om",
-      name: "Boss / Admin",
-      role: "admin",
-      assignedBranch: "all",
-      pin: "1234",
-      allowedBranches: ["alkhoud", "ghala"]
-    },
-    {
-      email: "alkhoud@gps.om",
-      name: "Al Khoud Staff",
-      role: "staff",
-      assignedBranch: "alkhoud",
-      pin: "1111",
-      allowedBranches: ["alkhoud"]
-    },
-    {
-      email: "ghala@gps.om",
-      name: "Ghala Staff",
-      role: "staff",
-      assignedBranch: "ghala",
-      pin: "2222",
-      allowedBranches: ["ghala"]
-    }
-  ];
-
-  // Load active user session from localStorage (default to admin demo account if not set)
+  // Load active user session from localStorage (returns null if not logged in)
   let currentUser = loadUserSession();
   let activeBranch = loadActiveBranch();
+
+  function getDeviceId() {
+    let devId = null;
+    try {
+      devId = localStorage.getItem(STORAGE_KEY_DEVICE);
+      if (!devId) {
+        devId = "dev_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now().toString(36);
+        localStorage.setItem(STORAGE_KEY_DEVICE, devId);
+      }
+    } catch (e) {
+      devId = "dev_default";
+    }
+    return devId;
+  }
+
+  function getDeviceName() {
+    const ua = navigator.userAgent || "";
+    let os = "Device";
+    if (ua.includes("iPhone")) os = "iPhone";
+    else if (ua.includes("iPad")) os = "iPad";
+    else if (ua.includes("Android")) os = "Android Phone";
+    else if (ua.includes("Windows")) os = "Windows PC";
+    else if (ua.includes("Macintosh")) os = "Mac";
+
+    let browser = "Browser";
+    if (ua.includes("Chrome") && !ua.includes("Edg")) browser = "Chrome";
+    else if (ua.includes("Safari") && !ua.includes("Chrome")) browser = "Safari";
+    else if (ua.includes("Edg")) browser = "Edge";
+    else if (ua.includes("Firefox")) browser = "Firefox";
+
+    return `${os} (${browser})`;
+  }
 
   function loadUserSession() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY_USER);
-      return stored ? JSON.parse(stored) : DEMO_USERS[0];
+      return stored ? JSON.parse(stored) : null;
     } catch (e) {
-      return DEMO_USERS[0];
+      return null;
+    }
+  }
+
+  function loadSessionToken() {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_SESSION);
+      return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+      return null;
     }
   }
 
@@ -57,12 +72,15 @@ window.Auth = (function () {
       : "alkhoud";
   }
 
-  function saveSession(user, branch) {
+  function saveSession(user, branch, sessionData) {
     currentUser = user;
     activeBranch = branch;
     try {
       localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
       localStorage.setItem(STORAGE_KEY_BRANCH, branch);
+      if (sessionData) {
+        localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(sessionData));
+      }
     } catch (e) {}
   }
 
@@ -73,6 +91,74 @@ window.Auth = (function () {
 
     getCurrentUser: function () {
       return currentUser ? { ...currentUser } : null;
+    },
+
+    getSessionToken: function () {
+      return loadSessionToken();
+    },
+
+    getDeviceId: getDeviceId,
+    getDeviceName: getDeviceName,
+
+    validateSession: function () {
+      currentUser = loadUserSession();
+      const sess = loadSessionToken();
+      if (currentUser && (currentUser.email || currentUser.role)) {
+        if (sess && sess.expiresAt) {
+          const expTime = new Date(sess.expiresAt).getTime();
+          if (!isNaN(expTime) && Date.now() > expTime) {
+            this.logout();
+            return null;
+          }
+        }
+        return { ...currentUser };
+      }
+      return null;
+    },
+
+    verifySessionWithCloud: function (webAppUrl) {
+      const sess = loadSessionToken();
+      const devId = getDeviceId();
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null);
+
+      if (!sess || !sess.sessionId || !targetUrl || !targetUrl.startsWith("http")) {
+        return Promise.resolve({ valid: true });
+      }
+
+      return fetch(targetUrl, {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({
+          action: "verify_session",
+          sessionId: sess.sessionId,
+          deviceId: devId
+        })
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data && data.status === "success" && data.valid) {
+            if (data.user) {
+              currentUser = data.user;
+              try { localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(currentUser)); } catch (e) {}
+            }
+            if (data.session && data.session.expiresAt) {
+              sess.expiresAt = data.session.expiresAt;
+              try { localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(sess)); } catch (e) {}
+            }
+            return { valid: true, user: currentUser };
+          }
+          console.warn("Session revoked or expired:", data ? data.message : "Invalid");
+          this.logout();
+          if (window.UI) {
+            window.UI.toast(data.message || "Session revoked by administrator", "warning");
+          }
+          return { valid: false, message: data ? data.message : "Session invalid" };
+        })
+        .catch((err) => {
+          console.warn("Cloud session check offline, using local session token");
+          return { valid: true, offline: true };
+        });
     },
 
     getActiveBranch: function () {
@@ -110,37 +196,25 @@ window.Auth = (function () {
       const inputVal = (emailOrUser || "").trim().toLowerCase();
       const pinVal = String(pin || "").trim();
 
-      // 1. Check local demo accounts first (for instant 0ms offline login)
-      const demoMatch = DEMO_USERS.find(
-        (u) =>
-          (u.email.toLowerCase() === inputVal || u.email.split("@")[0] === inputVal) &&
-          u.pin === pinVal
-      );
-
-      if (demoMatch) {
-        const userObj = {
-          email: demoMatch.email,
-          name: demoMatch.name,
-          role: demoMatch.role,
-          assignedBranch: demoMatch.assignedBranch,
-          allowedBranches: demoMatch.allowedBranches
-        };
-        const storedBranch = loadActiveBranch();
-        const initBranch = demoMatch.assignedBranch === "all"
-          ? (["alkhoud", "ghala"].includes(storedBranch) ? storedBranch : "alkhoud")
-          : demoMatch.assignedBranch;
-        saveSession(userObj, initBranch);
-        window.dispatchEvent(new CustomEvent("userLoggedIn", { detail: userObj }));
-        return Promise.resolve({ success: true, user: userObj });
+      if (!inputVal || !pinVal) {
+        return Promise.resolve({ success: false, message: "Please enter Username/Email and PIN Code" });
       }
 
-      // 2. Cloud login check if Web App URL is provided
-      if (webAppUrl && webAppUrl.startsWith("http")) {
-        return fetch(webAppUrl, {
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null);
+
+      // Cloud login check against Google Sheets users & sessions sheet
+      if (targetUrl && targetUrl.startsWith("http")) {
+        return fetch(targetUrl, {
           method: "POST",
           mode: "cors",
           headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "login", email: inputVal, pin: pinVal })
+          body: JSON.stringify({
+            action: "login",
+            email: inputVal,
+            pin: pinVal,
+            deviceId: getDeviceId(),
+            deviceName: getDeviceName()
+          })
         })
           .then((res) => res.json())
           .then((data) => {
@@ -150,18 +224,18 @@ window.Auth = (function () {
               const initBranch = u.assignedBranch === "all"
                 ? (["alkhoud", "ghala"].includes(storedBranch) ? storedBranch : "alkhoud")
                 : u.assignedBranch;
-              saveSession(u, initBranch);
+              saveSession(u, initBranch, data.session);
               window.dispatchEvent(new CustomEvent("userLoggedIn", { detail: u }));
-              return { success: true, user: u };
+              return { success: true, user: u, session: data.session };
             }
-            return { success: false, message: data.message || "Invalid Credentials" };
+            return { success: false, message: data.message || "Invalid Credentials. Check Username/PIN Code." };
           })
           .catch((err) => {
-            return { success: false, message: "Network error during login check" };
+            return { success: false, message: "Network error checking login credentials" };
           });
       }
 
-      return Promise.resolve({ success: false, message: "Invalid Email or PIN Code" });
+      return Promise.resolve({ success: false, message: "Backend Web App URL not configured" });
     },
 
     logout: function () {
@@ -170,6 +244,7 @@ window.Auth = (function () {
       try {
         localStorage.removeItem(STORAGE_KEY_USER);
         localStorage.removeItem(STORAGE_KEY_BRANCH);
+        localStorage.removeItem(STORAGE_KEY_SESSION);
       } catch (e) {}
 
       window.dispatchEvent(new CustomEvent("userLoggedOut"));
@@ -194,10 +269,6 @@ window.Auth = (function () {
         new CustomEvent("userUpdated", { detail: { user: { ...currentUser } } })
       );
       return true;
-    },
-
-    getDemoAccounts: function () {
-      return [...DEMO_USERS];
     }
   };
 })();

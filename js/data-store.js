@@ -1,21 +1,6 @@
 // js/data-store.js - High Performance Branch-Scoped Data Store for Sales & Inventory
 
 window.DataStore = (function () {
-  // Sample Fallbacks per branch if local storage and cloud have zero items
-  const DEFAULT_INVENTORY = {
-    alkhoud: [
-      { sku: "SKU-65239E2A", name: "Beninca 600KG", category: "Gate Automation", qty: 15, alertLevel: 3 },
-      { sku: "SKU-99A04B11", name: "Beninca Pupilla Photo Cell", category: "Accessories", qty: 25, alertLevel: 5 },
-      { sku: "SKU-31FA78B0", name: "Beninca TO.GO 2VA Remote", category: "Remotes", qty: 40, alertLevel: 10 },
-      { sku: "SKU-E84C12D5", name: "Armored Cable 3 Core 2.5mm", category: "Cables", qty: 100, alertLevel: 20 }
-    ],
-    ghala: [
-      { sku: "SKU-65239E2A", name: "Beninca 600KG", category: "Gate Automation", qty: 8, alertLevel: 2 },
-      { sku: "SKU-99A04B11", name: "Beninca Pupilla Photo Cell", category: "Accessories", qty: 12, alertLevel: 5 },
-      { sku: "SKU-31FA78B0", name: "Beninca TO.GO 2VA Remote", category: "Remotes", qty: 20, alertLevel: 8 }
-    ]
-  };
-
   function getActiveBranch() {
     return window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
   }
@@ -30,9 +15,9 @@ window.DataStore = (function () {
     const key = getStorageKey("inventory", b);
     try {
       const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : (DEFAULT_INVENTORY[b] || DEFAULT_INVENTORY.alkhoud);
+      return stored ? JSON.parse(stored) : [];
     } catch (e) {
-      return DEFAULT_INVENTORY[b] || DEFAULT_INVENTORY.alkhoud;
+      return [];
     }
   }
 

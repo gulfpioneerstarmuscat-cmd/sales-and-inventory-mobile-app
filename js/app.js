@@ -121,36 +121,149 @@ document.addEventListener("DOMContentLoaded", () => {
 
   showPage(1);
 
-  // Cold Start Loading Screen Overlay Management
-  const coldStartOverlay = document.getElementById("cold-start-overlay");
+  // --------------------------------------------------------------------------
+  // App Startup Lifecycle & Auth Protection Guard
+  // --------------------------------------------------------------------------
+  const splashScreen = document.getElementById("app-splash-screen");
+  const splashStatusText = document.getElementById("splash-status-text");
+  const loggedOutScreen = document.getElementById("logged-out-screen");
+  const mainAppContainer = document.querySelector(".bg");
+  const loginForm = document.getElementById("logged-out-login-form");
+  const authErrorBanner = document.getElementById("auth-error-banner");
+  const authBtnSpinner = document.getElementById("auth-btn-spinner");
+  const authChips = document.querySelectorAll(".auth-chip");
 
-  function hideColdStartOverlay() {
-    if (coldStartOverlay && !coldStartOverlay.classList.contains("is-hidden")) {
-      coldStartOverlay.classList.add("is-hidden");
-      setTimeout(() => {
-        coldStartOverlay.style.display = "none";
-      }, 600);
+  function showLoadingScreen(message) {
+    if (splashStatusText && message) {
+      splashStatusText.textContent = message;
+    }
+    if (splashScreen) {
+      splashScreen.classList.remove("is-hidden");
     }
   }
 
-  // Safety fallback: Hide overlay after max 35s even if offline
-  const maxOverlayTimeout = setTimeout(hideColdStartOverlay, 35000);
-
-  // Trigger immediate initial cloud sync for all authorized branches on app startup
-  const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
-  if (window.DataStore && webAppUrl) {
-    const syncPromise = typeof window.DataStore.syncAllBranches === "function"
-      ? window.DataStore.syncAllBranches(webAppUrl)
-      : window.DataStore.syncFromCloud(webAppUrl);
-
-    syncPromise.finally(() => {
-      clearTimeout(maxOverlayTimeout);
-      hideColdStartOverlay();
-    });
-  } else {
-    clearTimeout(maxOverlayTimeout);
-    hideColdStartOverlay();
+  function hideSplashScreen() {
+    if (splashScreen && !splashScreen.classList.contains("is-hidden")) {
+      splashScreen.classList.add("is-hidden");
+    }
   }
+
+  function showFullApp() {
+    if (mainAppContainer) mainAppContainer.style.display = "block";
+    if (loggedOutScreen) loggedOutScreen.classList.add("is-hidden");
+    setTimeout(() => {
+      hideSplashScreen();
+    }, 300);
+
+    // Trigger cloud data sync when entering full app
+    const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+    if (window.DataStore && webAppUrl) {
+      if (typeof window.DataStore.syncAllBranches === "function") {
+        window.DataStore.syncAllBranches(webAppUrl);
+      } else {
+        window.DataStore.syncFromCloud(webAppUrl);
+      }
+    }
+  }
+
+  function showLoggedOutScreen() {
+    if (mainAppContainer) mainAppContainer.style.display = "none";
+    if (loggedOutScreen) loggedOutScreen.classList.remove("is-hidden");
+    hideSplashScreen();
+  }
+
+  // 1. Initial Session Check: Splash Screen -> Session ID Checking Loading Screen
+  showLoadingScreen("Checking Session ID...");
+  const sessionUser = window.Auth ? window.Auth.validateSession() : null;
+
+  if (sessionUser) {
+    const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+    if (window.Auth && typeof window.Auth.verifySessionWithCloud === "function") {
+      window.Auth.verifySessionWithCloud(webAppUrl)
+        .then((res) => {
+          if (res && res.valid) {
+            showLoadingScreen("Session Verified! Loading App...");
+            showFullApp();
+          } else {
+            showLoggedOutScreen();
+          }
+        })
+        .catch(() => {
+          // If network error/offline, fallback to local session
+          showFullApp();
+        });
+    } else {
+      showFullApp();
+    }
+  } else {
+    setTimeout(() => {
+      showLoggedOutScreen();
+    }, 400);
+  }
+
+  // 2. Handle Login Submit: Logged Out Screen -> Authenticating Email & PIN Loading Screen -> App / Logged Out Screen
+  if (loginForm) {
+    loginForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const uIn = document.getElementById("auth-username-input");
+      const pIn = document.getElementById("auth-pin-input");
+      const uVal = uIn ? uIn.value : "";
+      const pVal = pIn ? pIn.value : "";
+
+      if (authErrorBanner) authErrorBanner.hidden = true;
+      if (authBtnSpinner) authBtnSpinner.hidden = false;
+
+      // Show Full-Screen Loading State: "Authenticating Email & PIN..."
+      showLoadingScreen("Authenticating Email & PIN...");
+
+      const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+      if (window.Auth) {
+        window.Auth.login(uVal, pVal, webAppUrl).then((res) => {
+          if (authBtnSpinner) authBtnSpinner.hidden = true;
+          if (res.success) {
+            showLoadingScreen("Credentials Validated! Loading App...");
+            showFullApp();
+            if (window.UI) window.UI.toast(`Welcome back, ${res.user.name || res.user.email}!`, "success");
+            if (uIn) uIn.value = "";
+            if (pIn) pIn.value = "";
+          } else {
+            showLoggedOutScreen();
+            if (authErrorBanner) {
+              authErrorBanner.textContent = res.message || "Invalid Username/Email or PIN Code";
+              authErrorBanner.hidden = false;
+            }
+            if (window.UI) window.UI.toast(res.message || "Login failed", "error");
+          }
+        }).catch(() => {
+          if (authBtnSpinner) authBtnSpinner.hidden = true;
+          showLoggedOutScreen();
+          if (authErrorBanner) {
+            authErrorBanner.textContent = "Network error. Please check your connection.";
+            authErrorBanner.hidden = false;
+          }
+        });
+      }
+    });
+  }
+
+  // Handle Quick Fill Chips
+  authChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const uIn = document.getElementById("auth-username-input");
+      const pIn = document.getElementById("auth-pin-input");
+      if (uIn) uIn.value = chip.dataset.user || "";
+      if (pIn) pIn.value = chip.dataset.pin || "";
+    });
+  });
+
+  // Global Auth Event Listeners
+  window.addEventListener("userLoggedOut", () => {
+    showLoggedOutScreen();
+  });
+
+  window.addEventListener("userLoggedIn", () => {
+    showFullApp();
+  });
 
   // Initial 60s countdown timer startup
   if (window.SyncCountdownManager) {
@@ -159,6 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Re-sync and reset countdown on branch change
   window.addEventListener("branchChanged", () => {
+    const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
     if (window.SyncCountdownManager) {
       window.SyncCountdownManager.reset();
       window.SyncCountdownManager.triggerSync(false);
