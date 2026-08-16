@@ -247,23 +247,7 @@
   gap: 8px;
 }
 
-.demo-login-btn {
-  padding: 8px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 10px;
-  border: 1px dashed rgba(69, 103, 250, 0.4);
-  background: rgba(255, 255, 255, 0.7);
-  color: #334155;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.15s ease;
-}
 
-.demo-login-btn:hover {
-  background: rgba(69, 103, 250, 0.1);
-  color: var(--color-brand, #4567fa);
-}
 
 .dev-btns-grid {
   display: grid;
@@ -299,8 +283,6 @@
 .dev-btn--warning:hover { border-color: #d97706; color: #b45309; }
 .dev-btn--error:hover { border-color: #dc2626; color: #b91c1c; }
 .dev-btn--lowstock:hover { border-color: #f59e0b; color: #d97706; }
-.dev-btn--dummy { background: rgba(238, 242, 255, 0.8); border-color: rgba(99, 102, 241, 0.3); color: #4338ca; }
-.dev-btn--dummy:hover { background: #6366f1; color: #ffffff; }
 
 .btn-logout {
   width: 100%;
@@ -414,44 +396,7 @@
   box-shadow: 0 0 0 3px rgba(69, 103, 250, 0.15);
 }
 
-.login-quick-fill-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 8px;
-  border-top: 1px dashed rgba(203, 213, 225, 0.8);
-}
 
-.quick-fill-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #64748b;
-}
-
-.quick-fill-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.quick-fill-chip {
-  padding: 6px 10px;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 8px;
-  border: 1px solid rgba(69, 103, 250, 0.25);
-  background: rgba(255, 255, 255, 0.9);
-  color: #1e3a8a;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.quick-fill-chip:hover {
-  background: var(--color-brand, #4567fa);
-  color: #ffffff;
-  border-color: var(--color-brand, #4567fa);
-  transform: translateY(-1px);
-}
 
 /* Not Logged In State Card Styling */
 .not-logged-in-card {

@@ -131,7 +131,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const loginForm = document.getElementById("logged-out-login-form");
   const authErrorBanner = document.getElementById("auth-error-banner");
   const authBtnSpinner = document.getElementById("auth-btn-spinner");
-  const authChips = document.querySelectorAll(".auth-chip");
 
   function showLoadingScreen(message) {
     if (splashStatusText && message) {
@@ -246,15 +245,71 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Handle Quick Fill Chips
-  authChips.forEach((chip) => {
-    chip.addEventListener("click", () => {
-      const uIn = document.getElementById("auth-username-input");
-      const pIn = document.getElementById("auth-pin-input");
-      if (uIn) uIn.value = chip.dataset.user || "";
-      if (pIn) pIn.value = chip.dataset.pin || "";
+  // Handle Google Login Button Click
+  const btnGoogleAuth = document.getElementById("btn-auth-google");
+  if (btnGoogleAuth) {
+    const originalGoogleBtnHtml = btnGoogleAuth.innerHTML;
+
+    function resetGoogleBtnState() {
+      if (btnGoogleAuth) {
+        btnGoogleAuth.innerHTML = originalGoogleBtnHtml;
+        btnGoogleAuth.disabled = false;
+        btnGoogleAuth.style.opacity = "1";
+      }
+    }
+
+    btnGoogleAuth.addEventListener("click", () => {
+      if (!window.Auth || typeof window.Auth.initGoogleAuth !== "function") return;
+
+      if (authErrorBanner) authErrorBanner.hidden = true;
+
+      // Immediate UI visual feedback on click
+      btnGoogleAuth.disabled = true;
+      btnGoogleAuth.style.opacity = "0.75";
+      btnGoogleAuth.innerHTML = `<span>Connecting to Google...</span>`;
+
+      window.Auth.initGoogleAuth(
+        (googleEmail, tokenData) => {
+          showLoadingScreen(`Authenticating Google Account (${googleEmail})...`);
+          resetGoogleBtnState();
+
+          const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+          window.Auth.loginWithGoogle(googleEmail, webAppUrl)
+            .then((res) => {
+              if (res.success) {
+                showLoadingScreen("Google Account Validated! Loading App...");
+                showFullApp();
+                if (window.UI) window.UI.toast(`Welcome back, ${res.user.name || res.user.email}!`, "success");
+              } else {
+                showLoggedOutScreen();
+                if (authErrorBanner) {
+                  authErrorBanner.textContent = res.message || `Google account (${googleEmail}) is not authorized.`;
+                  authErrorBanner.hidden = false;
+                }
+                if (window.UI) window.UI.toast(res.message || "Google login failed", "error");
+              }
+            })
+            .catch(() => {
+              showLoggedOutScreen();
+              if (authErrorBanner) {
+                authErrorBanner.textContent = "Network error verifying Google account. Please try again.";
+                authErrorBanner.hidden = false;
+              }
+            });
+        },
+        (errMessage) => {
+          resetGoogleBtnState();
+          if (authErrorBanner && errMessage) {
+            authErrorBanner.textContent = errMessage;
+            authErrorBanner.hidden = false;
+          }
+          if (window.UI && errMessage) {
+            window.UI.toast(errMessage, "warning");
+          }
+        }
+      );
     });
-  });
+  }
 
   // Global Auth Event Listeners
   window.addEventListener("userLoggedOut", () => {

@@ -114,7 +114,25 @@
       const googleBtn = container.querySelector("#btn-google-login");
       if (googleBtn) {
         googleBtn.onclick = () => {
-          if (window.UI) window.UI.toast("Google Auth initialized (Ready for connection)", "info");
+          if (window.Auth && typeof window.Auth.initGoogleAuth === "function") {
+            window.Auth.initGoogleAuth(
+              (googleEmail) => {
+                const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+                window.Auth.loginWithGoogle(googleEmail, webAppUrl).then((res) => {
+                  if (res.success) {
+                    closeProfileModal();
+                    updateTopProfileBadge();
+                    if (window.UI) window.UI.toast(`Welcome back, ${res.user.name || res.user.email}!`, "success");
+                  } else {
+                    if (window.UI) window.UI.toast(res.message || "Google login failed", "error");
+                  }
+                });
+              },
+              (errMessage) => {
+                if (window.UI && errMessage) window.UI.toast(errMessage, "warning");
+              }
+            );
+          }
         };
       }
       return;
@@ -173,22 +191,6 @@
             <span>⚡ Developer Test (Admin Only)</span>
           </h4>
           
-          <!-- Sub-section: Account Switcher -->
-          <div class="dev-test-group">
-            <div class="dev-group-label">Quick Account Switcher</div>
-            <div class="demo-buttons-grid">
-              <button type="button" class="demo-login-btn" data-user="admin@gps.om" data-pin="1234">
-                👑 Boss / Admin
-              </button>
-              <button type="button" class="demo-login-btn" data-user="alkhoud@gps.om" data-pin="1111">
-                📍 Al Khoud Staff
-              </button>
-              <button type="button" class="demo-login-btn" data-user="ghala@gps.om" data-pin="2222">
-                📍 Ghala Staff
-              </button>
-            </div>
-          </div>
-
           <!-- Sub-section: Notification Testing -->
           <div class="dev-test-group">
             <div class="dev-group-label">Test Notifications</div>
@@ -217,22 +219,6 @@
               </button>
               <button type="button" class="dev-action-btn" id="btn-test-sync">
                 🔄 Check Sync Timings
-              </button>
-            </div>
-          </div>
-
-          <!-- Sub-section: Dummy Data Generators -->
-          <div class="dev-test-group">
-            <div class="dev-group-label">Dummy Data Generators</div>
-            <div class="dev-btns-grid">
-              <button type="button" class="dev-action-btn dev-btn--dummy" id="btn-dummy-add-sale">
-                🛒 Add Dummy Sale
-              </button>
-              <button type="button" class="dev-action-btn dev-btn--dummy" id="btn-dummy-new-stock">
-                📦 Add Dummy Stock (New)
-              </button>
-              <button type="button" class="dev-action-btn dev-btn--dummy" id="btn-dummy-exist-stock">
-                ➕ Add Dummy Stock (+5 Existing)
               </button>
             </div>
           </div>
@@ -269,23 +255,6 @@
       });
     });
 
-    // Account Switcher click handlers
-    const demoBtns = container.querySelectorAll(".demo-login-btn");
-    demoBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const u = btn.dataset.user;
-        const p = btn.dataset.pin;
-        if (window.Auth) {
-          const webUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null;
-          window.Auth.login(u, p, webUrl).then(() => {
-            updateTopProfileBadge();
-            renderProfileContent(container);
-            if (window.UI) window.UI.toast(`Switched account to ${u}`, "info");
-          });
-        }
-      });
-    });
-
     // Test Notifications Click Handlers
     const btnSuccess = container.querySelector("#btn-test-notif-success");
     if (btnSuccess) btnSuccess.onclick = () => window.UI && window.UI.toast("✅ Test Success Notification!", "success");
@@ -317,15 +286,7 @@
       };
     }
 
-    // Dummy Data Generator Handlers
-    const btnDummySale = container.querySelector("#btn-dummy-add-sale");
-    if (btnDummySale) btnDummySale.onclick = () => runDummyAddSale();
 
-    const btnDummyNewStock = container.querySelector("#btn-dummy-new-stock");
-    if (btnDummyNewStock) btnDummyNewStock.onclick = () => runDummyAddNewStock();
-
-    const btnDummyExistStock = container.querySelector("#btn-dummy-exist-stock");
-    if (btnDummyExistStock) btnDummyExistStock.onclick = () => runDummyAddExistingStock();
 
     // Logout handler
     const logoutBtn = container.querySelector("#btn-logout");
@@ -425,90 +386,6 @@
       });
   }
 
-  function runDummyAddSale() {
-    if (!window.DataStore) return;
-    const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
-    const inventory = typeof window.DataStore.getInventory === "function" 
-      ? window.DataStore.getInventory(branch) 
-      : [];
-    const item = (inventory && inventory.length > 0) ? inventory[0] : { name: "Beninca 600KG", qty: 10 };
-    
-    const dummySale = {
-      date: new Date().toISOString().split("T")[0],
-      customerName: "Test Customer " + Math.floor(Math.random() * 90 + 10),
-      customerNumber: "9" + Math.floor(Math.random() * 8999999 + 1000000),
-      customerEmail: "testcustomer@gps.om",
-      vatBill: "yes",
-      paymentStatus: "paid",
-      paymentMethod: "cash",
-      cashAmount: 45.500,
-      cardAmount: 0.000,
-      grandTotal: 45.500,
-      items: [
-        { name: item.name, qty: 1, unitPrice: 45.500 }
-      ]
-    };
-
-    const webUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null;
-    const res = typeof window.DataStore.recordSale === "function"
-      ? window.DataStore.recordSale(dummySale, webUrl)
-      : { success: false };
-
-    if (res && res.success && window.UI) {
-      window.UI.toast(`🛒 Dummy Sale recorded for ${dummySale.customerName} (45.500 OMR)`, "success");
-    }
-  }
-
-  function runDummyAddNewStock() {
-    if (!window.DataStore) return;
-    const randomId = Math.floor(Math.random() * 900 + 100);
-    const newItem = {
-      name: "Auto Gate Motor X-" + randomId,
-      category: "Automation",
-      addQty: 15,
-      alertLevel: 5,
-      sku: "SKU-" + randomId + "X",
-      remarks: "Dummy New Stock"
-    };
-
-    const webUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null;
-    const res = typeof window.DataStore.addStockQuantity === "function"
-      ? window.DataStore.addStockQuantity(newItem, webUrl)
-      : { success: false };
-
-    if (res && res.success && window.UI) {
-      window.UI.toast(`📦 Added New Item: ${newItem.name} (Qty: 15)`, "success");
-    }
-  }
-
-  function runDummyAddExistingStock() {
-    if (!window.DataStore) return;
-    const branch = window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
-    const inventory = typeof window.DataStore.getInventory === "function"
-      ? window.DataStore.getInventory(branch)
-      : [];
-    if (!inventory || inventory.length === 0) {
-      if (window.UI) window.UI.toast("No existing inventory items found in active branch", "warning");
-      return;
-    }
-    const item = inventory[0];
-    const webUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null;
-    
-    const res = typeof window.DataStore.addStockQuantity === "function"
-      ? window.DataStore.addStockQuantity({
-          name: item.name,
-          addQty: 5,
-          category: item.category,
-          alertLevel: item.alertLevel,
-          remarks: "Dummy Test Increment +5"
-        }, webUrl)
-      : { success: false };
-
-    if (res && res.success && window.UI) {
-      window.UI.toast(`➕ Added +5 stock to existing item '${item.name}'`, "success");
-    }
-  }
-
   function showLoginModal() {
     if (!window.UI) return;
     window.UI.modal({
@@ -540,15 +417,6 @@
               <input type="password" id="login-pin-input" class="form-input login-input" placeholder="Enter PIN Code" maxlength="8" autocomplete="current-password" />
             </div>
           </div>
-
-          <div class="login-quick-fill-section">
-            <span class="quick-fill-label">⚡ Instant Test Fill:</span>
-            <div class="quick-fill-chips">
-              <button type="button" class="quick-fill-chip" data-user="admin@gps.om" data-pin="1234">👑 Boss (1234)</button>
-              <button type="button" class="quick-fill-chip" data-user="alkhoud@gps.om" data-pin="1111">📍 Al Khoud (1111)</button>
-              <button type="button" class="quick-fill-chip" data-user="ghala@gps.om" data-pin="2222">📍 Ghala (2222)</button>
-            </div>
-          </div>
         </div>
       `,
       cancelText: "Cancel",
@@ -575,19 +443,6 @@
         }
       }
     });
-
-    // Attach quick fill chips event handlers
-    setTimeout(() => {
-      const chips = document.querySelectorAll(".quick-fill-chip");
-      chips.forEach((chip) => {
-        chip.addEventListener("click", () => {
-          const uIn = document.getElementById("login-user-input");
-          const pIn = document.getElementById("login-pin-input");
-          if (uIn) uIn.value = chip.dataset.user || "";
-          if (pIn) pIn.value = chip.dataset.pin || "";
-        });
-      });
-    }, 50);
   }
 
   // Expose methods globally

@@ -1057,43 +1057,32 @@ input[type="date"] {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
-.auth-quick-chips {
-  border-top: 1px solid rgba(255, 255, 255, 0.3);
-  padding-top: 14px;
+.auth-google-btn {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.quick-chips-title {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.9);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.chips-flex {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.auth-chip {
-  padding: 6px 11px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  background: rgba(255, 255, 255, 0.25);
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px;
+  margin-top: 6px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #ffffff;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
-.auth-chip:hover,
-.auth-chip:active {
-  background: rgba(255, 255, 255, 0.45);
-  transform: scale(1.03);
+.auth-google-btn:hover,
+.auth-google-btn:active {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 

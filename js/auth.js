@@ -238,6 +238,149 @@ window.Auth = (function () {
       return Promise.resolve({ success: false, message: "Backend Web App URL not configured" });
     },
 
+    loginWithGoogle: function (googleEmail, webAppUrl) {
+      const emailVal = (googleEmail || "").trim().toLowerCase();
+      if (!emailVal) {
+        return Promise.resolve({ success: false, message: "Google Email is required" });
+      }
+
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null);
+
+      if (targetUrl && targetUrl.startsWith("http")) {
+        return fetch(targetUrl, {
+          method: "POST",
+          mode: "cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "google_login",
+            email: emailVal,
+            deviceId: getDeviceId(),
+            deviceName: getDeviceName()
+          })
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data && data.status === "success" && data.user) {
+              const u = data.user;
+              const storedBranch = loadActiveBranch();
+              const initBranch = u.assignedBranch === "all"
+                ? (["alkhoud", "ghala"].includes(storedBranch) ? storedBranch : "alkhoud")
+                : u.assignedBranch;
+              saveSession(u, initBranch, data.session);
+              window.dispatchEvent(new CustomEvent("userLoggedIn", { detail: u }));
+              return { success: true, user: u, session: data.session };
+            }
+            return { success: false, message: data.message || "Google email not authorized." };
+          })
+          .catch((err) => {
+            return { success: false, message: "Network error checking Google account" };
+          });
+      }
+
+      return Promise.resolve({ success: false, message: "Backend Web App URL not configured" });
+    },
+
+    _googleInitialized: false,
+    _googleTokenClient: null,
+    _activeGoogleSuccessCallback: null,
+    _activeGoogleErrorCallback: null,
+
+    initGoogleAuth: function (onSuccess, onError) {
+      const clientId = window.APP_CONFIG ? window.APP_CONFIG.googleClientId : "";
+      if (!clientId) {
+        if (typeof onError === "function") onError("Google Client ID is not configured in config.js");
+        return;
+      }
+      if (typeof window.google === "undefined" || !window.google.accounts) {
+        if (typeof onError === "function") onError("Google Identity library is loading... Please try again in a moment.");
+        return;
+      }
+
+      this._activeGoogleSuccessCallback = onSuccess;
+      this._activeGoogleErrorCallback = onError;
+
+      // 1. Google OAuth2 Token Client (Persistent instance for instant first-press execution)
+      if (window.google.accounts.oauth2) {
+        try {
+          if (!this._googleTokenClient) {
+            this._googleTokenClient = window.google.accounts.oauth2.initTokenClient({
+              client_id: clientId,
+              scope: "email profile",
+              callback: (tokenResponse) => {
+                const currentSuccess = this._activeGoogleSuccessCallback;
+                const currentError = this._activeGoogleErrorCallback;
+
+                if (tokenResponse && tokenResponse.access_token) {
+                  fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+                  })
+                    .then((res) => res.json())
+                    .then((userInfo) => {
+                      if (userInfo && userInfo.email) {
+                        if (typeof currentSuccess === "function") currentSuccess(userInfo.email, userInfo);
+                      } else if (typeof currentError === "function") {
+                        currentError("Could not retrieve email from Google Account");
+                      }
+                    })
+                    .catch(() => {
+                      if (typeof currentError === "function") currentError("Network error reading Google profile");
+                    });
+                } else if (tokenResponse && tokenResponse.error) {
+                  if (typeof currentError === "function") {
+                    currentError("Google Sign-In prompt closed or cancelled");
+                  }
+                }
+              },
+              error_callback: (err) => {
+                const currentError = this._activeGoogleErrorCallback;
+                if (typeof currentError === "function") currentError("Google Sign-In popup error");
+              }
+            });
+          }
+
+          // Request Google account picker popup immediately
+          this._googleTokenClient.requestAccessToken({ prompt: "select_account" });
+          return;
+        } catch (e) {
+          console.warn("Token client fallback to ID prompt:", e);
+        }
+      }
+
+      // 2. Fallback to Google ID Token prompt
+      if (window.google.accounts.id) {
+        try {
+          if (!this._googleInitialized) {
+            window.google.accounts.id.initialize({
+              client_id: clientId,
+              callback: (response) => {
+                const currentSuccess = this._activeGoogleSuccessCallback;
+                const currentError = this._activeGoogleErrorCallback;
+                if (response && response.credential) {
+                  try {
+                    const base64Url = response.credential.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+                      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    const tokenData = JSON.parse(jsonPayload);
+                    if (tokenData.email && typeof currentSuccess === "function") {
+                      currentSuccess(tokenData.email, tokenData);
+                    }
+                  } catch (e) {
+                    if (typeof currentError === "function") currentError("Error parsing Google account payload");
+                  }
+                }
+              }
+            });
+            this._googleInitialized = true;
+          }
+          window.google.accounts.id.prompt();
+        } catch (err) {
+          if (typeof onError === "function") onError("Failed to open Google Sign-In prompt");
+        }
+      }
+    },
+
     logout: function () {
       currentUser = null;
       activeBranch = "alkhoud";
