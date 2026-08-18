@@ -101,6 +101,8 @@ window.DataStore = (function () {
       // 1. Record Sale locally
       sales.unshift({
         ...saleData,
+        refundStatus: "NO",
+        isRefunded: false,
         branch: branch,
         id: Date.now(),
         timestamp: new Date().toISOString()
@@ -383,14 +385,47 @@ window.DataStore = (function () {
             }
             if (Array.isArray(data.sales)) {
               const localSales = loadBranchSales(branch);
-              const fifteenMinsAgo = Date.now() - 15 * 60 * 1000;
+              const sixtySecsAgo = Date.now() - 60 * 1000;
 
-              // Preserve recent local sales not yet present in cloud response
+              // Process each cloud sale strictly according to Google Sheets data
+              const processedCloudSales = data.sales.map((cs) => {
+                const rStatus = String(cs.refundStatus || "").trim().toUpperCase();
+                const isRef = rStatus === "REFUNDED" || rStatus === "YES" || cs.paymentStatus === "refunded";
+                return {
+                  ...cs,
+                  refundStatus: isRef ? "REFUNDED" : "NO",
+                  paymentStatus: isRef ? "refunded" : (cs.paymentStatus || "paid"),
+                  isRefunded: isRef
+                };
+              });
+
+              // Only preserve local refund status if refund was executed in the last 60s (in-flight POST window)
+              processedCloudSales.forEach((cs) => {
+                const matchingLocal = localSales.find((ls) => {
+                  const csName = String(cs.customerName || "").trim().toLowerCase();
+                  const lsName = String(ls.customerName || "").trim().toLowerCase();
+                  const csTotal = Number(cs.grandTotal) || 0;
+                  const lsTotal = Number(ls.grandTotal) || 0;
+                  return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001;
+                });
+
+                if (matchingLocal) {
+                  const refundedAtMs = matchingLocal.refundedAt ? new Date(matchingLocal.refundedAt).getTime() : 0;
+                  // If locally refunded within the last 60s, keep local refund status until POST completes
+                  if ((matchingLocal.isRefunded || matchingLocal.refundStatus === "REFUNDED") && refundedAtMs > sixtySecsAgo && !cs.isRefunded) {
+                    cs.isRefunded = true;
+                    cs.refundStatus = "REFUNDED";
+                    cs.paymentStatus = "refunded";
+                  }
+                }
+              });
+
+              // Preserve recent local pending sales not yet present in cloud response
               const recentPendingSales = localSales.filter((ls) => {
-                const isRecent = ls.id && typeof ls.id === "number" && ls.id > fifteenMinsAgo;
+                const isRecent = ls.id && typeof ls.id === "number" && ls.id > sixtySecsAgo;
                 if (!isRecent) return false;
 
-                const existsInCloud = data.sales.some((cs) => {
+                const existsInCloud = processedCloudSales.some((cs) => {
                   const csName = String(cs.customerName || "").trim().toLowerCase();
                   const lsName = String(ls.customerName || "").trim().toLowerCase();
                   const csTotal = Number(cs.grandTotal) || 0;
@@ -400,7 +435,7 @@ window.DataStore = (function () {
                 return !existsInCloud;
               });
 
-              const mergedSales = [...recentPendingSales, ...data.sales];
+              const mergedSales = [...recentPendingSales, ...processedCloudSales];
               saveBranchData("sales", mergedSales, branch);
             }
             const syncTime = new Date().toISOString();
@@ -465,6 +500,123 @@ window.DataStore = (function () {
       }
     },
 
+    refundSale: function (saleIdentifier, webAppUrl) {
+      const branch = getActiveBranch();
+      const sales = loadBranchSales(branch);
+      const inventory = loadBranchInventory(branch);
+
+      const targetIndex = sales.findIndex((s) => {
+        if (!s) return false;
+        if (s.id && String(s.id) === String(saleIdentifier)) return true;
+        if (typeof saleIdentifier === "object" && saleIdentifier !== null) {
+          if (s.id && saleIdentifier.id && String(s.id) === String(saleIdentifier.id)) return true;
+          return (
+            s.customerName === saleIdentifier.customerName &&
+            s.date === saleIdentifier.date &&
+            Number(s.grandTotal) === Number(saleIdentifier.grandTotal)
+          );
+        }
+        return false;
+      });
+
+      if (targetIndex < 0) {
+        return { success: false, message: "Target sale not found" };
+      }
+
+      const targetSale = sales[targetIndex];
+
+      if (targetSale.refundStatus === "REFUNDED" || targetSale.paymentStatus === "refunded" || targetSale.isRefunded) {
+        return { success: false, message: "Sale is already refunded" };
+      }
+
+      // 1. Mark Sale as Refunded
+      targetSale.refundStatus = "REFUNDED";
+      targetSale.paymentStatus = "refunded";
+      targetSale.isRefunded = true;
+      targetSale.refundedAt = new Date().toISOString();
+      sales[targetIndex] = targetSale;
+      saveBranchData("sales", sales, branch);
+
+      // 2. Return Items Stock to Inventory (Supports items array or itemsDetail string fallback)
+      let itemsToRestore = Array.isArray(targetSale.items) && targetSale.items.length > 0 ? targetSale.items : [];
+      if (itemsToRestore.length === 0 && typeof targetSale.itemsDetail === "string" && targetSale.itemsDetail.trim()) {
+        const lines = targetSale.itemsDetail.split("\n");
+        lines.forEach((line) => {
+          const match = line.match(/^(.*?)\s*\(Qty:\s*(\d+(?:\.\d+)?)/i);
+          if (match) {
+            itemsToRestore.push({
+              name: match[1].trim(),
+              qty: Number(match[2]) || 1
+            });
+          }
+        });
+      }
+
+      if (itemsToRestore.length > 0) {
+        itemsToRestore.forEach((soldItem) => {
+          const rawName = (soldItem.name || "").trim();
+          const name = rawName.toLowerCase();
+          const qtyToReturn = Number(soldItem.qty) || 0;
+
+          if (name && qtyToReturn > 0) {
+            const invIndex = inventory.findIndex(
+              (inv) => (inv.name || "").trim().toLowerCase() === name || name.includes((inv.name || "").trim().toLowerCase())
+            );
+            if (invIndex >= 0) {
+              inventory[invIndex].qty = (Number(inventory[invIndex].qty) || 0) + qtyToReturn;
+              inventory[invIndex].lastUpdated = new Date().toLocaleTimeString();
+            } else {
+              inventory.push({
+                sku: soldItem.sku || "SKU-" + Date.now().toString().slice(-5),
+                name: rawName || name,
+                category: soldItem.category || "General",
+                qty: qtyToReturn,
+                alertLevel: 5,
+                lastUpdated: new Date().toLocaleTimeString()
+              });
+            }
+          }
+        });
+        saveBranchData("inventory", inventory, branch);
+      }
+
+      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+
+      // 3. Background Sync to Cloud Backend
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "");
+
+      if (targetUrl && typeof targetUrl === "string" && targetUrl.startsWith("http")) {
+        const auth = getAuthPayload();
+        fetch(targetUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "refund_sale",
+            branch: branch,
+            saleId: targetSale.id,
+            timestamp: targetSale.timestamp || "",
+            saleDate: targetSale.date || "",
+            customerName: targetSale.customerName || "",
+            grandTotal: targetSale.grandTotal || 0,
+            itemsDetail: targetSale.itemsDetail || "",
+            items: itemsToRestore && itemsToRestore.length > 0 ? itemsToRestore : (targetSale.items || []),
+            refundStatus: "REFUNDED",
+            ...auth
+          })
+        })
+          .then(() => {
+            console.log(`Refund background sync completed for ${branch}!`);
+            setTimeout(() => {
+              this.syncFromCloud(targetUrl);
+            }, 2500);
+          })
+          .catch((err) => console.error("Refund sync error:", err));
+      }
+
+      return { success: true, sale: targetSale };
+    },
+
     clearCacheAndSync: function (webAppUrl) {
       const b = getActiveBranch();
       try {
@@ -476,3 +628,4 @@ window.DataStore = (function () {
     }
   };
 })();
+

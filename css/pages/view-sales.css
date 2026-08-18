@@ -388,6 +388,18 @@
   box-shadow: 0 3px 10px rgba(239, 68, 68, 0.12);
 }
 
+/* Muted Hue for Refunded Compact Tile */
+.compact-sale-tile--refunded {
+  background: rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  opacity: 0.85;
+}
+
+.compact-sale-tile--refunded:hover {
+  background: rgba(148, 163, 184, 0.18);
+  box-shadow: 0 3px 10px rgba(148, 163, 184, 0.15);
+}
+
 .tile-left {
   display: flex;
   flex-direction: column;
@@ -415,14 +427,15 @@
 .tile-amount {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: #1e293b;
 }
 
 .tile-badge {
   font-size: 10px;
   font-weight: 700;
   padding: 3px 8px;
-  border-radius: 8px;
+  border-radius: 12px;
+  white-space: nowrap;
 }
 
 .tile-badge--paid {
@@ -433,6 +446,41 @@
 .tile-badge--unpaid {
   background: rgba(239, 68, 68, 0.15);
   color: #dc2626;
+}
+
+.tile-badge--refunded {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+/* Red Refund Sale Button with White Text */
+.btn-refund-sale {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+
+.btn-refund-sale:hover {
+  background: #b91c1c !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
+}
+
+.btn-refund-sale:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(220, 38, 38, 0.2);
 }
 
 /* Month Selector Modal */

@@ -110,12 +110,14 @@ window.initViewSales = (function () {
         return false;
       }
 
+      const isRefunded = sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded);
+
       if (statusFilter === "today") {
         if (ymd !== todayStr) return false;
       } else if (statusFilter === "paid") {
-        if (sale.paymentStatus !== "paid") return false;
+        if (sale.paymentStatus !== "paid" || isRefunded) return false;
       } else if (statusFilter === "not_paid") {
-        if (sale.paymentStatus !== "not_paid") return false;
+        if (sale.paymentStatus !== "not_paid" || isRefunded) return false;
       }
 
       if (searchQuery) {
@@ -181,8 +183,9 @@ window.initViewSales = (function () {
       const ymd = getNormalizedYMD(s.date);
       const sMonthKey = ymd ? ymd.slice(0, 7) : "";
       const isMatchingMonth = selectedStatsMonth === "all" || sMonthKey === selectedStatsMonth;
+      const isRefunded = s.refundStatus === "REFUNDED" || s.paymentStatus === "refunded" || Boolean(s.isRefunded);
 
-      if (isMatchingMonth) {
+      if (isMatchingMonth && !isRefunded) {
         statsSalesCount++;
         const gTotal = Number(s.grandTotal) || 0;
         if (s.paymentStatus === "paid") {
@@ -201,14 +204,15 @@ window.initViewSales = (function () {
 
     allSales.forEach((s) => {
       const ymd = getNormalizedYMD(s.date);
+      const isRefunded = s.refundStatus === "REFUNDED" || s.paymentStatus === "refunded" || Boolean(s.isRefunded);
 
-      if (ymd === todayStr) {
+      if (ymd === todayStr && !isRefunded) {
         todayCount++;
       }
 
       const matchesPickedDate = !selectedDate || (ymd === selectedDate);
 
-      if (matchesPickedDate) {
+      if (matchesPickedDate && !isRefunded) {
         pillAllCount++;
         if (s.paymentStatus === "paid") {
           pillPaidCount++;
@@ -217,6 +221,7 @@ window.initViewSales = (function () {
         }
       }
     });
+
 
     const filteredSales = getFilteredSalesData();
     const activeMonthLabel = formatMonthLabel(selectedStatsMonth);
@@ -557,6 +562,7 @@ window.initViewSales = (function () {
     const existing = document.querySelector(".sale-detail-modal-backdrop");
     if (existing) existing.remove();
 
+    const isRefunded = sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded);
     const isPaid = sale.paymentStatus === "paid";
     const displayDateStr = formatDisplaySaleDate(sale.date);
 
@@ -591,6 +597,9 @@ window.initViewSales = (function () {
     const backdrop = document.createElement("div");
     backdrop.className = "dp-modal-backdrop sale-detail-modal-backdrop";
 
+    const badgeClass = isRefunded ? "tile-badge--refunded" : isPaid ? "tile-badge--paid" : "tile-badge--unpaid";
+    const badgeText = isRefunded ? "↩ Refunded" : isPaid ? "✓ Paid" : "⏳ Unpaid";
+
     backdrop.innerHTML = `
       <div class="dp-modal-card" style="max-width: 440px; width: 92vw;">
         <!-- Header Bar -->
@@ -601,8 +610,8 @@ window.initViewSales = (function () {
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
             <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
-            <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
-              ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
+            <span class="tile-badge ${badgeClass}">
+              ${badgeText}
             </span>
           </div>
           <span style="font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">Sale Date: ${escapeHtml(displayDateStr)}</span>
@@ -660,13 +669,23 @@ window.initViewSales = (function () {
             }
             <div class="pay-row pay-row--total">
               <span class="pay-lbl bold">Grand Total</span>
-              <span class="pay-val total-amount-big">OMR ${grandTotal.toFixed(3)}</span>
+              <span class="pay-val total-amount-big" style="${isRefunded ? "color: #dc2626; text-decoration: line-through;" : ""}">OMR ${grandTotal.toFixed(3)}</span>
             </div>
           </div>
         </div>
 
-        <!-- Footer Actions -->
-        <div class="dp-footer" style="justify-content: flex-end;">
+        <!-- Footer Actions: Bottom Left = Refund Button (Red, White Text), Bottom Right = Close Button -->
+        <div class="dp-footer" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div>
+            ${
+              isRefunded
+                ? `<span class="tile-badge tile-badge--refunded" style="font-size: 12px; padding: 6px 12px; border-radius: 8px;">↩ Sale Refunded</span>`
+                : `<button type="button" class="btn-refund-sale" id="btn-refund-sale">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    Refund Sale
+                   </button>`
+            }
+          </div>
           <button type="button" class="dp-btn-confirm" id="btn-close-sale-modal">Close</button>
         </div>
       </div>
@@ -674,6 +693,45 @@ window.initViewSales = (function () {
 
     backdrop.querySelector("#btn-close-sale-detail").addEventListener("click", () => backdrop.remove());
     backdrop.querySelector("#btn-close-sale-modal").addEventListener("click", () => backdrop.remove());
+
+    const refundBtn = backdrop.querySelector("#btn-refund-sale");
+    if (refundBtn) {
+      refundBtn.addEventListener("click", () => {
+        const formattedTotal = grandTotal.toFixed(3);
+        const confirmMsg = `Are you sure you want to refund this sale of OMR ${formattedTotal}?\n\nThis will return all purchased items back to inventory stock and revert monthly revenue and sales metrics.`;
+
+        const doRefund = () => {
+          const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
+          const res = window.DataStore ? window.DataStore.refundSale(sale.id || sale, webAppUrl) : { success: false };
+          if (res.success) {
+            if (window.UI && typeof window.UI.toast === "function") {
+              window.UI.toast("Sale refunded & stock returned to inventory!", "success");
+            }
+            backdrop.remove();
+            renderViewSalesUI();
+          } else {
+            if (window.UI && typeof window.UI.toast === "function") {
+              window.UI.toast(res.message || "Failed to refund sale", "error");
+            }
+          }
+        };
+
+        if (window.UI && typeof window.UI.modal === "function") {
+          window.UI.modal({
+            title: "Confirm Full Refund",
+            message: confirmMsg,
+            type: "danger",
+            dangerConfirm: true,
+            confirmText: "Yes, Refund Sale",
+            cancelText: "Cancel",
+            onConfirm: doRefund
+          });
+        } else if (window.confirm(confirmMsg)) {
+          doRefund();
+        }
+      });
+    }
+
     backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) backdrop.remove();
     });
@@ -682,19 +740,31 @@ window.initViewSales = (function () {
   }
 
   function renderCompactSaleTileHtml(sale, index) {
+    const isRefunded = sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded);
     const isPaid = sale.paymentStatus === "paid";
     const displayDateStr = formatDisplaySaleDate(sale.date);
     const grandTotal = Number(sale.grandTotal) || 0;
 
+    const badgeClass = isRefunded ? "tile-badge--refunded" : isPaid ? "tile-badge--paid" : "tile-badge--unpaid";
+    const badgeText = isRefunded ? "↩ Refunded" : isPaid ? "✓ Paid" : "⏳ Unpaid";
+
     const badgeHtml = `
-      <span class="tile-badge ${isPaid ? "tile-badge--paid" : "tile-badge--unpaid"}">
-        ${isPaid ? "✓ Paid" : "⏳ Unpaid"}
+      <span class="tile-badge ${badgeClass}">
+        ${badgeText}
       </span>
     `;
 
+    const containerClass = `compact-sale-tile ${
+      isRefunded
+        ? "compact-sale-tile--refunded"
+        : isPaid
+        ? "compact-sale-tile--paid"
+        : "compact-sale-tile--unpaid"
+    }`;
+
     if (window.renderCompactTileHtml) {
       return window.renderCompactTileHtml({
-        containerClass: `compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}`,
+        containerClass: containerClass,
         index: index,
         title: sale.customerName || "Walk-in Customer",
         subtitle: displayDateStr,
@@ -704,18 +774,19 @@ window.initViewSales = (function () {
     }
 
     return `
-      <div class="compact-tile compact-sale-tile ${isPaid ? "compact-sale-tile--paid" : "compact-sale-tile--unpaid"}" data-index="${index}">
+      <div class="compact-tile ${containerClass}" data-index="${index}">
         <div class="tile-left">
           <span class="tile-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</span>
           <span class="tile-subtitle">${escapeHtml(displayDateStr)}</span>
         </div>
         <div class="tile-right">
-          <span class="tile-metric">OMR ${grandTotal.toFixed(3)}</span>
+          <span class="tile-metric" style="${isRefunded ? "text-decoration: line-through; opacity: 0.7;" : ""} ">OMR ${grandTotal.toFixed(3)}</span>
           ${badgeHtml}
         </div>
       </div>
     `;
   }
+
 
   function escapeHtml(str) {
     return String(str || "")
