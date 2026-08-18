@@ -617,6 +617,82 @@ window.DataStore = (function () {
       return { success: true, sale: targetSale };
     },
 
+    markSaleAsPaid: function (saleIdentifier, paymentData, webAppUrl) {
+      const branch = getActiveBranch();
+      const sales = loadBranchSales(branch);
+
+      const targetIndex = sales.findIndex((s) => {
+        if (!s) return false;
+        if (s.id && String(s.id) === String(saleIdentifier)) return true;
+        if (typeof saleIdentifier === "object" && saleIdentifier !== null) {
+          if (s.id && saleIdentifier.id && String(s.id) === String(saleIdentifier.id)) return true;
+          return (
+            s.customerName === saleIdentifier.customerName &&
+            s.date === saleIdentifier.date &&
+            Number(s.grandTotal) === Number(saleIdentifier.grandTotal)
+          );
+        }
+        return false;
+      });
+
+      if (targetIndex < 0) {
+        return { success: false, message: "Target sale not found" };
+      }
+
+      const targetSale = sales[targetIndex];
+
+      if (targetSale.paymentStatus === "paid") {
+        return { success: false, message: "Sale is already marked as paid" };
+      }
+
+      // 1. Update Sale Payment Status & Breakdown locally
+      targetSale.paymentStatus = "paid";
+      targetSale.paymentMethod = paymentData.paymentMethod || "cash";
+      targetSale.cashAmount = Number(paymentData.cashAmount || 0);
+      targetSale.cardAmount = Number(paymentData.cardAmount || 0);
+      targetSale.paidAt = new Date().toISOString();
+
+      sales[targetIndex] = targetSale;
+      saveBranchData("sales", sales, branch);
+
+      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+
+      // 2. Background Sync to Cloud Backend
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "");
+
+      if (targetUrl && typeof targetUrl === "string" && targetUrl.startsWith("http")) {
+        const auth = getAuthPayload();
+        fetch(targetUrl, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: "mark_sale_paid",
+            branch: branch,
+            saleId: targetSale.id,
+            timestamp: targetSale.timestamp || "",
+            saleDate: targetSale.date || "",
+            customerName: targetSale.customerName || "",
+            grandTotal: targetSale.grandTotal || 0,
+            paymentStatus: "paid",
+            paymentMethod: targetSale.paymentMethod,
+            cashAmount: targetSale.cashAmount,
+            cardAmount: targetSale.cardAmount,
+            ...auth
+          })
+        })
+          .then(() => {
+            console.log(`Mark as paid background sync completed for ${branch}!`);
+            setTimeout(() => {
+              this.syncFromCloud(targetUrl);
+            }, 2500);
+          })
+          .catch((err) => console.error("Mark as paid sync error:", err));
+      }
+
+      return { success: true, sale: targetSale };
+    },
+
     clearCacheAndSync: function (webAppUrl) {
       const b = getActiveBranch();
       try {

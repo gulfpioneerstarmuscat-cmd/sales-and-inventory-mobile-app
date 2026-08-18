@@ -674,16 +674,24 @@ window.initViewSales = (function () {
           </div>
         </div>
 
-        <!-- Footer Actions: Bottom Left = Refund Button (Red, White Text), Bottom Right = Close Button -->
-        <div class="dp-footer" style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-          <div>
+        <!-- Footer Actions: Refund Sale (Red), Mark as Paid (Green if unpaid & not refunded), Close (Right) -->
+        <div class="dp-footer dp-footer-actions-row">
+          <div class="dp-footer-btn-group">
             ${
               isRefunded
-                ? `<span class="tile-badge tile-badge--refunded" style="font-size: 12px; padding: 6px 12px; border-radius: 8px;">↩ Sale Refunded</span>`
+                ? `<span class="tile-badge tile-badge--refunded" style="font-size: 11px; padding: 5px 10px; border-radius: 8px;">↩ Sale Refunded</span>`
                 : `<button type="button" class="btn-refund-sale" id="btn-refund-sale">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
                     Refund Sale
                    </button>`
+            }
+            ${
+              !isPaid && !isRefunded
+                ? `<button type="button" class="btn-mark-paid" id="btn-mark-paid-sale">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    Mark as Paid
+                   </button>`
+                : ""
             }
           </div>
           <button type="button" class="dp-btn-confirm" id="btn-close-sale-modal">Close</button>
@@ -732,9 +740,186 @@ window.initViewSales = (function () {
       });
     }
 
+    const markPaidBtn = backdrop.querySelector("#btn-mark-paid-sale");
+    if (markPaidBtn) {
+      markPaidBtn.addEventListener("click", () => {
+        openPaymentCollectionModal(sale, () => {
+          backdrop.remove();
+          renderViewSalesUI();
+        });
+      });
+    }
+
     backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) backdrop.remove();
     });
+
+    document.body.appendChild(backdrop);
+  }
+
+  // Payment Collection Modal Overlay for Unpaid Sales
+  function openPaymentCollectionModal(sale, onComplete) {
+    const existing = document.querySelector(".pay-modal-backdrop");
+    if (existing) existing.remove();
+
+    const grandTotal = Number(sale.grandTotal) || 0;
+    let selectedMethod = "cash";
+
+    const backdrop = document.createElement("div");
+    backdrop.className = "dp-modal-backdrop pay-modal-backdrop";
+
+    backdrop.innerHTML = `
+      <div class="dp-modal-card" style="max-width: 380px; width: 92vw;">
+        <!-- Header Bar -->
+        <div class="dp-header">
+          <div class="dp-title-bar">
+            <span class="dp-title-text">COLLECT PAYMENT</span>
+            <button type="button" class="dp-btn-close" id="btn-close-pay-modal">&times;</button>
+          </div>
+          <div style="margin-top: 4px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0f172a; margin: 0;">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
+            <span style="font-size: 11px; color: #64748b; font-weight: 600;">Total Due: <strong style="color: #16a34a; font-size: 14px;">OMR ${grandTotal.toFixed(3)}</strong></span>
+          </div>
+        </div>
+
+        <!-- Body Container -->
+        <div class="dp-body" style="padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+          <!-- Payment Method Pills -->
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <label style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase;">Payment Method</label>
+            <div class="pay-method-toggle-row" style="display: flex; gap: 6px;">
+              <button type="button" class="pay-method-pill pay-method-pill--active" data-method="cash" style="flex: 1; padding: 8px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid #cbd5e1; background: #16a34a; color: #ffffff; cursor: pointer;">Cash</button>
+              <button type="button" class="pay-method-pill" data-method="card" style="flex: 1; padding: 8px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; cursor: pointer;">Card</button>
+              <button type="button" class="pay-method-pill" data-method="both" style="flex: 1; padding: 8px; font-size: 12px; font-weight: 700; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; color: #475569; cursor: pointer;">Both</button>
+            </div>
+          </div>
+
+          <!-- Cash Amount Field -->
+          <div id="pay-cash-group" style="display: flex; flex-direction: column; gap: 4px;">
+            <label style="font-size: 11px; font-weight: 700; color: #64748b;">Cash Amount (OMR)</label>
+            <input type="number" id="pay-cash-input" step="0.001" value="${grandTotal.toFixed(3)}" style="width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 8px; outline: none;" />
+          </div>
+
+          <!-- Card Amount Field -->
+          <div id="pay-card-group" style="display: flex; flex-direction: column; gap: 4px; display: none;">
+            <label style="font-size: 11px; font-weight: 700; color: #64748b;">Card Amount (OMR)</label>
+            <input type="number" id="pay-card-input" step="0.001" value="0.000" disabled style="width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 700; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; background: #f1f5f9;" />
+          </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="dp-footer" style="display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="dp-btn-cancel" id="btn-cancel-pay-modal" style="height: 38px; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; border: 1px solid #cbd5e1; background: #ffffff; color: #475569;">Cancel</button>
+          <button type="button" class="btn-mark-paid" id="btn-confirm-pay" style="height: 38px; padding: 8px 16px; border-radius: 10px; font-size: 13px; font-weight: 700;">Confirm & Record Payment</button>
+        </div>
+      </div>
+    `;
+
+    // Internal Events & State Updates
+    const methodPills = backdrop.querySelectorAll(".pay-method-pill");
+    const cashGroup = backdrop.querySelector("#pay-cash-group");
+    const cashIn = backdrop.querySelector("#pay-cash-input");
+    const cardGroup = backdrop.querySelector("#pay-card-group");
+    const cardIn = backdrop.querySelector("#pay-card-input");
+
+    function updateFieldsForMethod(method) {
+      selectedMethod = method;
+      methodPills.forEach((p) => {
+        const isSel = p.dataset.method === method;
+        p.style.background = isSel ? "#16a34a" : "#f8fafc";
+        p.style.color = isSel ? "#ffffff" : "#475569";
+        p.style.borderColor = isSel ? "#16a34a" : "#cbd5e1";
+      });
+
+      if (method === "cash") {
+        cashGroup.style.display = "flex";
+        cardGroup.style.display = "none";
+        cashIn.disabled = false;
+        cashIn.value = grandTotal.toFixed(3);
+        cardIn.disabled = true;
+        cardIn.value = "0.000";
+      } else if (method === "card") {
+        cashGroup.style.display = "none";
+        cardGroup.style.display = "flex";
+        cashIn.disabled = true;
+        cashIn.value = "0.000";
+        cardIn.disabled = false;
+        cardIn.value = grandTotal.toFixed(3);
+      } else if (method === "both") {
+        cashGroup.style.display = "flex";
+        cardGroup.style.display = "flex";
+        cashIn.disabled = false;
+        cardIn.disabled = false;
+        const half = Math.round((grandTotal / 2) * 1000) / 1000;
+        cashIn.value = half.toFixed(3);
+        cardIn.value = (grandTotal - half).toFixed(3);
+      }
+    }
+
+    methodPills.forEach((p) => {
+      p.addEventListener("click", () => updateFieldsForMethod(p.dataset.method));
+    });
+
+    if (cashIn) {
+      cashIn.addEventListener("input", () => {
+        if (selectedMethod === "both") {
+          const cVal = parseFloat(cashIn.value) || 0;
+          const remaining = Math.max(0, grandTotal - cVal);
+          cardIn.value = remaining.toFixed(3);
+        }
+      });
+    }
+
+    if (cardIn) {
+      cardIn.addEventListener("input", () => {
+        if (selectedMethod === "both") {
+          const cdVal = parseFloat(cardIn.value) || 0;
+          const remaining = Math.max(0, grandTotal - cdVal);
+          cashIn.value = remaining.toFixed(3);
+        }
+      });
+    }
+
+    const closeBtn = backdrop.querySelector("#btn-close-pay-modal");
+    const cancelBtn = backdrop.querySelector("#btn-cancel-pay-modal");
+    const confirmBtn = backdrop.querySelector("#btn-confirm-pay");
+
+    if (closeBtn) closeBtn.addEventListener("click", () => backdrop.remove());
+    if (cancelBtn) cancelBtn.addEventListener("click", () => backdrop.remove());
+
+    if (confirmBtn) {
+      confirmBtn.addEventListener("click", () => {
+        const cashVal = parseFloat(cashIn.value) || 0;
+        const cardVal = parseFloat(cardIn.value) || 0;
+        const enteredTotal = Math.round((cashVal + cardVal) * 1000) / 1000;
+
+        if (Math.abs(enteredTotal - grandTotal) > 0.005) {
+          if (window.UI) {
+            window.UI.toast(`Payment total (${enteredTotal.toFixed(3)}) does not match Grand Total (${grandTotal.toFixed(3)}).`, "warning");
+          }
+          return;
+        }
+
+        const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
+        const res = window.DataStore ? window.DataStore.markSaleAsPaid(sale.id || sale, {
+          paymentMethod: selectedMethod,
+          cashAmount: cashVal,
+          cardAmount: cardVal
+        }, webAppUrl) : { success: false };
+
+        if (res.success) {
+          if (window.UI) {
+            window.UI.toast(`Payment of OMR ${grandTotal.toFixed(3)} recorded! Sale marked as Paid.`, "success");
+          }
+          backdrop.remove();
+          if (typeof onComplete === "function") onComplete();
+        } else {
+          if (window.UI) {
+            window.UI.toast(res.message || "Failed to record payment", "error");
+          }
+        }
+      });
+    }
 
     document.body.appendChild(backdrop);
   }

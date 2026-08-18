@@ -454,21 +454,48 @@
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
 
-/* Red Refund Sale Button with White Text */
-.btn-refund-sale {
-  background: #dc2626 !important;
-  color: #ffffff !important;
-  border: none;
-  border-radius: 10px;
-  padding: 8px 14px;
+/* Uniform Responsive Modal Footer Buttons (Refund, Mark as Paid, Close) */
+.dp-footer-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.dp-footer-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.btn-refund-sale,
+.btn-mark-paid,
+.dp-footer .dp-btn-confirm {
+  height: 34px;
+  padding: 6px 12px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 12px;
+  border-radius: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  transition: all 0.2s ease;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  border: none;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Red Refund Sale Button */
+.btn-refund-sale {
+  background: #dc2626 !important;
+  color: #ffffff !important;
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
 }
 
@@ -481,6 +508,51 @@
 .btn-refund-sale:active {
   transform: translateY(0);
   box-shadow: 0 1px 4px rgba(220, 38, 38, 0.2);
+}
+
+/* Green Mark as Paid Button */
+.btn-mark-paid {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(22, 163, 74, 0.25);
+}
+
+.btn-mark-paid:hover {
+  background: #15803d !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.35);
+}
+
+.btn-mark-paid:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(22, 163, 74, 0.2);
+}
+
+/* Dynamic Mobile & Small Screen Responsiveness (< 420px) */
+@media (max-width: 420px) {
+  .dp-footer-actions-row {
+    gap: 6px;
+  }
+
+  .dp-footer-btn-group {
+    gap: 4px;
+  }
+
+  .btn-refund-sale,
+  .btn-mark-paid,
+  .dp-footer .dp-btn-confirm {
+    height: 32px;
+    padding: 5px 8px;
+    font-size: 11px;
+    gap: 4px;
+    border-radius: 7px;
+  }
+
+  .btn-refund-sale svg,
+  .btn-mark-paid svg {
+    width: 13px;
+    height: 13px;
+  }
 }
 
 /* Month Selector Modal */
