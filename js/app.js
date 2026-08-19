@@ -118,8 +118,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // Pre-initialize initial page components
   if (typeof window.initViewSales === "function") window.initViewSales();
   if (typeof window.initViewInventory === "function") window.initViewInventory();
+  if (typeof window.initAddSales === "function") window.initAddSales();
 
-  showPage(1);
+  // Default initial open page is Page 3 ("Add Sales"), or URL ?page= parameter if specified
+  const urlPageParam = new URLSearchParams(window.location.search).get("page");
+  showPage(urlPageParam || 3);
 
   // --------------------------------------------------------------------------
   // App Startup Lifecycle & Auth Protection Guard
