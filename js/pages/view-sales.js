@@ -167,36 +167,10 @@ window.initViewSales = (function () {
     const monthSet = new Set();
     monthSet.add(getCurrentMonthKey());
 
-    allSales.forEach((s) => {
-      const ymd = getNormalizedYMD(s.date);
-      if (ymd && ymd.length >= 7) {
-        monthSet.add(ymd.slice(0, 7));
-      }
-    });
-    const availableMonthKeys = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
-
+    const todayStr = getTodayDateString();
     let statsRevenue = 0;
     let statsSalesCount = 0;
     let statsPaidCount = 0;
-
-    allSales.forEach((s) => {
-      const ymd = getNormalizedYMD(s.date);
-      const sMonthKey = ymd ? ymd.slice(0, 7) : "";
-      const isMatchingMonth = selectedStatsMonth === "all" || sMonthKey === selectedStatsMonth;
-      const isRefunded = s.refundStatus === "REFUNDED" || s.paymentStatus === "refunded" || Boolean(s.isRefunded);
-
-      if (isMatchingMonth && !isRefunded) {
-        statsSalesCount++;
-        const gTotal = Number(s.grandTotal) || 0;
-        if (s.paymentStatus === "paid") {
-          statsRevenue += gTotal;
-          statsPaidCount++;
-        }
-      }
-    });
-
-    const todayStr = getTodayDateString();
-
     let todayCount = 0;
     let pillAllCount = 0;
     let pillPaidCount = 0;
@@ -204,23 +178,37 @@ window.initViewSales = (function () {
 
     allSales.forEach((s) => {
       const ymd = getNormalizedYMD(s.date);
+      if (ymd && ymd.length >= 7) {
+        monthSet.add(ymd.slice(0, 7));
+      }
       const isRefunded = s.refundStatus === "REFUNDED" || s.paymentStatus === "refunded" || Boolean(s.isRefunded);
+      const isPaid = s.paymentStatus === "paid";
+      const isUnpaid = s.paymentStatus === "not_paid";
 
+      // Monthly stats calculation
+      const sMonthKey = ymd ? ymd.slice(0, 7) : "";
+      const isMatchingMonth = selectedStatsMonth === "all" || sMonthKey === selectedStatsMonth;
+      if (isMatchingMonth && !isRefunded) {
+        statsSalesCount++;
+        if (isPaid) {
+          statsRevenue += Number(s.grandTotal) || 0;
+          statsPaidCount++;
+        }
+      }
+
+      // Filter pill counts
       if (ymd === todayStr && !isRefunded) {
         todayCount++;
       }
-
       const matchesPickedDate = !selectedDate || (ymd === selectedDate);
-
       if (matchesPickedDate && !isRefunded) {
         pillAllCount++;
-        if (s.paymentStatus === "paid") {
-          pillPaidCount++;
-        } else if (s.paymentStatus === "not_paid") {
-          pillUnpaidCount++;
-        }
+        if (isPaid) pillPaidCount++;
+        else if (isUnpaid) pillUnpaidCount++;
       }
     });
+
+    const availableMonthKeys = Array.from(monthSet).sort((a, b) => b.localeCompare(a));
 
 
     const filteredSales = getFilteredSalesData();
@@ -429,9 +417,8 @@ window.initViewSales = (function () {
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         statusFilter = btn.dataset.status;
-        const filterName = btn.innerText.trim().replace(/\n/g, " ");
-        if (window.UI) window.UI.toast(`Filtered sales by "${filterName}"`, "info");
-        renderViewSalesUI();
+        filterBtns.forEach((b) => b.classList.toggle("filter-pill--active", b === btn));
+        updateSalesListBodyOnly(root);
       });
     });
 
@@ -893,7 +880,7 @@ window.initViewSales = (function () {
         const cardVal = parseFloat(cardIn.value) || 0;
         const enteredTotal = Math.round((cashVal + cardVal) * 1000) / 1000;
 
-        if (Math.abs(enteredTotal - grandTotal) > 0.005) {
+        if (Math.abs(enteredTotal - grandTotal) > 0.0001) {
           if (window.UI) {
             window.UI.toast(`Payment total (${enteredTotal.toFixed(3)}) does not match Grand Total (${grandTotal.toFixed(3)}).`, "warning");
           }

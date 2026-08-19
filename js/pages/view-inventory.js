@@ -165,9 +165,8 @@ window.initViewInventory = (function () {
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         statusFilter = btn.dataset.status;
-        const filterName = btn.innerText.trim().replace(/\n/g, " ");
-        if (window.UI) window.UI.toast(`Filtered inventory by "${filterName}"`, "info");
-        renderViewInventoryUI();
+        filterBtns.forEach((b) => b.classList.toggle("filter-pill--active", b === btn));
+        updateInventoryListBodyOnly(root);
       });
     });
 

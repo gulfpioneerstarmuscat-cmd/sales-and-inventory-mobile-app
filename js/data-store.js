@@ -1,6 +1,15 @@
 // js/data-store.js - High Performance Branch-Scoped Data Store for Sales & Inventory
 
 window.DataStore = (function () {
+  const PENDING_MUTATIONS_KEY = "gps_pending_mutations_v1";
+
+  // In-Memory RAM Cache for sub-millisecond lookups & reduced GC pressure
+  const memoryCache = {
+    inventory: {},
+    sales: {},
+    amend_logs: {}
+  };
+
   function getActiveBranch() {
     return window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
   }
@@ -12,33 +21,41 @@ window.DataStore = (function () {
 
   function loadBranchInventory(branch) {
     const b = branch || getActiveBranch();
+    if (memoryCache.inventory[b]) return memoryCache.inventory[b];
     const key = getStorageKey("inventory", b);
     try {
       const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : [];
+      memoryCache.inventory[b] = stored ? JSON.parse(stored) : [];
     } catch (e) {
-      return [];
+      memoryCache.inventory[b] = [];
     }
+    return memoryCache.inventory[b];
   }
 
   function loadBranchSales(branch) {
     const b = branch || getActiveBranch();
+    if (memoryCache.sales[b]) return memoryCache.sales[b];
     const key = getStorageKey("sales", b);
     try {
       const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : [];
+      memoryCache.sales[b] = stored ? JSON.parse(stored) : [];
     } catch (e) {
-      return [];
+      memoryCache.sales[b] = [];
     }
+    return memoryCache.sales[b];
   }
 
   function saveBranchData(type, data, branch) {
     const b = branch || getActiveBranch();
+    if (type === "inventory") memoryCache.inventory[b] = data;
+    if (type === "sales") memoryCache.sales[b] = data;
+    if (type === "amend_logs") memoryCache.amend_logs[b] = data;
+
     const key = getStorageKey(type, b);
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (e) {
-      console.warn("Error writing localStorage:", key, e);
+      if (window.DevLogger) window.DevLogger.warn("DataStore", `Error writing localStorage: ${key}`, e);
     }
   }
 
@@ -58,10 +75,284 @@ window.DataStore = (function () {
     return { apiKey: apiKey, sessionId: sessionId };
   }
 
-  // Auto re-sync when user switches branch
-  window.addEventListener("branchChanged", function () {
-    window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-  });
+  function getLastSyncedTime(branch) {
+    const b = branch || getActiveBranch();
+    try {
+      return localStorage.getItem(getStorageKey("lastSynced", b)) || null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // Offline Mutation Queue (Outbox Pattern)
+  // --------------------------------------------------------------------------
+  function getPendingMutations() {
+    try {
+      const stored = localStorage.getItem(PENDING_MUTATIONS_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function savePendingMutations(queue) {
+    try {
+      localStorage.setItem(PENDING_MUTATIONS_KEY, JSON.stringify(queue));
+    } catch (e) {}
+  }
+
+  function enqueueMutation(action, branch, payload) {
+    const queue = getPendingMutations();
+    queue.push({
+      id: "mut_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
+      action: action,
+      branch: branch,
+      payload: payload,
+      queuedAt: new Date().toISOString()
+    });
+    savePendingMutations(queue);
+    if (window.DevLogger) {
+      window.DevLogger.info("DataStore", `Enqueued offline mutation [${action}] for branch ${branch}. Total pending: ${queue.length}`);
+    }
+  }
+
+  let isFlushingMutations = false;
+  function flushPendingMutations(webAppUrl) {
+    if (isFlushingMutations) return Promise.resolve();
+    const queue = getPendingMutations();
+    if (!queue.length) return Promise.resolve();
+
+    const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
+    if (!targetUrl || !targetUrl.startsWith("http") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+      return Promise.resolve();
+    }
+
+    isFlushingMutations = true;
+    const auth = getAuthPayload();
+
+    const processQueue = async () => {
+      const remainingQueue = [...queue];
+      while (remainingQueue.length > 0) {
+        const item = remainingQueue[0];
+        try {
+          const bodyPayload = {
+            action: item.action,
+            branch: item.branch,
+            ...auth,
+            ...(item.payload || {})
+          };
+          await fetch(targetUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify(bodyPayload)
+          });
+          remainingQueue.shift();
+          savePendingMutations(remainingQueue);
+          if (window.DevLogger) {
+            window.DevLogger.log("DataStore", `Flushed queued mutation [${item.action}] for ${item.branch}. Remaining: ${remainingQueue.length}`);
+          }
+        } catch (err) {
+          if (window.DevLogger) window.DevLogger.warn("DataStore", `Failed to flush mutation [${item.action}], will retry later`, { item, error: err });
+          break;
+        }
+      }
+      isFlushingMutations = false;
+    };
+
+    return processQueue();
+  }
+
+  function sendMutation(action, branch, payload, webAppUrl) {
+    const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
+    if (!targetUrl || !targetUrl.startsWith("http") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
+      enqueueMutation(action, branch, payload);
+      return Promise.resolve({ queued: true });
+    }
+
+    const auth = getAuthPayload();
+    const bodyPayload = {
+      action: action,
+      branch: branch,
+      ...auth,
+      ...(payload || {})
+    };
+
+    return fetch(targetUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(bodyPayload)
+    })
+      .then(() => {
+        if (window.DevLogger) {
+          window.DevLogger.log("DataStore", `Direct mutation [${action}] sent successfully for ${branch}`);
+        }
+        return flushPendingMutations(targetUrl);
+      })
+      .catch((err) => {
+        if (window.DevLogger) window.DevLogger.warn("DataStore", `Direct mutation [${action}] failed, enqueuing for background retry`, err);
+        enqueueMutation(action, branch, payload);
+      });
+  }
+
+  // --------------------------------------------------------------------------
+  // Cloud Synchronization Engine
+  // --------------------------------------------------------------------------
+  const inFlightSyncs = {};
+  function syncFromCloud(webAppUrl, retryCount, targetBranch) {
+    if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
+
+    const branch = targetBranch || getActiveBranch();
+    if (inFlightSyncs[branch]) {
+      return inFlightSyncs[branch];
+    }
+
+    // Flush any pending mutations in the background without blocking the sync fetch
+    flushPendingMutations(webAppUrl);
+
+    const retriesSoFar = typeof retryCount === "number" ? retryCount : (retryCount ? 1 : 0);
+    const cacheBuster = `_t=${Date.now()}`;
+    
+    const lastSynced = getLastSyncedTime(branch);
+    const sinceParam = lastSynced ? `&since=${encodeURIComponent(lastSynced)}` : "";
+    const auth = getAuthPayload();
+    const authParams = `&apiKey=${encodeURIComponent(auth.apiKey)}` + (auth.sessionId ? `&sessionId=${encodeURIComponent(auth.sessionId)}` : "");
+
+    const syncUrl = webAppUrl.includes("?")
+      ? `${webAppUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`
+      : `${webAppUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`;
+
+    // Generous serverless window for Google Apps Script cold starts (20s initial, 12s retry)
+    const timeoutMs = retriesSoFar === 0 ? 20000 : 12000;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+    const syncPromise = fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
+      .then((res) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        delete inFlightSyncs[branch];
+        if (data && data.status === "success") {
+          if (Array.isArray(data.inventory)) {
+            if (data.inventory.length > 0) {
+              saveBranchData("inventory", data.inventory, branch);
+            } else {
+              const existing = loadBranchInventory(branch);
+              if (!existing || existing.length === 0) {
+                saveBranchData("inventory", data.inventory, branch);
+              }
+            }
+          }
+          if (Array.isArray(data.sales)) {
+            const localSales = loadBranchSales(branch);
+            const sixtySecsAgo = Date.now() - 60 * 1000;
+
+            const processedCloudSales = data.sales.map((cs) => {
+              const rStatus = String(cs.refundStatus || "").trim().toUpperCase();
+              const isRef = rStatus === "REFUNDED" || rStatus === "YES" || cs.paymentStatus === "refunded";
+              return {
+                ...cs,
+                refundStatus: isRef ? "REFUNDED" : "NO",
+                paymentStatus: isRef ? "refunded" : (cs.paymentStatus || "paid"),
+                isRefunded: isRef
+              };
+            });
+
+            processedCloudSales.forEach((cs) => {
+              const matchingLocal = localSales.find((ls) => {
+                if (cs.id && ls.id && String(cs.id) === String(ls.id)) return true;
+                if (cs.saleId && ls.saleId && String(cs.saleId) === String(ls.saleId)) return true;
+                const csName = String(cs.customerName || "").trim().toLowerCase();
+                const lsName = String(ls.customerName || "").trim().toLowerCase();
+                const csTotal = Number(cs.grandTotal) || 0;
+                const lsTotal = Number(ls.grandTotal) || 0;
+                const csDate = String(cs.date || "").trim();
+                const lsDate = String(ls.date || "").trim();
+                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001 && (!csDate || !lsDate || csDate === lsDate);
+              });
+
+              if (matchingLocal) {
+                const refundedAtMs = matchingLocal.refundedAt ? new Date(matchingLocal.refundedAt).getTime() : 0;
+                if ((matchingLocal.isRefunded || matchingLocal.refundStatus === "REFUNDED") && refundedAtMs > sixtySecsAgo && !cs.isRefunded) {
+                  cs.isRefunded = true;
+                  cs.refundStatus = "REFUNDED";
+                  cs.paymentStatus = "refunded";
+                }
+              }
+            });
+
+            const recentPendingSales = localSales.filter((ls) => {
+              const isRecent = ls.id && typeof ls.id === "number" && ls.id > sixtySecsAgo;
+              if (!isRecent) return false;
+
+              const existsInCloud = processedCloudSales.some((cs) => {
+                if (cs.id && ls.id && String(cs.id) === String(ls.id)) return true;
+                if (cs.saleId && ls.saleId && String(cs.saleId) === String(ls.saleId)) return true;
+                const csName = String(cs.customerName || "").trim().toLowerCase();
+                const lsName = String(ls.customerName || "").trim().toLowerCase();
+                const csTotal = Number(cs.grandTotal) || 0;
+                const lsTotal = Number(ls.grandTotal) || 0;
+                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001;
+              });
+              return !existsInCloud;
+            });
+
+            const mergedSales = [...recentPendingSales, ...processedCloudSales];
+            saveBranchData("sales", mergedSales, branch);
+          }
+          const syncTime = new Date().toISOString();
+          try {
+            localStorage.setItem(getStorageKey("lastSynced", branch), syncTime);
+          } catch (e) {}
+
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged", { detail: { branch, syncTime } }));
+          if (window.DevLogger) {
+            window.DevLogger.success("DataStore", `Successfully synced real ${branch} Google Sheet data at ${syncTime}!`, { branch, syncTime });
+          }
+          return { success: true, branch, syncTime, data };
+        } else {
+          throw new Error(data ? data.message : "Invalid response");
+        }
+      })
+      .catch((err) => {
+        delete inFlightSyncs[branch];
+        if (timeoutId) clearTimeout(timeoutId);
+        if (retriesSoFar < 2) {
+          if (window.DevLogger) {
+            window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1.5s...`, { branch, attempt: retriesSoFar + 1, error: err.message }, 3);
+          }
+          return new Promise((resolve) => setTimeout(resolve, 1500)).then(() =>
+            syncFromCloud(webAppUrl, retriesSoFar + 1, branch)
+          );
+        }
+        if (window.DevLogger) {
+          window.DevLogger.warn("DataStore", `PWA Background sync notice for ${branch} (using local storage data): ${err.message || err}`, { branch, error: err.message || err }, 2);
+        }
+        return { success: false, error: err };
+      });
+
+    inFlightSyncs[branch] = syncPromise;
+    return syncPromise;
+  }
+
+  // Auto-flush queue when connection is restored
+  if (typeof window !== "undefined") {
+    window.addEventListener("online", function () {
+      const url = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+      if (url) {
+        syncFromCloud(url);
+      }
+    });
+
+    window.addEventListener("branchChanged", function () {
+      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+    });
+  }
 
   return {
     // Getters for Active Branch
@@ -77,7 +368,7 @@ window.DataStore = (function () {
       if (!nameQuery || typeof nameQuery !== "string") return null;
       const q = nameQuery.trim().toLowerCase();
       const inv = loadBranchInventory(branch);
-      return inv.find((item) => item.name.toLowerCase() === q) || null;
+      return inv.find((item) => (item.name || "").trim().toLowerCase() === q) || null;
     },
 
     searchItems: function (query, branch) {
@@ -86,7 +377,7 @@ window.DataStore = (function () {
       const inv = loadBranchInventory(branch);
       return inv.filter(
         (item) =>
-          item.name.toLowerCase().includes(q) ||
+          (item.name && item.name.toLowerCase().includes(q)) ||
           (item.sku && item.sku.toLowerCase().includes(q)) ||
           (item.category && item.category.toLowerCase().includes(q))
       );
@@ -99,14 +390,15 @@ window.DataStore = (function () {
       const inventory = loadBranchInventory(branch);
 
       // 1. Record Sale locally
-      sales.unshift({
+      const newSale = {
         ...saleData,
         refundStatus: "NO",
         isRefunded: false,
         branch: branch,
         id: Date.now(),
         timestamp: new Date().toISOString()
-      });
+      };
+      sales.unshift(newSale);
       saveBranchData("sales", sales, branch);
 
       // 2. Deduct Inventory Stock locally
@@ -117,12 +409,12 @@ window.DataStore = (function () {
 
           if (name && qtySold > 0) {
             const existingIndex = inventory.findIndex(
-              (inv) => inv.name.trim().toLowerCase() === name
+              (inv) => (inv.name || "").trim().toLowerCase() === name
             );
             if (existingIndex >= 0) {
               inventory[existingIndex].qty = Math.max(
                 0,
-                inventory[existingIndex].qty - qtySold
+                (Number(inventory[existingIndex].qty) || 0) - qtySold
               );
               inventory[existingIndex].lastUpdated = new Date().toLocaleTimeString();
             } else {
@@ -142,23 +434,8 @@ window.DataStore = (function () {
 
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      // 3. Background Sync to Google Sheets API with branch target
-      if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
-        const auth = getAuthPayload();
-        fetch(webAppUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "add_sale", branch: branch, ...auth, ...saleData })
-        })
-          .then(() => {
-            console.log(`Background sync completed for ${branch}!`);
-            setTimeout(() => {
-              this.syncFromCloud(webAppUrl);
-            }, 2500);
-          })
-          .catch((err) => console.error("Background sync error:", err));
-      }
+      // 3. Reliable Mutation Sync with Offline Queueing
+      sendMutation("add_sale", branch, newSale, webAppUrl);
 
       return { success: true };
     },
@@ -173,13 +450,13 @@ window.DataStore = (function () {
       if (!name) return { success: false, message: "Item name required" };
 
       const index = inventory.findIndex(
-        (inv) => inv.name.trim().toLowerCase() === name.toLowerCase()
+        (inv) => (inv.name || "").trim().toLowerCase() === name.toLowerCase()
       );
 
       if (index >= 0) {
         inventory[index].qty = (Number(inventory[index].qty) || 0) + addQty;
         if (payload.category) inventory[index].category = payload.category;
-        if (payload.alertLevel) inventory[index].alertLevel = Number(payload.alertLevel);
+        if (payload.alertLevel !== undefined) inventory[index].alertLevel = Number(payload.alertLevel);
         if (payload.remarks) inventory[index].lastRemark = payload.remarks;
         inventory[index].lastUpdated = new Date().toLocaleTimeString();
       } else {
@@ -197,15 +474,7 @@ window.DataStore = (function () {
       saveBranchData("inventory", inventory, branch);
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
-        const auth = getAuthPayload();
-        fetch(webAppUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "add_stock_qty", branch: branch, ...auth, ...payload })
-        }).catch((err) => console.error("Add stock sync error:", err));
-      }
+      sendMutation("add_stock_qty", branch, payload, webAppUrl);
 
       return { success: true };
     },
@@ -218,7 +487,7 @@ window.DataStore = (function () {
       const origName = (originalItem.name || "").trim().toLowerCase();
 
       const index = inventory.findIndex(
-        (inv) => inv.name.trim().toLowerCase() === origName
+        (inv) => (inv.name || "").trim().toLowerCase() === origName
       );
 
       if (index < 0) return { success: false, message: "Target item not found in inventory." };
@@ -234,13 +503,21 @@ window.DataStore = (function () {
 
       const currentUser = getCurrentUserSafe();
 
-      // Update selectively only changed fields
+      // Safe number assignment preventing NaN corruption
+      const targetQty = updatedFields.qty !== undefined && !isNaN(Number(updatedFields.qty))
+        ? Number(updatedFields.qty)
+        : (Number(currentItem.qty) || 0);
+
+      const targetAlert = updatedFields.alertLevel !== undefined && !isNaN(Number(updatedFields.alertLevel))
+        ? Number(updatedFields.alertLevel)
+        : (Number(currentItem.alertLevel) || 5);
+
       inventory[index] = {
         ...currentItem,
         name: updatedFields.name || currentItem.name,
         category: updatedFields.category || currentItem.category,
-        qty: Number(updatedFields.qty) ?? currentItem.qty,
-        alertLevel: Number(updatedFields.alertLevel) ?? currentItem.alertLevel,
+        qty: targetQty,
+        alertLevel: targetAlert,
         lastRemark: updatedFields.lastRemark !== undefined ? updatedFields.lastRemark : (currentItem.lastRemark || currentItem.remark || ""),
         lastAmendedBy: currentUser ? currentUser.name : "Staff",
         lastAmendedRemark: updatedFields.amendReason || updatedFields.remarks || "",
@@ -267,30 +544,20 @@ window.DataStore = (function () {
         branch: branch,
         sku: currentItem.sku || "N/A",
         originalName: originalItem.name,
-        amendedName: updatedFields.name,
+        amendedName: updatedFields.name || originalItem.name,
         originalQty: originalItem.qty,
-        amendedQty: updatedFields.qty,
-        qtyDelta: Number(updatedFields.qty) - Number(originalItem.qty),
+        amendedQty: targetQty,
+        qtyDelta: Number(targetQty) - Number(originalItem.qty || 0),
         diffs: diffs,
-        remarks: updatedFields.remarks
+        remarks: updatedFields.remarks || updatedFields.amendReason || ""
       };
 
       logs.unshift(auditRecord);
-      try {
-        localStorage.setItem(auditLogKey, JSON.stringify(logs));
-      } catch (e) {}
+      saveBranchData("amend_logs", logs, branch);
 
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
-        const auth = getAuthPayload();
-        fetch(webAppUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "amend_stock", branch: branch, ...auth, auditRecord: auditRecord })
-        }).catch((err) => console.error("Amend stock sync error:", err));
-      }
+      sendMutation("amend_stock", branch, { auditRecord: auditRecord }, webAppUrl);
 
       return { success: true, auditRecord: auditRecord };
     },
@@ -304,7 +571,7 @@ window.DataStore = (function () {
       if (!name) return { success: false, message: "Item name required" };
 
       const index = inventory.findIndex(
-        (inv) => inv.name.trim().toLowerCase() === name.toLowerCase()
+        (inv) => (inv.name || "").trim().toLowerCase() === name.toLowerCase()
       );
 
       if (index >= 0) {
@@ -329,176 +596,39 @@ window.DataStore = (function () {
       saveBranchData("inventory", inventory, branch);
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      if (webAppUrl && typeof webAppUrl === "string" && webAppUrl.startsWith("http")) {
-        const auth = getAuthPayload();
-        fetch(webAppUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({ action: "update_stock", branch: branch, ...auth, item: itemData })
-        }).catch((err) => console.error("Stock update error:", err));
-      }
+      sendMutation("update_stock", branch, { item: itemData }, webAppUrl);
 
       return { success: true };
     },
 
-    // Sync Active or Target Branch data from Google Sheets Cloud (Replaces local cache with real sheet data)
-    syncFromCloud: function (webAppUrl, retryCount, targetBranch) {
-      if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
-
-      const retriesSoFar = typeof retryCount === "number" ? retryCount : (retryCount ? 1 : 0);
-      const branch = targetBranch || getActiveBranch();
-      const cacheBuster = `_t=${Date.now()}`;
-      
-      const lastSynced = this.getLastSyncedTime(branch);
-      const sinceParam = lastSynced ? `&since=${encodeURIComponent(lastSynced)}` : "";
-      const auth = getAuthPayload();
-      const authParams = `&apiKey=${encodeURIComponent(auth.apiKey)}` + (auth.sessionId ? `&sessionId=${encodeURIComponent(auth.sessionId)}` : "");
-
-      const syncUrl = webAppUrl.includes("?")
-        ? `${webAppUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`
-        : `${webAppUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`;
-
-      // Adaptive Timeouts: Attempt 1 gets 15s (serverless cold-start window), Retries get 10s (warm container window)
-      const timeoutMs = retriesSoFar === 0 ? 15000 : 10000;
-      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
-
-      return fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
-        .then((res) => {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
-        .then((data) => {
-          if (data && data.status === "success") {
-            // Override local inventory with Google Sheets data if data exists or if local is empty
-            if (Array.isArray(data.inventory)) {
-              if (data.inventory.length > 0) {
-                saveBranchData("inventory", data.inventory, branch);
-              } else {
-                const existing = loadBranchInventory(branch);
-                if (!existing || existing.length === 0) {
-                  saveBranchData("inventory", data.inventory, branch);
-                }
-              }
-            }
-            if (Array.isArray(data.sales)) {
-              const localSales = loadBranchSales(branch);
-              const sixtySecsAgo = Date.now() - 60 * 1000;
-
-              // Process each cloud sale strictly according to Google Sheets data
-              const processedCloudSales = data.sales.map((cs) => {
-                const rStatus = String(cs.refundStatus || "").trim().toUpperCase();
-                const isRef = rStatus === "REFUNDED" || rStatus === "YES" || cs.paymentStatus === "refunded";
-                return {
-                  ...cs,
-                  refundStatus: isRef ? "REFUNDED" : "NO",
-                  paymentStatus: isRef ? "refunded" : (cs.paymentStatus || "paid"),
-                  isRefunded: isRef
-                };
-              });
-
-              // Only preserve local refund status if refund was executed in the last 60s (in-flight POST window)
-              processedCloudSales.forEach((cs) => {
-                const matchingLocal = localSales.find((ls) => {
-                  const csName = String(cs.customerName || "").trim().toLowerCase();
-                  const lsName = String(ls.customerName || "").trim().toLowerCase();
-                  const csTotal = Number(cs.grandTotal) || 0;
-                  const lsTotal = Number(ls.grandTotal) || 0;
-                  return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001;
-                });
-
-                if (matchingLocal) {
-                  const refundedAtMs = matchingLocal.refundedAt ? new Date(matchingLocal.refundedAt).getTime() : 0;
-                  // If locally refunded within the last 60s, keep local refund status until POST completes
-                  if ((matchingLocal.isRefunded || matchingLocal.refundStatus === "REFUNDED") && refundedAtMs > sixtySecsAgo && !cs.isRefunded) {
-                    cs.isRefunded = true;
-                    cs.refundStatus = "REFUNDED";
-                    cs.paymentStatus = "refunded";
-                  }
-                }
-              });
-
-              // Preserve recent local pending sales not yet present in cloud response
-              const recentPendingSales = localSales.filter((ls) => {
-                const isRecent = ls.id && typeof ls.id === "number" && ls.id > sixtySecsAgo;
-                if (!isRecent) return false;
-
-                const existsInCloud = processedCloudSales.some((cs) => {
-                  const csName = String(cs.customerName || "").trim().toLowerCase();
-                  const lsName = String(ls.customerName || "").trim().toLowerCase();
-                  const csTotal = Number(cs.grandTotal) || 0;
-                  const lsTotal = Number(ls.grandTotal) || 0;
-                  return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001;
-                });
-                return !existsInCloud;
-              });
-
-              const mergedSales = [...recentPendingSales, ...processedCloudSales];
-              saveBranchData("sales", mergedSales, branch);
-            }
-            const syncTime = new Date().toISOString();
-            try {
-              localStorage.setItem(getStorageKey("lastSynced", branch), syncTime);
-            } catch (e) {}
-
-            window.dispatchEvent(new CustomEvent("inventoryDataChanged", { detail: { branch, syncTime } }));
-            if (window.DevLogger) {
-              window.DevLogger.success("DataStore", `Successfully synced real ${branch} Google Sheet data at ${syncTime}!`, { branch, syncTime });
-            } else {
-              console.log(`Successfully synced real ${branch} Google Sheet data at ${syncTime}!`);
-            }
-            return { success: true, branch, syncTime, data };
-          } else {
-            throw new Error(data ? data.message : "Invalid response");
-          }
-        })
-        .catch((err) => {
-          if (timeoutId) clearTimeout(timeoutId);
-          // If attempt failed or timed out, fast-retry on warm container up to 2 times after 1s delay
-          if (retriesSoFar < 2) {
-            if (window.DevLogger) {
-              window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1s...`, { branch, attempt: retriesSoFar + 1, error: err.message }, 3);
-            } else {
-              console.log(`Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1s...`);
-            }
-            return new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
-              this.syncFromCloud(webAppUrl, retriesSoFar + 1, branch)
-            );
-          }
-          if (window.DevLogger) {
-            window.DevLogger.warn("DataStore", `PWA Background sync notice for ${branch} (using local storage data): ${err.message || err}`, { branch, error: err.message || err }, 2);
-          } else {
-            console.log(`PWA Background sync notice for ${branch} (using local storage data):`, err.message || err);
-          }
-          return { success: false, error: err };
-        });
+    flushPendingMutations: function (webAppUrl) {
+      return flushPendingMutations(webAppUrl);
     },
 
-    // Sync all authorized branches sequentially to pre-warm local cache for 0ms branch switching
+    syncFromCloud: syncFromCloud,
+
+    // Sync active branch first, then other authorized branches with 1500ms spacing to prevent Google Apps Script lock/concurrency errors
     syncAllBranches: function (webAppUrl) {
       if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false });
+      const active = getActiveBranch();
       const user = window.Auth ? window.Auth.getUser() : null;
       const allowed = (user && Array.isArray(user.allowedBranches) && user.allowedBranches.length > 0)
         ? user.allowedBranches
         : ["alkhoud", "ghala"];
 
-      return Promise.all(
-        allowed.map((b) => this.syncFromCloud(webAppUrl, 0, b))
-      ).then((results) => {
+      const sortedBranches = [active, ...allowed.filter((b) => b !== active)];
+
+      return sortedBranches.reduce((chain, b, idx) => {
+        return chain.then((prevResults) => {
+          const delay = idx > 0 ? new Promise((r) => setTimeout(r, 1500)) : Promise.resolve();
+          return delay.then(() => syncFromCloud(webAppUrl, 0, b)).then((res) => [...prevResults, res]);
+        });
+      }, Promise.resolve([])).then((results) => {
         return { success: results.some((r) => r && r.success) };
       });
     },
 
-    getLastSyncedTime: function (branch) {
-      const b = branch || getActiveBranch();
-      try {
-        return localStorage.getItem(getStorageKey("lastSynced", b)) || null;
-      } catch (e) {
-        return null;
-      }
-    },
+    getLastSyncedTime: getLastSyncedTime,
 
     refundSale: function (saleIdentifier, webAppUrl) {
       const branch = getActiveBranch();
@@ -513,7 +643,7 @@ window.DataStore = (function () {
           return (
             s.customerName === saleIdentifier.customerName &&
             s.date === saleIdentifier.date &&
-            Number(s.grandTotal) === Number(saleIdentifier.grandTotal)
+            Math.abs(Number(s.grandTotal) - Number(saleIdentifier.grandTotal)) < 0.001
           );
         }
         return false;
@@ -529,7 +659,7 @@ window.DataStore = (function () {
         return { success: false, message: "Sale is already refunded" };
       }
 
-      // 1. Mark Sale as Refunded
+      // 1. Mark Sale as Refunded locally
       targetSale.refundStatus = "REFUNDED";
       targetSale.paymentStatus = "refunded";
       targetSale.isRefunded = true;
@@ -537,7 +667,7 @@ window.DataStore = (function () {
       sales[targetIndex] = targetSale;
       saveBranchData("sales", sales, branch);
 
-      // 2. Return Items Stock to Inventory (Supports items array or itemsDetail string fallback)
+      // 2. Return Items Stock to Inventory using exact matching (No loose substring collision)
       let itemsToRestore = Array.isArray(targetSale.items) && targetSale.items.length > 0 ? targetSale.items : [];
       if (itemsToRestore.length === 0 && typeof targetSale.itemsDetail === "string" && targetSale.itemsDetail.trim()) {
         const lines = targetSale.itemsDetail.split("\n");
@@ -557,11 +687,17 @@ window.DataStore = (function () {
           const rawName = (soldItem.name || "").trim();
           const name = rawName.toLowerCase();
           const qtyToReturn = Number(soldItem.qty) || 0;
+          const soldSku = (soldItem.sku || "").trim().toLowerCase();
 
           if (name && qtyToReturn > 0) {
-            const invIndex = inventory.findIndex(
-              (inv) => (inv.name || "").trim().toLowerCase() === name || name.includes((inv.name || "").trim().toLowerCase())
-            );
+            const invIndex = inventory.findIndex((inv) => {
+              const invName = (inv.name || "").trim().toLowerCase();
+              const invSku = (inv.sku || "").trim().toLowerCase();
+              if (invName === name) return true;
+              if (soldSku && invSku === soldSku) return true;
+              return false;
+            });
+
             if (invIndex >= 0) {
               inventory[invIndex].qty = (Number(inventory[invIndex].qty) || 0) + qtyToReturn;
               inventory[invIndex].lastUpdated = new Date().toLocaleTimeString();
@@ -582,37 +718,17 @@ window.DataStore = (function () {
 
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      // 3. Background Sync to Cloud Backend
-      const targetUrl = webAppUrl || (window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "");
-
-      if (targetUrl && typeof targetUrl === "string" && targetUrl.startsWith("http")) {
-        const auth = getAuthPayload();
-        fetch(targetUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({
-            action: "refund_sale",
-            branch: branch,
-            saleId: targetSale.id,
-            timestamp: targetSale.timestamp || "",
-            saleDate: targetSale.date || "",
-            customerName: targetSale.customerName || "",
-            grandTotal: targetSale.grandTotal || 0,
-            itemsDetail: targetSale.itemsDetail || "",
-            items: itemsToRestore && itemsToRestore.length > 0 ? itemsToRestore : (targetSale.items || []),
-            refundStatus: "REFUNDED",
-            ...auth
-          })
-        })
-          .then(() => {
-            console.log(`Refund background sync completed for ${branch}!`);
-            setTimeout(() => {
-              this.syncFromCloud(targetUrl);
-            }, 2500);
-          })
-          .catch((err) => console.error("Refund sync error:", err));
-      }
+      // 3. Reliable Mutation Sync with Offline Queueing
+      sendMutation("refund_sale", branch, {
+        saleId: targetSale.id,
+        timestamp: targetSale.timestamp || "",
+        saleDate: targetSale.date || "",
+        customerName: targetSale.customerName || "",
+        grandTotal: targetSale.grandTotal || 0,
+        itemsDetail: targetSale.itemsDetail || "",
+        items: itemsToRestore && itemsToRestore.length > 0 ? itemsToRestore : (targetSale.items || []),
+        refundStatus: "REFUNDED"
+      }, webAppUrl);
 
       return { success: true, sale: targetSale };
     },
@@ -629,7 +745,7 @@ window.DataStore = (function () {
           return (
             s.customerName === saleIdentifier.customerName &&
             s.date === saleIdentifier.date &&
-            Number(s.grandTotal) === Number(saleIdentifier.grandTotal)
+            Math.abs(Number(s.grandTotal) - Number(saleIdentifier.grandTotal)) < 0.001
           );
         }
         return false;
@@ -657,51 +773,33 @@ window.DataStore = (function () {
 
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      // 2. Background Sync to Cloud Backend
-      const targetUrl = webAppUrl || (window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "");
-
-      if (targetUrl && typeof targetUrl === "string" && targetUrl.startsWith("http")) {
-        const auth = getAuthPayload();
-        fetch(targetUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "text/plain" },
-          body: JSON.stringify({
-            action: "mark_sale_paid",
-            branch: branch,
-            saleId: targetSale.id,
-            timestamp: targetSale.timestamp || "",
-            saleDate: targetSale.date || "",
-            customerName: targetSale.customerName || "",
-            grandTotal: targetSale.grandTotal || 0,
-            paymentStatus: "paid",
-            paymentMethod: targetSale.paymentMethod,
-            cashAmount: targetSale.cashAmount,
-            cardAmount: targetSale.cardAmount,
-            ...auth
-          })
-        })
-          .then(() => {
-            console.log(`Mark as paid background sync completed for ${branch}!`);
-            setTimeout(() => {
-              this.syncFromCloud(targetUrl);
-            }, 2500);
-          })
-          .catch((err) => console.error("Mark as paid sync error:", err));
-      }
+      // 2. Reliable Mutation Sync with Offline Queueing
+      sendMutation("mark_sale_paid", branch, {
+        saleId: targetSale.id,
+        timestamp: targetSale.timestamp || "",
+        saleDate: targetSale.date || "",
+        customerName: targetSale.customerName || "",
+        grandTotal: targetSale.grandTotal || 0,
+        paymentStatus: "paid",
+        paymentMethod: targetSale.paymentMethod,
+        cashAmount: targetSale.cashAmount,
+        cardAmount: targetSale.cardAmount
+      }, webAppUrl);
 
       return { success: true, sale: targetSale };
     },
 
     clearCacheAndSync: function (webAppUrl) {
       const b = getActiveBranch();
+      delete memoryCache.inventory[b];
+      delete memoryCache.sales[b];
+      delete memoryCache.amend_logs[b];
       try {
         localStorage.removeItem(getStorageKey("inventory", b));
         localStorage.removeItem(getStorageKey("sales", b));
         localStorage.removeItem(getStorageKey("lastSynced", b));
       } catch (e) {}
-      return this.syncFromCloud(webAppUrl);
+      return syncFromCloud(webAppUrl);
     }
   };
 })();
-

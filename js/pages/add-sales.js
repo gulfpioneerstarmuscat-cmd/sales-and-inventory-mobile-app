@@ -13,6 +13,10 @@ function formatOMR(val) {
   return `OMR ${num.toFixed(3)}`;
 }
 
+function roundOMR(val) {
+  return Math.round((Number(val) || 0) * 1000) / 1000;
+}
+
 function getTodayString() {
   const d = new Date();
   const y = d.getFullYear();
@@ -377,8 +381,8 @@ window.initAddSales = (function () {
       // Update each item card's individual Subtotal (OMR) field in DOM
       const rowCards = itemsListContainer ? itemsListContainer.querySelectorAll(".item-row-card") : [];
       items.forEach((item, idx) => {
-        const itemSubtotal = (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
-        subtotal += itemSubtotal;
+        const itemSubtotal = roundOMR((Number(item.qty) || 0) * (Number(item.unitPrice) || 0));
+        subtotal = roundOMR(subtotal + itemSubtotal);
 
         if (rowCards[idx]) {
           const totInp = rowCards[idx].querySelector(".item-total-input");
@@ -389,8 +393,8 @@ window.initAddSales = (function () {
       });
 
       const vatRate = vatBill === "yes" ? 0.05 : 0;
-      const vatAmount = subtotal * vatRate;
-      const grandTotal = subtotal + vatAmount;
+      const vatAmount = roundOMR(subtotal * vatRate);
+      const grandTotal = roundOMR(subtotal + vatAmount);
 
       const subtotalDisplay = root.querySelector("#items-subtotal-display");
       if (subtotalDisplay) subtotalDisplay.textContent = formatOMR(subtotal);
@@ -420,14 +424,14 @@ window.initAddSales = (function () {
           const cashVal = parseFloat(cashInput ? cashInput.value : "");
           const cardVal = parseFloat(cardInput ? cardInput.value : "");
           if (isNaN(cashVal) && isNaN(cardVal)) {
-            const half = grandTotal / 2;
+            const half = roundOMR(grandTotal / 2);
             if (cashInput) cashInput.value = half.toFixed(3);
-            if (cardInput) cardInput.value = half.toFixed(3);
+            if (cardInput) cardInput.value = roundOMR(grandTotal - half).toFixed(3);
           } else if (!isNaN(cashVal)) {
-            const newCard = Math.max(0, grandTotal - cashVal);
+            const newCard = Math.max(0, roundOMR(grandTotal - cashVal));
             if (cardInput) cardInput.value = newCard.toFixed(3);
           } else if (!isNaN(cardVal)) {
-            const newCash = Math.max(0, grandTotal - cardVal);
+            const newCash = Math.max(0, roundOMR(grandTotal - cardVal));
             if (cashInput) cashInput.value = newCash.toFixed(3);
           }
         } else {
@@ -506,10 +510,11 @@ window.initAddSales = (function () {
     function getGrandTotalValue() {
       let subtotal = 0;
       items.forEach((item) => {
-        subtotal += (Number(item.qty) || 0) * (Number(item.unitPrice) || 0);
+        subtotal = roundOMR(subtotal + roundOMR((Number(item.qty) || 0) * (Number(item.unitPrice) || 0)));
       });
       const vatRate = vatBill === "yes" ? 0.05 : 0;
-      return subtotal + subtotal * vatRate;
+      const vatAmount = roundOMR(subtotal * vatRate);
+      return roundOMR(subtotal + vatAmount);
     }
 
     function setupToggleGroup(container, onSelect) {

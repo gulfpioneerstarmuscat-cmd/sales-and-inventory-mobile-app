@@ -29,7 +29,7 @@ window.Auth = (function () {
   }
 
   function getDeviceName() {
-    const ua = navigator.userAgent || "";
+    const ua = (typeof navigator !== "undefined" && navigator.userAgent) || "";
     let os = "Device";
     if (ua.includes("iPhone")) os = "iPhone";
     else if (ua.includes("iPad")) os = "iPad";
@@ -88,12 +88,27 @@ window.Auth = (function () {
     } catch (e) {}
   }
 
+  function fetchWithTimeout(url, options, timeoutMs = 6000) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const opts = {
+      ...(options || {}),
+      signal: controller ? controller.signal : undefined
+    };
+
+    return fetch(url, opts).finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+    });
+  }
+
   return {
     getUser: function () {
+      if (!currentUser) currentUser = loadUserSession();
       return currentUser ? { ...currentUser } : null;
     },
 
     getCurrentUser: function () {
+      if (!currentUser) currentUser = loadUserSession();
       return currentUser ? { ...currentUser } : null;
     },
 
@@ -138,7 +153,7 @@ window.Auth = (function () {
         return Promise.resolve({ valid: true });
       }
 
-      return fetch(targetUrl, {
+      return fetchWithTimeout(targetUrl, {
         method: "POST",
         mode: "cors",
         headers: { "Content-Type": "text/plain" },
@@ -148,7 +163,7 @@ window.Auth = (function () {
           sessionId: sess.sessionId,
           deviceId: devId
         })
-      })
+      }, 4500)
         .then((res) => res.json())
         .then((data) => {
           if (data && data.status === "success" && data.valid) {
@@ -162,7 +177,7 @@ window.Auth = (function () {
             }
             return { valid: true, user: currentUser };
           }
-          console.warn("Session revoked or expired:", data ? data.message : "Invalid");
+          if (window.DevLogger) window.DevLogger.warn("Auth", "Session revoked or expired", data ? data.message : "Invalid");
           this.logout();
           if (window.UI) {
             window.UI.toast(data.message || "Session revoked by administrator", "warning");
@@ -170,7 +185,7 @@ window.Auth = (function () {
           return { valid: false, message: data ? data.message : "Session invalid" };
         })
         .catch((err) => {
-          console.warn("Cloud session check offline, using local session token");
+          if (window.DevLogger) window.DevLogger.info("Auth", "Cloud session check offline or timed out, using local session token", err.message || err);
           return { valid: true, offline: true };
         });
     },
@@ -190,7 +205,7 @@ window.Auth = (function () {
       // Check permissions
       if (currentUser && currentUser.role !== "admin") {
         if (currentUser.assignedBranch !== branchKey) {
-          console.warn("Staff user cannot switch to unauthorized branch");
+          if (window.DevLogger) window.DevLogger.warn("Auth", "Staff user cannot switch to unauthorized branch");
           return false;
         }
       }
@@ -218,7 +233,7 @@ window.Auth = (function () {
 
       // Cloud login check against Google Sheets users & sessions sheet
       if (targetUrl && targetUrl.startsWith("http")) {
-        return fetch(targetUrl, {
+        return fetchWithTimeout(targetUrl, {
           method: "POST",
           mode: "cors",
           headers: { "Content-Type": "text/plain" },
@@ -230,7 +245,7 @@ window.Auth = (function () {
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
           })
-        })
+        }, 8000)
           .then((res) => res.json())
           .then((data) => {
             if (data && data.status === "success" && data.user) {
@@ -262,7 +277,7 @@ window.Auth = (function () {
       const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null);
 
       if (targetUrl && targetUrl.startsWith("http")) {
-        return fetch(targetUrl, {
+        return fetchWithTimeout(targetUrl, {
           method: "POST",
           mode: "cors",
           headers: { "Content-Type": "text/plain" },
@@ -273,7 +288,7 @@ window.Auth = (function () {
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
           })
-        })
+        }, 8000)
           .then((res) => res.json())
           .then((data) => {
             if (data && data.status === "success" && data.user) {
@@ -305,7 +320,7 @@ window.Auth = (function () {
       const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : null);
 
       if (targetUrl && targetUrl.startsWith("http")) {
-        return fetch(targetUrl, {
+        return fetchWithTimeout(targetUrl, {
           method: "POST",
           mode: "cors",
           headers: { "Content-Type": "text/plain" },
@@ -316,7 +331,7 @@ window.Auth = (function () {
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
           })
-        })
+        }, 8000)
           .then((res) => res.json())
           .then((data) => {
             if (data && data.status === "success" && data.user) {
@@ -401,7 +416,7 @@ window.Auth = (function () {
           this._googleTokenClient.requestAccessToken({ prompt: "select_account" });
           return;
         } catch (e) {
-          console.warn("Token client fallback to ID prompt:", e);
+          if (window.DevLogger) window.DevLogger.info("Auth", "Token client fallback to ID prompt", e);
         }
       }
 

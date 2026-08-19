@@ -150,9 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function showFullApp() {
     if (mainAppContainer) mainAppContainer.style.display = "block";
     if (loggedOutScreen) loggedOutScreen.classList.add("is-hidden");
-    setTimeout(() => {
-      hideSplashScreen();
-    }, 300);
+    hideSplashScreen();
 
     // Trigger cloud data sync when entering full app
     const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
@@ -171,33 +169,32 @@ document.addEventListener("DOMContentLoaded", () => {
     hideSplashScreen();
   }
 
-  // 1. Initial Session Check: Splash Screen -> Session ID Checking Loading Screen
-  showLoadingScreen("Checking Session ID...");
+  // 1. Initial Session Check: Instant 0ms Optimistic Launch with Background Server Verification
   const sessionUser = window.Auth ? window.Auth.validateSession() : null;
 
   if (sessionUser) {
+    // 0ms Instant UI Unlock: Open dashboard immediately using verified local token
+    showFullApp();
+
+    // Background Server Verification (staggered slightly so it does not collide with initial data sync)
     const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
-    if (window.Auth && typeof window.Auth.verifySessionWithCloud === "function") {
-      window.Auth.verifySessionWithCloud(webAppUrl)
-        .then((res) => {
-          if (res && res.valid) {
-            showLoadingScreen("Session Verified! Loading App...");
-            showFullApp();
-          } else {
-            showLoggedOutScreen();
-          }
-        })
-        .catch(() => {
-          // If network error/offline, fallback to local session
-          showFullApp();
-        });
-    } else {
-      showFullApp();
+    if (window.Auth && typeof window.Auth.verifySessionWithCloud === "function" && webAppUrl) {
+      setTimeout(() => {
+        window.Auth.verifySessionWithCloud(webAppUrl)
+          .then((res) => {
+            if (res && res.valid === false) {
+              // Explicitly revoked on server -> kick to login screen
+              showLoggedOutScreen();
+            }
+          })
+          .catch(() => {
+            // Keep running offline seamlessly if network drops
+          });
+      }, 1500);
     }
   } else {
-    setTimeout(() => {
-      showLoggedOutScreen();
-    }, 400);
+    // Immediate transition to login screen (no artificial delay)
+    showLoggedOutScreen();
   }
 
   // 2. Emergency Access Panel Toggle Handler
@@ -370,7 +367,7 @@ if ("serviceWorker" in navigator) {
           if (newWorker) {
             newWorker.addEventListener("statechange", () => {
               if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                console.log("New version available! Refreshing automatically...");
+                if (window.DevLogger) window.DevLogger.info("App", "New version available! Refreshing automatically...");
                 window.location.reload();
               }
             });
@@ -378,7 +375,7 @@ if ("serviceWorker" in navigator) {
         });
       })
       .catch((err) => {
-        console.log("ServiceWorker registration failed: ", err);
+        if (window.DevLogger) window.DevLogger.warn("App", "ServiceWorker registration failed", err);
       });
   });
 }
@@ -387,5 +384,5 @@ if ("serviceWorker" in navigator) {
 window.addEventListener("beforeinstallprompt", (e) => {
   e.preventDefault();
   window.deferredPwaPrompt = e;
-  console.log("WebAPK Install Prompt captured");
+  if (window.DevLogger) window.DevLogger.info("App", "WebAPK Install Prompt captured");
 });
