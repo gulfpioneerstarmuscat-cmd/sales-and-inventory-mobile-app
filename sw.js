@@ -1,5 +1,5 @@
-const CACHE_NAME = "gps-app-v70";
-
+const CACHE_NAME = "gps-app-v72";
+const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
   "./",
@@ -51,7 +51,89 @@ const ASSETS_TO_CACHE = [
   "./assets/logo/icon-512.png?v=52"
 ];
 
-// Install: Pre-cache essential assets safely (Promise.allSettled guarantees PWA installability even if 1 asset fails)
+// Helper: Open IndexedDB inside Service Worker context
+function openSWDatabase() {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === "undefined") return resolve(null);
+    try {
+      const req = indexedDB.open(DB_NAME, 1);
+      req.onsuccess = (e) => resolve(e.target.result);
+      req.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+// Flush Pending Outbox Mutations from IndexedDB directly from Service Worker
+async function flushIndexedDBOutboxInSW() {
+  const db = await openSWDatabase();
+  if (!db || !db.objectStoreNames.contains("mutations_outbox")) return;
+
+  const pendingItems = await new Promise((resolve) => {
+    try {
+      const tx = db.transaction("mutations_outbox", "readonly");
+      const store = tx.objectStore("mutations_outbox");
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => resolve([]);
+    } catch (e) {
+      resolve([]);
+    }
+  });
+
+  if (!pendingItems.length) return;
+
+  // Attempt to read config.js from cache to extract target Web App URL
+  let targetUrl = "";
+  try {
+    const configResp = await caches.match("./config.js");
+    if (configResp) {
+      const configText = await configResp.text();
+      const match = configText.match(/googleSheetWebAppUrl:\s*["']([^"']+)["']/);
+      if (match) targetUrl = match[1];
+    }
+  } catch (e) {}
+
+  for (const item of pendingItems) {
+    const url = item.targetUrl || targetUrl;
+    if (!url || !url.startsWith("http")) continue;
+
+    try {
+      const bodyPayload = {
+        action: item.action,
+        branch: item.branch,
+        apiKey: item.apiKey || "",
+        sessionId: item.sessionId || "",
+        ...(item.payload || {})
+      };
+
+      await fetch(url, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(bodyPayload)
+      });
+
+      // Remove successfully pushed item from IndexedDB outbox
+      await new Promise((resolve) => {
+        try {
+          const tx = db.transaction("mutations_outbox", "readwrite");
+          tx.objectStore("mutations_outbox").delete(item.id);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => resolve();
+        } catch (e) {
+          resolve();
+        }
+      });
+    } catch (err) {
+      // If network fails again, keep in IndexedDB for the next sync attempt
+      break;
+    }
+  }
+}
+
+// Install: Pre-cache essential assets safely
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -76,14 +158,21 @@ self.addEventListener("activate", (event) => {
         return Promise.all(
           keys.map((key) => {
             if (key !== CACHE_NAME) {
-              console.log("ServiceWorker purging old cache:", key);
               return caches.delete(key);
             }
           })
         );
       })
       .then(() => self.clients.claim())
+      .then(() => flushIndexedDBOutboxInSW())
   );
+});
+
+// Service Worker Background Sync API (Fires when device connects to internet even if app is closed)
+self.addEventListener("sync", (event) => {
+  if (event.tag === "gps-outbox-sync") {
+    event.waitUntil(flushIndexedDBOutboxInSW());
+  }
 });
 
 // Fetch Strategy: Network-First for local HTML/JS/CSS (Always get live updates first, fallback to cache if offline)

@@ -1,14 +1,67 @@
 // js/data-store.js - High Performance Branch-Scoped Data Store for Sales & Inventory
+// Hybrid Storage Model: Synchronous In-Memory RAM Cache + IndexedDB Durable Storage + Offline Outbox Background Sync
 
 window.DataStore = (function () {
+  const DB_NAME = "gps_app_db_v1";
+  const DB_VERSION = 1;
   const PENDING_MUTATIONS_KEY = "gps_pending_mutations_v1";
 
-  // In-Memory RAM Cache for sub-millisecond lookups & reduced GC pressure
+  // In-Memory RAM Cache for sub-millisecond lookups & instantaneous UI queries
   const memoryCache = {
     inventory: {},
     sales: {},
     amend_logs: {}
   };
+
+  let dbInstance = null;
+  let dbInitPromise = null;
+
+  // --------------------------------------------------------------------------
+  // IndexedDB Core Engine
+  // --------------------------------------------------------------------------
+  function openDatabase() {
+    if (dbInstance) return Promise.resolve(dbInstance);
+    if (dbInitPromise) return dbInitPromise;
+    if (typeof indexedDB === "undefined") {
+      return Promise.resolve(null);
+    }
+
+    dbInitPromise = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains("inventory")) {
+            db.createObjectStore("inventory", { keyPath: "storeKey" });
+          }
+          if (!db.objectStoreNames.contains("sales")) {
+            db.createObjectStore("sales", { keyPath: "storeKey" });
+          }
+          if (!db.objectStoreNames.contains("audit_logs")) {
+            db.createObjectStore("audit_logs", { keyPath: "storeKey" });
+          }
+          if (!db.objectStoreNames.contains("mutations_outbox")) {
+            const outbox = db.createObjectStore("mutations_outbox", { keyPath: "id" });
+            outbox.createIndex("branch", "branch", { unique: false });
+            outbox.createIndex("queuedAt", "queuedAt", { unique: false });
+          }
+        };
+        req.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          resolve(dbInstance);
+        };
+        req.onerror = (e) => {
+          if (window.DevLogger) window.DevLogger.warn("DataStore", "IndexedDB open notice:", e ? e.target : "Error");
+          resolve(null);
+        };
+      } catch (err) {
+        if (window.DevLogger) window.DevLogger.warn("DataStore", "IndexedDB initialization caught:", err);
+        resolve(null);
+      }
+    });
+
+    return dbInitPromise;
+  }
 
   function getActiveBranch() {
     return window.Auth ? window.Auth.getActiveBranch() : "alkhoud";
@@ -19,30 +72,57 @@ window.DataStore = (function () {
     return `gps_${b}_${type}_v1`;
   }
 
+  // Asynchronously persist branch dataset to IndexedDB
+  function persistToIndexedDB(type, branch, data) {
+    const b = branch || getActiveBranch();
+    return openDatabase().then((db) => {
+      if (!db) return false;
+      return new Promise((resolve) => {
+        try {
+          const storeName = type === "amend_logs" ? "audit_logs" : type;
+          const tx = db.transaction(storeName, "readwrite");
+          const store = tx.objectStore(storeName);
+          store.put({ storeKey: b, branch: b, data: data, updatedAt: Date.now() });
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+        } catch (e) {
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  // Load from LocalStorage fallback
+  function loadFromLocalStorage(type, branch) {
+    const b = branch || getActiveBranch();
+    const key = getStorageKey(type, b);
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   function loadBranchInventory(branch) {
     const b = branch || getActiveBranch();
     if (memoryCache.inventory[b]) return memoryCache.inventory[b];
-    const key = getStorageKey("inventory", b);
-    try {
-      const stored = localStorage.getItem(key);
-      memoryCache.inventory[b] = stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      memoryCache.inventory[b] = [];
-    }
+    memoryCache.inventory[b] = loadFromLocalStorage("inventory", b);
     return memoryCache.inventory[b];
   }
 
   function loadBranchSales(branch) {
     const b = branch || getActiveBranch();
     if (memoryCache.sales[b]) return memoryCache.sales[b];
-    const key = getStorageKey("sales", b);
-    try {
-      const stored = localStorage.getItem(key);
-      memoryCache.sales[b] = stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      memoryCache.sales[b] = [];
-    }
+    memoryCache.sales[b] = loadFromLocalStorage("sales", b);
     return memoryCache.sales[b];
+  }
+
+  function loadBranchAuditLogs(branch) {
+    const b = branch || getActiveBranch();
+    if (memoryCache.amend_logs[b]) return memoryCache.amend_logs[b];
+    memoryCache.amend_logs[b] = loadFromLocalStorage("amend_logs", b);
+    return memoryCache.amend_logs[b];
   }
 
   function saveBranchData(type, data, branch) {
@@ -51,12 +131,83 @@ window.DataStore = (function () {
     if (type === "sales") memoryCache.sales[b] = data;
     if (type === "amend_logs") memoryCache.amend_logs[b] = data;
 
+    // 1. Synchronous fallback save
     const key = getStorageKey(type, b);
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (e) {
       if (window.DevLogger) window.DevLogger.warn("DataStore", `Error writing localStorage: ${key}`, e);
     }
+
+    // 2. Asynchronous durable save to IndexedDB
+    persistToIndexedDB(type, b, data);
+  }
+
+  // Auto-migration from legacy LocalStorage to IndexedDB
+  function autoMigrateLegacyStorage() {
+    return openDatabase().then((db) => {
+      if (!db) return false;
+      const branches = ["alkhoud", "ghala"];
+      branches.forEach((b) => {
+        ["inventory", "sales", "amend_logs"].forEach((type) => {
+          const legacyKey = getStorageKey(type, b);
+          try {
+            const stored = localStorage.getItem(legacyKey);
+            if (stored) {
+              const parsed = JSON.parse(stored);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                persistToIndexedDB(type, b, parsed);
+              }
+            }
+          } catch (e) {}
+        });
+      });
+      return true;
+    });
+  }
+
+  // Load from IndexedDB into RAM cache on boot
+  function preloadFromIndexedDB() {
+    return openDatabase().then((db) => {
+      if (!db) return false;
+      const branches = ["alkhoud", "ghala"];
+      const promises = [];
+
+      branches.forEach((b) => {
+        ["inventory", "sales", "audit_logs"].forEach((storeName) => {
+          const p = new Promise((resolve) => {
+            try {
+              const tx = db.transaction(storeName, "readonly");
+              const store = tx.objectStore(storeName);
+              const req = store.get(b);
+              req.onsuccess = () => {
+                if (req.result && Array.isArray(req.result.data)) {
+                  const cacheKey = storeName === "audit_logs" ? "amend_logs" : storeName;
+                  if (!memoryCache[cacheKey][b] || memoryCache[cacheKey][b].length === 0) {
+                    memoryCache[cacheKey][b] = req.result.data;
+                  }
+                }
+                resolve();
+              };
+              req.onerror = () => resolve();
+            } catch (e) {
+              resolve();
+            }
+          });
+          promises.push(p);
+        });
+      });
+
+      return Promise.all(promises);
+    });
+  }
+
+  // Initialize DB & Preload
+  if (typeof window !== "undefined") {
+    openDatabase().then(() => {
+      autoMigrateLegacyStorage();
+      preloadFromIndexedDB();
+    });
   }
 
   function getAuthPayload() {
@@ -85,8 +236,23 @@ window.DataStore = (function () {
   }
 
   // --------------------------------------------------------------------------
-  // Offline Mutation Queue (Outbox Pattern)
+  // Offline Mutation Queue (IndexedDB Outbox + LocalStorage Backup + Background Sync)
   // --------------------------------------------------------------------------
+  function triggerBackgroundSync() {
+    const hasSync = (typeof window !== "undefined" && "SyncManager" in window) || (typeof globalThis !== "undefined" && "SyncManager" in globalThis);
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator && hasSync) {
+      navigator.serviceWorker.ready
+        .then((reg) => {
+          if (reg && reg.sync && typeof reg.sync.register === "function") {
+            return reg.sync.register("gps-outbox-sync");
+          }
+        })
+        .catch((err) => {
+          if (window.DevLogger) window.DevLogger.info("DataStore", "Background sync registration notice", err);
+        });
+    }
+  }
+
   function getPendingMutations() {
     try {
       const stored = localStorage.getItem(PENDING_MUTATIONS_KEY);
@@ -100,18 +266,35 @@ window.DataStore = (function () {
     try {
       localStorage.setItem(PENDING_MUTATIONS_KEY, JSON.stringify(queue));
     } catch (e) {}
+
+    // Also persist queue into IndexedDB mutations_outbox
+    openDatabase().then((db) => {
+      if (!db) return;
+      try {
+        const tx = db.transaction("mutations_outbox", "readwrite");
+        const store = tx.objectStore("mutations_outbox");
+        queue.forEach((item) => store.put(item));
+      } catch (e) {
+        if (window.DevLogger) window.DevLogger.warn("DataStore", "Outbox save error in IndexedDB:", e);
+      }
+    });
   }
 
   function enqueueMutation(action, branch, payload) {
     const queue = getPendingMutations();
-    queue.push({
+    const item = {
       id: "mut_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
       action: action,
       branch: branch,
       payload: payload,
       queuedAt: new Date().toISOString()
-    });
+    };
+    queue.push(item);
     savePendingMutations(queue);
+
+    // Register Background Sync with Service Worker
+    triggerBackgroundSync();
+
     if (window.DevLogger) {
       window.DevLogger.info("DataStore", `Enqueued offline mutation [${action}] for branch ${branch}. Total pending: ${queue.length}`);
     }
@@ -150,6 +333,16 @@ window.DataStore = (function () {
           });
           remainingQueue.shift();
           savePendingMutations(remainingQueue);
+
+          // Clean from IndexedDB
+          openDatabase().then((db) => {
+            if (!db) return;
+            try {
+              const tx = db.transaction("mutations_outbox", "readwrite");
+              tx.objectStore("mutations_outbox").delete(item.id);
+            } catch (e) {}
+          });
+
           if (window.DevLogger) {
             window.DevLogger.log("DataStore", `Flushed queued mutation [${item.action}] for ${item.branch}. Remaining: ${remainingQueue.length}`);
           }
@@ -355,6 +548,11 @@ window.DataStore = (function () {
   }
 
   return {
+    // Database Initialization & Preload
+    openDatabase: openDatabase,
+    preloadFromIndexedDB: preloadFromIndexedDB,
+    autoMigrateLegacyStorage: autoMigrateLegacyStorage,
+
     // Getters for Active Branch
     getInventory: function (branch) {
       return [...loadBranchInventory(branch)];
@@ -362,6 +560,10 @@ window.DataStore = (function () {
 
     getSales: function (branch) {
       return [...loadBranchSales(branch)];
+    },
+
+    getAuditLogs: function (branch) {
+      return [...loadBranchAuditLogs(branch)];
     },
 
     findItemByName: function (nameQuery, branch) {
@@ -383,21 +585,36 @@ window.DataStore = (function () {
       );
     },
 
-    // Record Sale with 0ms Instant Local Stock Deduction for Active Branch
+    // Save New Sale for Active Branch
     recordSale: function (saleData, webAppUrl) {
       const branch = getActiveBranch();
       const sales = loadBranchSales(branch);
       const inventory = loadBranchInventory(branch);
 
-      // 1. Record Sale locally
+      // 1. Add Sale locally to branch history
       const newSale = {
-        ...saleData,
-        refundStatus: "NO",
-        isRefunded: false,
-        branch: branch,
         id: Date.now(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        date: saleData.date || new Date().toISOString().split("T")[0],
+        customerName: saleData.customerName || "Walk-in Customer",
+        customerPhone: saleData.customerPhone || "",
+        customerAddress: saleData.customerAddress || "",
+        vatBill: saleData.vatBill || "no",
+        itemsDetail: saleData.itemsDetail || "",
+        items: saleData.items || [],
+        subtotal: Number(saleData.subtotal) || 0,
+        vatAmount: Number(saleData.vatAmount) || 0,
+        discountAmount: Number(saleData.discountAmount) || 0,
+        grandTotal: Number(saleData.grandTotal) || 0,
+        paymentStatus: saleData.paymentStatus || "paid",
+        paymentMethod: saleData.paymentMethod || "cash",
+        cashAmount: Number(saleData.cashAmount || 0),
+        cardAmount: Number(saleData.cardAmount || 0),
+        notes: saleData.notes || "",
+        recordedBy: saleData.recordedBy || "Staff",
+        refundStatus: "NO"
       };
+
       sales.unshift(newSale);
       saveBranchData("sales", sales, branch);
 
@@ -455,10 +672,10 @@ window.DataStore = (function () {
 
       if (index >= 0) {
         inventory[index].qty = (Number(inventory[index].qty) || 0) + addQty;
-        if (payload.category) inventory[index].category = payload.category;
-        if (payload.alertLevel !== undefined) inventory[index].alertLevel = Number(payload.alertLevel);
-        if (payload.remarks) inventory[index].lastRemark = payload.remarks;
         inventory[index].lastUpdated = new Date().toLocaleTimeString();
+        if (payload.category) inventory[index].category = payload.category;
+        if (payload.alertLevel) inventory[index].alertLevel = Number(payload.alertLevel);
+        if (payload.remarks) inventory[index].lastRemark = payload.remarks;
       } else {
         inventory.push({
           sku: payload.sku || "SKU-" + Date.now().toString().slice(-5),
@@ -474,26 +691,48 @@ window.DataStore = (function () {
       saveBranchData("inventory", inventory, branch);
       window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
 
-      sendMutation("add_stock_qty", branch, payload, webAppUrl);
+      sendMutation("add_stock_qty", branch, {
+        name: name,
+        sku: payload.sku || "",
+        category: payload.category || "General",
+        addQty: addQty,
+        alertLevel: Number(payload.alertLevel) || 5,
+        remarks: payload.remarks || "",
+        addedBy: payload.addedBy || "Staff"
+      }, webAppUrl);
 
       return { success: true };
     },
 
-    // Amend Stock Item with Selective Updating and Deep Audit Trail Tracking
-    amendStockItem: function (amendData, webAppUrl) {
+    // Amend Stock Item with NaN protection and Audit Trail recording
+    amendStockItem: function (arg1, arg2, arg3, arg4) {
+      let originalItem, updatedFields, diffs, webAppUrl;
+      if (arg1 && typeof arg1 === "object" && arg1.originalItem) {
+        originalItem = arg1.originalItem;
+        updatedFields = arg1.updatedFields || {};
+        diffs = arg1.diffs || [];
+        webAppUrl = arg2;
+      } else {
+        originalItem = arg1 || {};
+        updatedFields = arg2 || {};
+        diffs = arg3 || [];
+        webAppUrl = arg4;
+      }
+
       const branch = getActiveBranch();
       const inventory = loadBranchInventory(branch);
-      const { originalItem, updatedFields, diffs } = amendData;
-      const origName = (originalItem.name || "").trim().toLowerCase();
 
-      const index = inventory.findIndex(
-        (inv) => (inv.name || "").trim().toLowerCase() === origName
-      );
+      const targetIdentifier = originalItem.sku || originalItem.name;
+      const index = inventory.findIndex((inv) => {
+        if (originalItem.sku && inv.sku) return inv.sku === originalItem.sku;
+        return (inv.name || "").trim().toLowerCase() === (originalItem.name || "").trim().toLowerCase();
+      });
 
-      if (index < 0) return { success: false, message: "Target item not found in inventory." };
+      if (index < 0) {
+        return { success: false, message: "Original item not found for amendment" };
+      }
 
       const currentItem = inventory[index];
-
       const getCurrentUserSafe = () => {
         if (!window.Auth) return null;
         if (typeof window.Auth.getUser === "function") return window.Auth.getUser();
@@ -528,13 +767,7 @@ window.DataStore = (function () {
 
       // Record Audit Trail locally
       const auditLogKey = getStorageKey("amend_logs", branch);
-      let logs = [];
-      try {
-        const storedLogs = localStorage.getItem(auditLogKey);
-        logs = storedLogs ? JSON.parse(storedLogs) : [];
-      } catch (e) {
-        logs = [];
-      }
+      let logs = loadBranchAuditLogs(branch);
 
       const auditRecord = {
         id: Date.now(),
@@ -578,8 +811,6 @@ window.DataStore = (function () {
         inventory[index] = {
           ...inventory[index],
           ...itemData,
-          category: itemData.category || inventory[index].category || "General",
-          qty: Number(itemData.qty) || 0,
           lastUpdated: new Date().toLocaleTimeString()
         };
       } else {
@@ -655,21 +886,31 @@ window.DataStore = (function () {
 
       const targetSale = sales[targetIndex];
 
-      if (targetSale.refundStatus === "REFUNDED" || targetSale.paymentStatus === "refunded" || targetSale.isRefunded) {
+      if (targetSale.refundStatus === "REFUNDED" || targetSale.isRefunded) {
         return { success: false, message: "Sale is already refunded" };
       }
 
-      // 1. Mark Sale as Refunded locally
+      // 1. Update Sale Ledger to REFUNDED
       targetSale.refundStatus = "REFUNDED";
-      targetSale.paymentStatus = "refunded";
       targetSale.isRefunded = true;
+      targetSale.paymentStatus = "refunded";
       targetSale.refundedAt = new Date().toISOString();
+
       sales[targetIndex] = targetSale;
       saveBranchData("sales", sales, branch);
 
-      // 2. Return Items Stock to Inventory using exact matching (No loose substring collision)
-      let itemsToRestore = Array.isArray(targetSale.items) && targetSale.items.length > 0 ? targetSale.items : [];
-      if (itemsToRestore.length === 0 && typeof targetSale.itemsDetail === "string" && targetSale.itemsDetail.trim()) {
+      // 2. Restore Inventory Quantities accurately
+      const itemsToRestore = [];
+      if (Array.isArray(targetSale.items) && targetSale.items.length > 0) {
+        targetSale.items.forEach((it) => {
+          itemsToRestore.push({
+            sku: it.sku || "",
+            name: it.name || "",
+            category: it.category || "General",
+            qty: Number(it.qty) || 1
+          });
+        });
+      } else if (targetSale.itemsDetail && typeof targetSale.itemsDetail === "string") {
         const lines = targetSale.itemsDetail.split("\n");
         lines.forEach((line) => {
           const match = line.match(/^(.*?)\s*\(Qty:\s*(\d+(?:\.\d+)?)/i);
@@ -687,17 +928,12 @@ window.DataStore = (function () {
           const rawName = (soldItem.name || "").trim();
           const name = rawName.toLowerCase();
           const qtyToReturn = Number(soldItem.qty) || 0;
-          const soldSku = (soldItem.sku || "").trim().toLowerCase();
 
           if (name && qtyToReturn > 0) {
             const invIndex = inventory.findIndex((inv) => {
-              const invName = (inv.name || "").trim().toLowerCase();
-              const invSku = (inv.sku || "").trim().toLowerCase();
-              if (invName === name) return true;
-              if (soldSku && invSku === soldSku) return true;
-              return false;
+              if (soldItem.sku && inv.sku && inv.sku === soldItem.sku) return true;
+              return (inv.name || "").trim().toLowerCase() === name;
             });
-
             if (invIndex >= 0) {
               inventory[invIndex].qty = (Number(inventory[invIndex].qty) || 0) + qtyToReturn;
               inventory[invIndex].lastUpdated = new Date().toLocaleTimeString();
@@ -799,6 +1035,17 @@ window.DataStore = (function () {
         localStorage.removeItem(getStorageKey("sales", b));
         localStorage.removeItem(getStorageKey("lastSynced", b));
       } catch (e) {}
+
+      openDatabase().then((db) => {
+        if (!db) return;
+        try {
+          const tx1 = db.transaction("inventory", "readwrite");
+          tx1.objectStore("inventory").delete(b);
+          const tx2 = db.transaction("sales", "readwrite");
+          tx2.objectStore("sales").delete(b);
+        } catch (e) {}
+      });
+
       return syncFromCloud(webAppUrl);
     }
   };

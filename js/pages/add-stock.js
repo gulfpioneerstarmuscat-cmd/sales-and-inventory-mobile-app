@@ -354,9 +354,83 @@ window.initAddStock = (function () {
       if (remarksCounter) remarksCounter.textContent = "0 / 200";
       selectedExistingItem = null;
       updateCurrentStockPreview(0);
+      clearDraft();
       showSection(1);
       if (window.showNotification) window.showNotification("Entire form cleared.", "info");
     }
+
+    // ------------------------------------------------------------------------
+    // Draft Auto-Saving & Recovery System
+    // ------------------------------------------------------------------------
+    const STORAGE_KEY_DRAFT = "gps_draft_stock_v1";
+
+    function saveDraft() {
+      try {
+        const hasData = (nameInput && nameInput.value.trim()) ||
+          (qtyInput && qtyInput.value.trim()) ||
+          (remarksInput && remarksInput.value.trim());
+
+        if (!hasData) {
+          localStorage.removeItem(STORAGE_KEY_DRAFT);
+          return;
+        }
+
+        const draft = {
+          mode: mode,
+          name: nameInput ? nameInput.value : "",
+          category: categoryInput ? categoryInput.value : "",
+          qty: qtyInput ? qtyInput.value : "",
+          alertLevel: alertLevelInput ? alertLevelInput.value : "",
+          remarks: remarksInput ? remarksInput.value : "",
+          selectedSku: selectedExistingItem ? selectedExistingItem.sku : null,
+          savedAt: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY_DRAFT, JSON.stringify(draft));
+      } catch (e) {}
+    }
+
+    function restoreDraft() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_DRAFT);
+        if (!stored) return false;
+        const draft = JSON.parse(stored);
+        if (!draft) return false;
+
+        if (draft.mode && modeSelector) {
+          const targetBtn = modeSelector.querySelector(`[data-mode="${draft.mode}"]`);
+          if (targetBtn) targetBtn.click();
+        }
+
+        if (nameInput && draft.name) nameInput.value = draft.name;
+        if (categoryInput && draft.category) categoryInput.value = draft.category;
+        if (qtyInput && draft.qty) qtyInput.value = draft.qty;
+        if (alertLevelInput && draft.alertLevel) alertLevelInput.value = draft.alertLevel;
+        if (remarksInput && draft.remarks) {
+          remarksInput.value = draft.remarks;
+          if (remarksCounter) remarksCounter.textContent = `${draft.remarks.length} / 200`;
+        }
+
+        if (draft.name && mode === "existing") {
+          const matched = window.DataStore ? window.DataStore.findItemByName(draft.name) : null;
+          if (matched) {
+            selectedExistingItem = matched;
+            updateCurrentStockPreview(matched.qty);
+          }
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function clearDraft() {
+      try {
+        localStorage.removeItem(STORAGE_KEY_DRAFT);
+      } catch (e) {}
+    }
+
+    root.addEventListener("input", () => saveDraft());
+    root.addEventListener("change", () => saveDraft());
 
     // Segmented Mode Switcher
     if (modeSelector) {
@@ -447,6 +521,7 @@ window.initAddStock = (function () {
             window.showNotification(`Successfully added +${addQtyVal} units to ${payload.name}!`, "success");
           }
           // Reset form & go back to Section 1
+          clearDraft();
           clearEntireForm();
         } else {
           if (window.showNotification) {
@@ -455,5 +530,8 @@ window.initAddStock = (function () {
         }
       }
     });
+
+    // Restore draft if present
+    restoreDraft();
   }
 })();

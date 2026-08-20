@@ -653,9 +653,92 @@ window.initAddSales = (function () {
       if (cashInput) cashInput.value = "";
       if (cardInput) cardInput.value = "";
 
+      clearDraft();
       showSection(1);
       UI.toast("Entire sale form cleared", "info");
     }
+
+    // ------------------------------------------------------------------------
+    // Draft Auto-Saving & Recovery System
+    // ------------------------------------------------------------------------
+    const STORAGE_KEY_DRAFT = "gps_draft_sale_v1";
+
+    function saveDraft() {
+      try {
+        const hasData = (nameInput && nameInput.value.trim()) ||
+          (numberInput && numberInput.value.trim()) ||
+          (emailInput && emailInput.value.trim()) ||
+          (items && items.some((it) => it.name && it.name.trim()));
+
+        if (!hasData) {
+          localStorage.removeItem(STORAGE_KEY_DRAFT);
+          return;
+        }
+
+        const draft = {
+          date: dateInput ? dateInput.value : getTodayString(),
+          customerName: nameInput ? nameInput.value : "",
+          customerNumber: numberInput ? numberInput.value : "",
+          customerEmail: emailInput ? emailInput.value : "",
+          vatBill: vatBill,
+          paymentStatus: paymentStatus,
+          paymentMethod: paymentMethod,
+          cashAmount: cashInput ? cashInput.value : "",
+          cardAmount: cardInput ? cardInput.value : "",
+          items: items,
+          savedAt: Date.now()
+        };
+        localStorage.setItem(STORAGE_KEY_DRAFT, JSON.stringify(draft));
+      } catch (e) {}
+    }
+
+    function restoreDraft() {
+      try {
+        const stored = localStorage.getItem(STORAGE_KEY_DRAFT);
+        if (!stored) return false;
+        const draft = JSON.parse(stored);
+        if (!draft) return false;
+
+        if (dateInput && draft.date) dateInput.value = draft.date;
+        if (nameInput && draft.customerName) nameInput.value = draft.customerName;
+        if (numberInput && draft.customerNumber) numberInput.value = draft.customerNumber;
+        if (emailInput && draft.customerEmail) emailInput.value = draft.customerEmail;
+        if (draft.vatBill) vatBill = draft.vatBill;
+        if (draft.paymentStatus) paymentStatus = draft.paymentStatus;
+        if (draft.paymentMethod) paymentMethod = draft.paymentMethod;
+        if (cashInput && draft.cashAmount) cashInput.value = draft.cashAmount;
+        if (cardInput && draft.cardAmount) cardInput.value = draft.cardAmount;
+
+        if (Array.isArray(draft.items) && draft.items.length > 0) {
+          items = draft.items;
+        }
+
+        const resetToggle = (container, val) => {
+          if (!container) return;
+          container.querySelectorAll(".toggle-btn").forEach((btn) => {
+            btn.classList.toggle("toggle-btn--active", btn.dataset.value === val);
+          });
+        };
+        resetToggle(vatToggle, vatBill);
+        resetToggle(statusToggle, paymentStatus);
+        resetToggle(methodToggle, paymentMethod);
+
+        renderItems();
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function clearDraft() {
+      try {
+        localStorage.removeItem(STORAGE_KEY_DRAFT);
+      } catch (e) {}
+    }
+
+    // Auto-save draft on any user input
+    root.addEventListener("input", () => saveDraft());
+    root.addEventListener("change", () => saveDraft());
 
     // Navigation (Back, Next, Save) Handlers
     root.addEventListener("click", (e) => {
@@ -856,8 +939,11 @@ window.initAddSales = (function () {
       }
     });
 
-    // Initial render
-    renderItems();
+    // Initial render & draft restore
+    const draftRestored = restoreDraft();
+    if (!draftRestored) {
+      renderItems();
+    }
     showSection(1);
   };
 })();

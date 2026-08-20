@@ -102,6 +102,89 @@ Object.defineProperty(global.navigator, "onLine", {
   configurable: true
 });
 
+const idbStores = {
+  inventory: {},
+  sales: {},
+  audit_logs: {},
+  mutations_outbox: {}
+};
+
+const backgroundSyncTags = [];
+
+global.indexedDB = {
+  open: (dbName, version) => {
+    const req = {
+      result: {
+        objectStoreNames: {
+          contains: (name) => ["inventory", "sales", "audit_logs", "mutations_outbox"].includes(name)
+        },
+        createObjectStore: (name, opts) => ({
+          createIndex: () => {}
+        }),
+        transaction: (storeName, mode) => {
+          const sName = storeName === "amend_logs" ? "audit_logs" : storeName;
+          return {
+            objectStore: (subStore) => ({
+              get: (key) => {
+                const effectiveStore = subStore === "amend_logs" ? "audit_logs" : subStore;
+                const r = { result: idbStores[effectiveStore] ? idbStores[effectiveStore][key] : null };
+                setTimeout(() => { if (r.onsuccess) r.onsuccess(); }, 0);
+                return r;
+              },
+              getAll: () => {
+                const effectiveStore = subStore === "amend_logs" ? "audit_logs" : subStore;
+                const items = idbStores[effectiveStore] ? Object.values(idbStores[effectiveStore]) : [];
+                const r = { result: items };
+                setTimeout(() => { if (r.onsuccess) r.onsuccess(); }, 0);
+                return r;
+              },
+              put: (val) => {
+                const effectiveStore = subStore === "amend_logs" ? "audit_logs" : subStore;
+                const k = val.storeKey || val.id;
+                if (!idbStores[effectiveStore]) idbStores[effectiveStore] = {};
+                idbStores[effectiveStore][k] = val;
+              },
+              delete: (key) => {
+                const effectiveStore = subStore === "amend_logs" ? "audit_logs" : subStore;
+                if (idbStores[effectiveStore]) delete idbStores[effectiveStore][key];
+              },
+              clear: () => {
+                const effectiveStore = subStore === "amend_logs" ? "audit_logs" : subStore;
+                idbStores[effectiveStore] = {};
+              }
+            }),
+            oncomplete: null,
+            onerror: null
+          };
+        }
+      },
+      onsuccess: null,
+      onerror: null,
+      onupgradeneeded: null
+    };
+
+    setTimeout(() => {
+      if (req.onupgradeneeded) req.onupgradeneeded({ target: req });
+      if (req.onsuccess) req.onsuccess({ target: req });
+    }, 0);
+
+    return req;
+  }
+};
+
+global.SyncManager = function () {};
+global.window.SyncManager = global.SyncManager;
+global.navigator.serviceWorker = {
+  ready: Promise.resolve({
+    sync: {
+      register: (tag) => {
+        backgroundSyncTags.push(tag);
+        return Promise.resolve();
+      }
+    }
+  })
+};
+
 // Load modules under test
 require(path.join(process.cwd(), "js/developer.js"));
 require(path.join(process.cwd(), "js/auth.js"));
@@ -440,12 +523,99 @@ async function runTestSuite() {
   devLogger.disable(false);
 
   // ----------------------------------------------------------------------------
+  // Flow 11: IndexedDB Durable Storage & LocalStorage Auto-Migration
+  // ----------------------------------------------------------------------------
+  section("IndexedDB Durable Storage & LocalStorage Auto-Migration", "11");
+
+  info("Testing IndexedDB auto-migration and persistence...");
+  // Test auto-migration
+  await ds.autoMigrateLegacyStorage();
+  assert(idbStores.inventory["alkhoud"] !== undefined, "Al Khoud inventory persisted in IndexedDB 'inventory' store");
+  assert(idbStores.sales["alkhoud"] !== undefined, "Al Khoud sales ledger persisted in IndexedDB 'sales' store");
+
+  // Test deep audit log persistence in IndexedDB
+  const auditLogs = ds.getAuditLogs("alkhoud");
+  assert(Array.isArray(auditLogs) && auditLogs.length > 0, "Audit logs accessible via DataStore.getAuditLogs()");
+
+  // ----------------------------------------------------------------------------
+  // Flow 12: Sales & Stock Draft Auto-Save and Recovery
+  // ----------------------------------------------------------------------------
+  section("Sales & Stock Draft Auto-Save and Recovery", "12");
+
+  info("Testing sales form draft auto-saving...");
+  const testDraftSale = {
+    customerName: "Fahad Al-Balushi",
+    customerNumber: "96899123456",
+    vatBill: "yes",
+    paymentStatus: "paid",
+    paymentMethod: "card",
+    items: [{ id: 101, name: "Automatic Barrier 4M", qty: 2, unitPrice: 220.000 }],
+    savedAt: Date.now()
+  };
+
+  localStorage.setItem("gps_draft_sale_v1", JSON.stringify(testDraftSale));
+  const retrievedSaleDraft = JSON.parse(localStorage.getItem("gps_draft_sale_v1") || "null");
+  assert(retrievedSaleDraft !== null && retrievedSaleDraft.customerName === "Fahad Al-Balushi", "Sales draft persisted in localStorage (gps_draft_sale_v1)");
+  assert(retrievedSaleDraft.items.length === 1 && retrievedSaleDraft.items[0].qty === 2, "Sales draft cart items recovered completely");
+
+  info("Testing stock inward draft auto-saving...");
+  const testDraftStock = {
+    mode: "new",
+    name: "Solar Remote Control 868MHz",
+    category: "Accessories",
+    qty: "15",
+    alertLevel: "4",
+    remarks: "Received from Muscat Port",
+    savedAt: Date.now()
+  };
+
+  localStorage.setItem("gps_draft_stock_v1", JSON.stringify(testDraftStock));
+  const retrievedStockDraft = JSON.parse(localStorage.getItem("gps_draft_stock_v1") || "null");
+  assert(retrievedStockDraft !== null && retrievedStockDraft.name === "Solar Remote Control 868MHz", "Stock draft persisted in localStorage (gps_draft_stock_v1)");
+  assert(retrievedStockDraft.qty === "15" && retrievedStockDraft.remarks === "Received from Muscat Port", "Stock draft details recovered completely");
+
+  // Clean up drafts
+  localStorage.removeItem("gps_draft_sale_v1");
+  localStorage.removeItem("gps_draft_stock_v1");
+
+  // ----------------------------------------------------------------------------
+  // Flow 13: Service Worker Background Sync Outbox Registration
+  // ----------------------------------------------------------------------------
+  section("Service Worker Background Sync Outbox Execution", "13");
+
+  info("Testing offline mutation enqueueing to IndexedDB outbox & Background Sync registration...");
+  networkOnline = false;
+  backgroundSyncTags.length = 0;
+
+  ds.recordSale({
+    customerName: "Tariq Al-Mamari",
+    items: [{ name: "Gate Remote 433MHz", qty: 1, unitPrice: 15.000 }],
+    grandTotal: 15.750,
+    vatBill: "yes",
+    paymentStatus: "paid",
+    paymentMethod: "cash",
+    cashAmount: 15.750
+  }, window.APP_CONFIG.googleSheetWebAppUrl);
+
+  // Allow async IndexedDB outbox write to complete
+  await new Promise((r) => setTimeout(r, 40));
+
+  assert(backgroundSyncTags.includes("gps-outbox-sync"), "Background Sync tag 'gps-outbox-sync' registered with Service Worker");
+  const outboxItems = Object.values(idbStores.mutations_outbox);
+  assert(outboxItems.length > 0, "Offline mutation stored in IndexedDB 'mutations_outbox' store for background sync");
+  assert(outboxItems[outboxItems.length - 1] && outboxItems[outboxItems.length - 1].action === "add_sale", "Outbox record contains correct 'add_sale' payload");
+
+  // Clean up
+  networkOnline = true;
+  await ds.flushPendingMutations(window.APP_CONFIG.googleSheetWebAppUrl);
+
+  // ----------------------------------------------------------------------------
   // Final Summary Report
   // ----------------------------------------------------------------------------
   console.log(`\n${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════════════════════════${colors.reset}`);
   console.log(`${colors.bright} FINAL TEST RESULTS SUMMARY${colors.reset}`);
   console.log(`${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════════════════════════${colors.reset}`);
-  console.log(`  Total User Flows Tested : ${colors.bright}10 Flows${colors.reset}`);
+  console.log(`  Total User Flows Tested : ${colors.bright}13 Flows${colors.reset}`);
   console.log(`  Total Assertions Run    : ${colors.bright}${totalTests}${colors.reset}`);
   console.log(`  Tests Passed            : ${colors.green}${passedTests} ✔${colors.reset}`);
   console.log(`  Tests Failed            : ${failedTests === 0 ? colors.green + "0 ✖" : colors.red + failedTests + " ✖"}${colors.reset}`);
