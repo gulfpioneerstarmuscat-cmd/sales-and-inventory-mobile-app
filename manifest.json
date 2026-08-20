@@ -36,5 +36,35 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Add Sale",
+      "short_name": "Add Sale",
+      "description": "Record a new sale transaction",
+      "url": "./index.html?view=add-sales",
+      "icons": [{ "src": "./assets/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Add Stock",
+      "short_name": "Add Stock",
+      "description": "Add new inventory stock inward",
+      "url": "./index.html?view=add-stock",
+      "icons": [{ "src": "./assets/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "View Sales",
+      "short_name": "Sales History",
+      "description": "View sales history & reports",
+      "url": "./index.html?view=view-sales",
+      "icons": [{ "src": "./assets/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "View Inventory",
+      "short_name": "Inventory",
+      "description": "View product catalog & stock levels",
+      "url": "./index.html?view=view-inventory",
+      "icons": [{ "src": "./assets/logo/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
   ]
 }

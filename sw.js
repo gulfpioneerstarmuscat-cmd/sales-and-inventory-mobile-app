@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v72";
+const CACHE_NAME = "gps-app-v73";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
@@ -115,12 +115,17 @@ async function flushIndexedDBOutboxInSW() {
         body: JSON.stringify(bodyPayload)
       });
 
-      // Remove successfully pushed item from IndexedDB outbox
+      // Remove successfully pushed item from IndexedDB outbox & notify active clients
       await new Promise((resolve) => {
         try {
           const tx = db.transaction("mutations_outbox", "readwrite");
           tx.objectStore("mutations_outbox").delete(item.id);
-          tx.oncomplete = () => resolve();
+          tx.oncomplete = () => {
+            self.clients.matchAll().then((clientList) => {
+              clientList.forEach((c) => c.postMessage({ action: "outboxItemFlushed", itemId: item.id }));
+            });
+            resolve();
+          };
           tx.onerror = () => resolve();
         } catch (e) {
           resolve();
@@ -172,6 +177,17 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("sync", (event) => {
   if (event.tag === "gps-outbox-sync") {
     event.waitUntil(flushIndexedDBOutboxInSW());
+  }
+});
+
+// Periodic Background Sync API (Fires periodically to refresh cached assets in background)
+self.addEventListener("periodicsync", (event) => {
+  if (event.tag === "gps-catalog-refresh") {
+    event.waitUntil(
+      caches.open(CACHE_NAME).then((cache) => {
+        return cache.add("./config.js").catch(() => {});
+      })
+    );
   }
 });
 

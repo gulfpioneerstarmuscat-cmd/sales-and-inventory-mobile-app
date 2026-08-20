@@ -62,7 +62,18 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   navButtons.forEach((button, index) => {
-    button.addEventListener("click", () => showPage(index + 1));
+    button.addEventListener("click", () => {
+      const targetPageNum = String(index + 1);
+      const isAdmin = window.Auth ? window.Auth.isAdmin() : true;
+      if (!isAdmin && targetPageNum === "5") {
+        if (window.UI && typeof window.UI.toast === "function") {
+          window.UI.toast("Amend Stock is restricted", "warning");
+        }
+        showPage("3");
+        return;
+      }
+      showPage(targetPageNum);
+    });
   });
 
   if (profileButton) {
@@ -150,10 +161,34 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function handleShortcutRouting() {
+    const params = new URLSearchParams(window.location.search);
+    const viewParam = (params.get("view") || window.location.hash.replace("#", "") || "").toLowerCase().trim();
+    if (!viewParam) return;
+
+    let targetPage = null;
+    if (viewParam === "add-sales" || viewParam === "3") targetPage = "3";
+    else if (viewParam === "add-stock" || viewParam === "4") targetPage = "4";
+    else if (viewParam === "view-sales" || viewParam === "1") targetPage = "1";
+    else if (viewParam === "view-inventory" || viewParam === "2") targetPage = "2";
+    else if (viewParam === "amend-stock" || viewParam === "5") targetPage = "5";
+
+    if (!targetPage) return;
+
+    // Role-based protection check: Page 5 (Amend Stock) is admin-only. Page 4 (Add Stock) is available to all staff.
+    const isAdmin = window.Auth ? window.Auth.isAdmin() : true;
+    if (!isAdmin && targetPage === "5") {
+      targetPage = "3";
+    }
+
+    showPage(targetPage);
+  }
+
   function showFullApp() {
     if (mainAppContainer) mainAppContainer.style.display = "block";
     if (loggedOutScreen) loggedOutScreen.classList.add("is-hidden");
     hideSplashScreen();
+    handleShortcutRouting();
 
     // Trigger cloud data sync when entering full app
     const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
@@ -165,6 +200,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
   }
+
+  window.addEventListener("popstate", handleShortcutRouting);
+  window.addEventListener("hashchange", handleShortcutRouting);
 
   function showLoggedOutScreen() {
     if (mainAppContainer) mainAppContainer.style.display = "none";

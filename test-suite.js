@@ -45,12 +45,13 @@ function section(title, stepNum) {
 // Mock Browser Environment for Headless Node.js Execution
 // ============================================================================
 const localStorageStore = {};
-global.localStorage = {
-  getItem: (key) => (key in localStorageStore ? localStorageStore[key] : null),
-  setItem: (key, val) => { localStorageStore[key] = String(val); },
-  removeItem: (key) => { delete localStorageStore[key]; },
-  clear: () => { Object.keys(localStorageStore).forEach((k) => delete localStorageStore[k]); }
-};
+global.Storage = class Storage {};
+global.Storage.prototype.getItem = (key) => (key in localStorageStore ? localStorageStore[key] : null);
+global.Storage.prototype.setItem = (key, val) => { localStorageStore[key] = String(val); };
+global.Storage.prototype.removeItem = (key) => { delete localStorageStore[key]; };
+global.Storage.prototype.clear = () => { Object.keys(localStorageStore).forEach((k) => delete localStorageStore[k]); };
+
+global.localStorage = new global.Storage();
 
 let currentBranch = "alkhoud";
 let currentUser = { name: "Ahmed Al-Harthy", email: "ahmed@gps.om", role: "admin", assignedBranch: "all" };
@@ -75,6 +76,16 @@ global.window = {
   location: { hostname: "localhost" },
   addEventListener: () => { },
   dispatchEvent: () => { }
+};
+
+global.document = {
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  querySelector: () => null,
+  querySelectorAll: () => [],
+  getElementById: () => null,
+  createElement: () => ({ setAttribute: () => {}, appendChild: () => {}, style: {} }),
+  documentElement: { classList: { add: () => {}, remove: () => {}, toggle: () => {} } }
 };
 
 global.CustomEvent = function (name, opts) {
@@ -402,6 +413,7 @@ async function runTestSuite() {
 
   // Clean outbox for this isolated test
   localStorage.removeItem("gps_pending_mutations_v1");
+  localStorage.setItem("gps_session_token_v1", JSON.stringify({ sessionId: "sess_gps_test_99", expiresAt: Date.now() + 86400000 }));
 
   info("Simulating network disconnection (navigator.onLine = false)");
   networkOnline = false;
@@ -424,6 +436,34 @@ async function runTestSuite() {
   const pendingQueue = JSON.parse(localStorage.getItem("gps_pending_mutations_v1") || "[]");
   assert(pendingQueue.length === 2, `Offline mutations queued in outbox (Found: ${pendingQueue.length} pending actions)`);
   assert(pendingQueue[0].action === "add_sale" && pendingQueue[1].action === "add_stock_qty", "Outbox correctly queued 'add_sale' and 'add_stock_qty' in sequence");
+  assert(Boolean(pendingQueue[0].apiKey && pendingQueue[0].sessionId && pendingQueue[0].targetUrl), "Offline mutation item explicitly contains auth credentials (apiKey, sessionId) and targetUrl for SW background sync");
+
+  info("Testing QuotaExceededError handling in saveBranchData...");
+  const originalSetItem = global.localStorage.setItem;
+  global.localStorage.setItem = () => {
+    const err = new Error("QuotaExceededError: Storage quota full");
+    err.name = "QuotaExceededError";
+    throw err;
+  };
+  try {
+    ds.recordSale(offlineSale, window.APP_CONFIG.googleSheetWebAppUrl);
+    pass("DataStore gracefully recovered from QuotaExceededError without crashing");
+  } catch (err) {
+    fail("DataStore crashed on QuotaExceededError", err);
+  } finally {
+    global.localStorage.setItem = originalSetItem;
+  }
+
+  // Verify offline sales created >60s ago are preserved during sync
+  const oldOfflineSale = {
+    id: Date.now() - 120000,
+    date: "2026-08-19",
+    customerName: "Long Offline Customer",
+    grandTotal: 75.000,
+    items: [{ name: "Gate Remote 433MHz Pro", qty: 1, unitPrice: 75.000 }],
+    paymentStatus: "paid"
+  };
+  ds.recordSale(oldOfflineSale, window.APP_CONFIG.googleSheetWebAppUrl);
 
   info("Simulating network reconnection (navigator.onLine = true)");
   networkOnline = true;
@@ -431,6 +471,10 @@ async function runTestSuite() {
 
   // Trigger cloud sync which auto-flushes pending queue
   await ds.syncFromCloud(window.APP_CONFIG.googleSheetWebAppUrl);
+
+  const postSyncSales = ds.getSales("alkhoud");
+  const preservedOldSale = postSyncSales.find((s) => s.customerName === "Long Offline Customer");
+  assert(preservedOldSale !== undefined, "Offline sale created >60s ago is preserved locally during cloud sync merge without disappearing");
 
   const postFlushQueue = JSON.parse(localStorage.getItem("gps_pending_mutations_v1") || "[]");
   assert(postFlushQueue.length === 0, "Outbox queue completely flushed and cleared upon reconnecting");
@@ -610,12 +654,27 @@ async function runTestSuite() {
   await ds.flushPendingMutations(window.APP_CONFIG.googleSheetWebAppUrl);
 
   // ----------------------------------------------------------------------------
+  // Flow 14: PWA App Shortcuts & Deep-Link Router Verification
+  // ----------------------------------------------------------------------------
+  section("PWA App Shortcuts & Deep-Link Router Verification", "14");
+
+  info("Testing PWA manifest shortcuts configuration and deep-link parameter parsing...");
+  const manifest = require(path.join(process.cwd(), "manifest.json"));
+  assert(Array.isArray(manifest.shortcuts) && manifest.shortcuts.length === 4, "PWA manifest contains 4 long-press app shortcuts");
+
+  const shortcutUrls = manifest.shortcuts.map((s) => s.url);
+  assert(shortcutUrls.includes("./index.html?view=add-sales"), "Manifest contains 'Add Sale' shortcut URL");
+  assert(shortcutUrls.includes("./index.html?view=add-stock"), "Manifest contains 'Add Stock' shortcut URL");
+  assert(shortcutUrls.includes("./index.html?view=view-sales"), "Manifest contains 'View Sales' shortcut URL");
+  assert(shortcutUrls.includes("./index.html?view=view-inventory"), "Manifest contains 'View Inventory' shortcut URL");
+
+  // ----------------------------------------------------------------------------
   // Final Summary Report
   // ----------------------------------------------------------------------------
   console.log(`\n${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════════════════════════${colors.reset}`);
   console.log(`${colors.bright} FINAL TEST RESULTS SUMMARY${colors.reset}`);
   console.log(`${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════════════════════════${colors.reset}`);
-  console.log(`  Total User Flows Tested : ${colors.bright}13 Flows${colors.reset}`);
+  console.log(`  Total User Flows Tested : ${colors.bright}14 Flows${colors.reset}`);
   console.log(`  Total Assertions Run    : ${colors.bright}${totalTests}${colors.reset}`);
   console.log(`  Tests Passed            : ${colors.green}${passedTests} ✔${colors.reset}`);
   console.log(`  Tests Failed            : ${failedTests === 0 ? colors.green + "0 ✖" : colors.red + failedTests + " ✖"}${colors.reset}`);

@@ -131,12 +131,13 @@ window.DataStore = (function () {
     if (type === "sales") memoryCache.sales[b] = data;
     if (type === "amend_logs") memoryCache.amend_logs[b] = data;
 
-    // 1. Synchronous fallback save
+    // 1. Synchronous fallback save (with QuotaExceeded pruning safety)
     const key = getStorageKey(type, b);
     try {
       localStorage.setItem(key, JSON.stringify(data));
     } catch (e) {
-      if (window.DevLogger) window.DevLogger.warn("DataStore", `Error writing localStorage: ${key}`, e);
+      if (window.DevLogger) window.DevLogger.warn("DataStore", `Quota exceeded writing localStorage: ${key}. Pruning key to rely on IndexedDB.`, e);
+      try { localStorage.removeItem(key); } catch (err) {}
     }
 
     // 2. Asynchronous durable save to IndexedDB
@@ -239,12 +240,18 @@ window.DataStore = (function () {
   // Offline Mutation Queue (IndexedDB Outbox + LocalStorage Backup + Background Sync)
   // --------------------------------------------------------------------------
   function triggerBackgroundSync() {
-    const hasSync = (typeof window !== "undefined" && "SyncManager" in window) || (typeof globalThis !== "undefined" && "SyncManager" in globalThis);
-    if (typeof navigator !== "undefined" && "serviceWorker" in navigator && hasSync) {
+    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker.ready
         .then((reg) => {
           if (reg && reg.sync && typeof reg.sync.register === "function") {
-            return reg.sync.register("gps-outbox-sync");
+            reg.sync.register("gps-outbox-sync").catch((err) => {
+              if (window.DevLogger) window.DevLogger.info("DataStore", "SyncManager register notice", err);
+            });
+          }
+          if (reg && "periodicSync" in reg && typeof reg.periodicSync.register === "function") {
+            reg.periodicSync.register("gps-catalog-refresh", { minInterval: 24 * 60 * 60 * 1000 }).catch((err) => {
+              if (window.DevLogger) window.DevLogger.info("DataStore", "PeriodicSync register notice", err);
+            });
           }
         })
         .catch((err) => {
@@ -267,12 +274,13 @@ window.DataStore = (function () {
       localStorage.setItem(PENDING_MUTATIONS_KEY, JSON.stringify(queue));
     } catch (e) {}
 
-    // Also persist queue into IndexedDB mutations_outbox
+    // Also persist queue into IndexedDB mutations_outbox atomically
     openDatabase().then((db) => {
       if (!db) return;
       try {
         const tx = db.transaction("mutations_outbox", "readwrite");
         const store = tx.objectStore("mutations_outbox");
+        store.clear();
         queue.forEach((item) => store.put(item));
       } catch (e) {
         if (window.DevLogger) window.DevLogger.warn("DataStore", "Outbox save error in IndexedDB:", e);
@@ -280,12 +288,18 @@ window.DataStore = (function () {
     });
   }
 
-  function enqueueMutation(action, branch, payload) {
+  function enqueueMutation(action, branch, payload, explicitTargetUrl) {
     const queue = getPendingMutations();
+    const auth = getAuthPayload();
+    const targetUrl = explicitTargetUrl || (typeof window !== "undefined" && window.APP_CONFIG && window.APP_CONFIG.googleSheetWebAppUrl ? window.APP_CONFIG.googleSheetWebAppUrl : "");
+
     const item = {
       id: "mut_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
       action: action,
       branch: branch,
+      apiKey: auth ? (auth.apiKey || "") : "",
+      sessionId: auth ? (auth.sessionId || "") : "",
+      targetUrl: targetUrl,
       payload: payload,
       queuedAt: new Date().toISOString()
     };
@@ -360,7 +374,7 @@ window.DataStore = (function () {
   function sendMutation(action, branch, payload, webAppUrl) {
     const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
     if (!targetUrl || !targetUrl.startsWith("http") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
-      enqueueMutation(action, branch, payload);
+      enqueueMutation(action, branch, payload, targetUrl);
       return Promise.resolve({ queued: true });
     }
 
@@ -386,7 +400,7 @@ window.DataStore = (function () {
       })
       .catch((err) => {
         if (window.DevLogger) window.DevLogger.warn("DataStore", `Direct mutation [${action}] failed, enqueuing for background retry`, err);
-        enqueueMutation(action, branch, payload);
+        enqueueMutation(action, branch, payload, targetUrl);
       });
   }
 
@@ -479,10 +493,7 @@ window.DataStore = (function () {
               }
             });
 
-            const recentPendingSales = localSales.filter((ls) => {
-              const isRecent = ls.id && typeof ls.id === "number" && ls.id > sixtySecsAgo;
-              if (!isRecent) return false;
-
+            const unmatchedLocalSales = localSales.filter((ls) => {
               const existsInCloud = processedCloudSales.some((cs) => {
                 if (cs.id && ls.id && String(cs.id) === String(ls.id)) return true;
                 if (cs.saleId && ls.saleId && String(cs.saleId) === String(ls.saleId)) return true;
@@ -490,12 +501,14 @@ window.DataStore = (function () {
                 const lsName = String(ls.customerName || "").trim().toLowerCase();
                 const csTotal = Number(cs.grandTotal) || 0;
                 const lsTotal = Number(ls.grandTotal) || 0;
-                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001;
+                const csDate = String(cs.date || "").trim();
+                const lsDate = String(ls.date || "").trim();
+                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001 && (!csDate || !lsDate || csDate === lsDate);
               });
               return !existsInCloud;
             });
 
-            const mergedSales = [...recentPendingSales, ...processedCloudSales];
+            const mergedSales = [...unmatchedLocalSales, ...processedCloudSales];
             saveBranchData("sales", mergedSales, branch);
           }
           const syncTime = new Date().toISOString();
