@@ -384,6 +384,11 @@ document.addEventListener("DOMContentLoaded", () => {
     window.SyncCountdownManager.start();
   }
 
+  // Initialize Notification Manager & scheduled daily/monthly push alarms
+  if (window.NotificationManager && typeof window.NotificationManager.init === "function") {
+    window.NotificationManager.init();
+  }
+
   // Re-sync and reset countdown on branch change
   window.addEventListener("branchChanged", () => {
     const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";

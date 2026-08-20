@@ -365,6 +365,12 @@ window.DataStore = (function () {
           break;
         }
       }
+
+      const flushedTotal = queue.length - remainingQueue.length;
+      if (flushedTotal > 0 && window.NotificationManager && typeof window.NotificationManager.notifyOfflineSync === "function") {
+        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        window.NotificationManager.notifyOfflineSync(flushedTotal, timeNow);
+      }
       isFlushingMutations = false;
     };
 

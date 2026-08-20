@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v73";
+const CACHE_NAME = "gps-app-v74";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
@@ -24,6 +24,7 @@ const ASSETS_TO_CACHE = [
   "./js/auth.js",
   "./js/data-store.js",
   "./js/notifications.js",
+  "./js/notification.js",
   "./js/components/date-picker.js",
   "./js/components/filter-pills.js",
   "./js/components/search-box.js",
@@ -189,6 +190,28 @@ self.addEventListener("periodicsync", (event) => {
       })
     );
   }
+});
+
+// Notification Click Handler (Deep-links to specified view e.g. ?view=view-sales)
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "./index.html?view=view-sales";
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) {
+          if (client.url.includes("index.html")) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
 });
 
 // Fetch Strategy: Network-First for local HTML/JS/CSS (Always get live updates first, fallback to cache if offline)

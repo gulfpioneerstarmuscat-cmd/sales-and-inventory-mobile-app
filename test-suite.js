@@ -53,6 +53,14 @@ global.Storage.prototype.clear = () => { Object.keys(localStorageStore).forEach(
 
 global.localStorage = new global.Storage();
 
+global.Notification = class Notification {
+  constructor(title, options) {
+    global.Notification.lastInstance = { title, options };
+  }
+  static requestPermission() { return Promise.resolve("granted"); }
+};
+global.Notification.permission = "granted";
+
 let currentBranch = "alkhoud";
 let currentUser = { name: "Ahmed Al-Harthy", email: "ahmed@gps.om", role: "admin", assignedBranch: "all" };
 
@@ -69,6 +77,7 @@ global.window = {
     isAdmin: () => currentUser.role === "admin",
     getAuthPayload: () => ({ apiKey: "GPS-SECURE-API-KEY-2026-V1", sessionId: "sess_gps_test_99" })
   },
+  Notification: global.Notification,
   APP_CONFIG: {
     apiKey: "GPS-SECURE-API-KEY-2026-V1",
     googleSheetWebAppUrl: "https://script.google.com/macros/s/TEST_DEPLOYMENT_ID/exec"
@@ -186,12 +195,17 @@ global.indexedDB = {
 global.SyncManager = function () {};
 global.window.SyncManager = global.SyncManager;
 global.navigator.serviceWorker = {
+  controller: {},
   ready: Promise.resolve({
     sync: {
       register: (tag) => {
         backgroundSyncTags.push(tag);
         return Promise.resolve();
       }
+    },
+    showNotification: (title, options) => {
+      global.Notification.lastInstance = { title, options };
+      return Promise.resolve();
     }
   })
 };
@@ -669,12 +683,35 @@ async function runTestSuite() {
   assert(shortcutUrls.includes("./index.html?view=view-inventory"), "Manifest contains 'View Inventory' shortcut URL");
 
   // ----------------------------------------------------------------------------
+  // Flow 15: Push Notification System & Scheduled Admin Summaries
+  // ----------------------------------------------------------------------------
+  section("Push Notification System & Scheduled Admin Summaries", "15");
+
+  info("Testing NotificationManager offline sync alerts & admin daily/monthly rules...");
+  require(path.join(process.cwd(), "js", "notification.js"));
+  const notifMgr = window.NotificationManager;
+  assert(notifMgr !== undefined, "NotificationManager module loaded successfully");
+
+  // Test Offline Sync Notification
+  await notifMgr.notifyOfflineSync(3, "08:15 PM");
+  await new Promise((r) => setTimeout(r, 20));
+  assert(global.Notification.lastInstance && global.Notification.lastInstance.title === "☁️ Offline Sync Completed", "Offline sync notification triggered with correct title");
+  assert(global.Notification.lastInstance.options.body.includes("3 offline data items were synced to cloud at 08:15 PM"), "Offline sync notification body formats count and time correctly");
+
+  // Test Admin Daily & Monthly summary calculation functions
+  const dailyData = notifMgr.getDailySummaryData();
+  assert(dailyData !== null && typeof dailyData.alkhoudCount === "number" && typeof dailyData.ghalaCount === "number", "Daily sales and revenue calculation computed Al Khoud & Ghala metrics");
+
+  const monthlyData = notifMgr.getMonthlySummaryData();
+  assert(monthlyData !== null && typeof monthlyData.monthName === "string", "Monthly sales and revenue calculation computed previous calendar month metrics");
+
+  // ----------------------------------------------------------------------------
   // Final Summary Report
   // ----------------------------------------------------------------------------
   console.log(`\n${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════════════════════════${colors.reset}`);
   console.log(`${colors.bright} FINAL TEST RESULTS SUMMARY${colors.reset}`);
   console.log(`${colors.bright}${colors.cyan}════════════════════════════════════════════════════════════════════════════════${colors.reset}`);
-  console.log(`  Total User Flows Tested : ${colors.bright}14 Flows${colors.reset}`);
+  console.log(`  Total User Flows Tested : ${colors.bright}15 Flows${colors.reset}`);
   console.log(`  Total Assertions Run    : ${colors.bright}${totalTests}${colors.reset}`);
   console.log(`  Tests Passed            : ${colors.green}${passedTests} ✔${colors.reset}`);
   console.log(`  Tests Failed            : ${failedTests === 0 ? colors.green + "0 ✖" : colors.red + failedTests + " ✖"}${colors.reset}`);

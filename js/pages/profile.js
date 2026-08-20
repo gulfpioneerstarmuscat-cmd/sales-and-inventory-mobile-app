@@ -207,6 +207,9 @@
               <button type="button" class="dev-action-btn dev-btn--lowstock" id="btn-test-notif-lowstock">
                 🔔 Low Stock Alert
               </button>
+              <button type="button" class="dev-action-btn" id="btn-test-push-notif" style="grid-column: span 2; background: linear-gradient(135deg, #4567fa, #6366f1); color: white; border: none; font-weight: 600;">
+                📲 Send Test Push Notification
+              </button>
             </div>
           </div>
 
@@ -267,6 +270,17 @@
 
     const btnLowStock = container.querySelector("#btn-test-notif-lowstock");
     if (btnLowStock) btnLowStock.onclick = () => window.UI && window.UI.toast("⚠️ Low Stock Alert: Beninca 600KG (Only 2 remaining!)", "warning");
+
+    const btnPushNotif = container.querySelector("#btn-test-push-notif");
+    if (btnPushNotif) {
+      btnPushNotif.onclick = () => {
+        if (window.NotificationManager && typeof window.NotificationManager.sendTestNotification === "function") {
+          window.NotificationManager.sendTestNotification();
+        } else if (window.UI) {
+          window.UI.toast("NotificationManager module not loaded", "error");
+        }
+      };
+    }
 
     // Speed Benchmark Handler
     const btnSpeed = container.querySelector("#btn-test-speed");
