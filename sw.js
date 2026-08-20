@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v75";
+const CACHE_NAME = "gps-app-v76";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
@@ -178,6 +178,29 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("sync", (event) => {
   if (event.tag === "gps-outbox-sync") {
     event.waitUntil(flushIndexedDBOutboxInSW());
+  }
+});
+
+// Message Listener: Handles background timer scheduling from client tabs
+self.addEventListener("message", (event) => {
+  if (!event.data) return;
+
+  if (event.data.action === "scheduleDelayedNotification") {
+    const delayMs = Number(event.data.delayMs) || 30000;
+    const title = event.data.title || "⏱️ Background Push Test";
+    const body = event.data.body || "Background push notification received after app was closed!";
+    const targetUrl = event.data.url || "./index.html?view=view-sales";
+
+    setTimeout(() => {
+      self.registration.showNotification(title, {
+        body: body,
+        icon: "./assets/logo/icon-192.png",
+        badge: "./assets/logo/icon-192.png",
+        vibrate: [200, 100, 200],
+        tag: "gps-delayed-30s-notif",
+        data: { url: targetUrl }
+      });
+    }, delayMs);
   }
 });
 

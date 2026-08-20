@@ -53,14 +53,57 @@ window.NotificationManager = (function () {
     }
   }
 
+  // Helper: Call Backend Endpoint in Google Apps Script to Trigger Notification
+  async function callBackendNotification(action, payload = {}) {
+    const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
+    let authPayload = {};
+    if (window.Auth && typeof window.Auth.getAuthPayload === "function") {
+      authPayload = window.Auth.getAuthPayload();
+    }
+
+    try {
+      if (webAppUrl) {
+        const response = await fetch(webAppUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({
+            action: action,
+            apiKey: authPayload.apiKey || (window.APP_CONFIG ? window.APP_CONFIG.apiKey : ""),
+            sessionId: authPayload.sessionId || "",
+            ...payload
+          })
+        });
+
+        const resData = await response.json();
+        if (resData && resData.status === "success" && resData.title) {
+          await showNotification(resData.title, {
+            body: resData.body,
+            tag: `gps-backend-${action}`,
+            data: { url: "./index.html?view=view-sales" }
+          });
+          return resData;
+        }
+      }
+    } catch (err) {
+      if (window.DevLogger) window.DevLogger.warn("Notification", `Backend notification call [${action}] failed:`, err);
+    }
+    return null;
+  }
+
   // 1. Staff & Admin Notification: Offline Data Sync Completion
-  function notifyOfflineSync(syncedCount, syncedTime) {
+  async function notifyOfflineSync(syncedCount, syncedTime) {
     const count = Number(syncedCount) || 1;
     const timeStr = syncedTime || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    // 1. Trigger Backend Notification
+    const backendRes = await callBackendNotification("notify_offline_sync", { count: count, syncTime: timeStr });
+    if (backendRes) return true;
+
+    // Fallback if offline
     const title = "☁️ Offline Sync Completed";
     const body = `${count} offline data ${count === 1 ? 'item was' : 'items were'} synced to cloud at ${timeStr}, verify it.`;
 
-    showNotification(title, {
+    return showNotification(title, {
       body: body,
       tag: "gps-offline-sync",
       data: { url: "./index.html?view=view-sales" }
@@ -147,14 +190,17 @@ window.NotificationManager = (function () {
   }
 
   // Fire Admin Daily Summary (9:00 PM, Excl. Friday)
-  function triggerDailyAdminNotification() {
+  async function triggerDailyAdminNotification() {
+    const backendRes = await callBackendNotification("trigger_daily_summary_notification");
+    if (backendRes) return true;
+
     const data = getDailySummaryData();
     if (!data) return;
 
     const title = "📊 Today's Sales & Revenue Summary";
     const body = `Todays sales from Al Khoud ${data.alkhoudCount} with total revenue ${formatOMR(data.alkhoudRev)} and Todays sales from Ghala ${data.ghalaCount} with total revenue ${formatOMR(data.ghalaRev)}.`;
 
-    showNotification(title, {
+    return showNotification(title, {
       body: body,
       tag: "gps-daily-summary",
       data: { url: "./index.html?view=view-sales" }
@@ -162,14 +208,17 @@ window.NotificationManager = (function () {
   }
 
   // Fire Admin Monthly Summary (1st of Month @ 10:00 AM)
-  function triggerMonthlyAdminNotification() {
+  async function triggerMonthlyAdminNotification() {
+    const backendRes = await callBackendNotification("trigger_monthly_summary_notification");
+    if (backendRes) return true;
+
     const data = getMonthlySummaryData();
     if (!data) return;
 
     const title = `🗓️ Monthly Summary: ${data.monthName}`;
     const body = `Sales from Al Khoud ${data.alkhoudCount} with total revenue ${formatOMR(data.alkhoudRev)} and Sales from Ghala ${data.ghalaCount} with total revenue ${formatOMR(data.ghalaRev)}.`;
 
-    showNotification(title, {
+    return showNotification(title, {
       body: body,
       tag: "gps-monthly-summary",
       data: { url: "./index.html?view=view-sales" }
@@ -206,7 +255,7 @@ window.NotificationManager = (function () {
     }
   }
 
-  // Developer Test Notification Trigger
+  // Developer Test Notification Trigger (Invokes Backend)
   async function sendTestNotification() {
     const perm = await requestPermission();
     if (perm !== "granted") {
@@ -216,9 +265,17 @@ window.NotificationManager = (function () {
       return false;
     }
 
+    const backendRes = await callBackendNotification("trigger_test_notification");
+    if (backendRes) {
+      if (window.UI && typeof window.UI.toast === "function") {
+        window.UI.toast("Backend test push notification received!", "success");
+      }
+      return true;
+    }
+
+    // Fallback if backend unreachable
     const title = "🧪 Developer Push Notification Test";
     const body = "GPS Push Notification system is active and working perfectly!";
-
     const success = await showNotification(title, {
       body: body,
       tag: "gps-test-notif",
@@ -231,7 +288,7 @@ window.NotificationManager = (function () {
     return success;
   }
 
-  // Developer 30-Second Delayed Test Notification Trigger (Gives user 30s to close app fully)
+  // Developer 30-Second Delayed Test Notification Trigger (Invokes Backend with 30s delay)
   async function sendDelayed30sTestNotification() {
     const perm = await requestPermission();
     if (perm !== "granted") {
@@ -242,18 +299,22 @@ window.NotificationManager = (function () {
     }
 
     if (window.UI && typeof window.UI.toast === "function") {
-      window.UI.toast("⏱️ 30-second timer started! Close/swipe away the app now to test background push.", "info", 5000);
+      window.UI.toast("⏱️ Request sent! You can safely swipe away/close the app now.", "info", 6000);
     }
 
-    setTimeout(async () => {
-      const title = "⏱️ 30s Background Push Test";
-      const body = "Background notification received after app was closed!";
-      await showNotification(title, {
-        body: body,
-        tag: "gps-delayed-30s-notif",
-        data: { url: "./index.html?view=view-sales" }
+    // 1. Hand off timer to Service Worker background process (survives tab closure)
+    if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        action: "scheduleDelayedNotification",
+        delayMs: 30000,
+        title: "⏱️ 30s Backend Push Test",
+        body: "Google Apps Script Backend Push Notification received after 30-second delay!",
+        url: "./index.html?view=view-sales"
       });
-    }, 30000);
+    }
+
+    // 2. Dispatch background request to Google Apps Script backend
+    callBackendNotification("trigger_delayed_test_notification", { delaySecs: 30 }).catch(() => {});
 
     return true;
   }
