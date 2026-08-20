@@ -208,7 +208,10 @@
                 🔔 Low Stock Alert
               </button>
               <button type="button" class="dev-action-btn" id="btn-test-push-notif" style="grid-column: span 2; background: linear-gradient(135deg, #4567fa, #6366f1); color: white; border: none; font-weight: 600;">
-                📲 Send Test Push Notification
+                📲 Send Instant Push Notification
+              </button>
+              <button type="button" class="dev-action-btn" id="btn-test-push-30s" style="grid-column: span 2; background: linear-gradient(135deg, #059669, #10b981); color: white; border: none; font-weight: 600; margin-top: 4px;">
+                ⏱️ Test 30s Delayed Push (Close App Now)
               </button>
             </div>
           </div>
@@ -276,6 +279,17 @@
       btnPushNotif.onclick = () => {
         if (window.NotificationManager && typeof window.NotificationManager.sendTestNotification === "function") {
           window.NotificationManager.sendTestNotification();
+        } else if (window.UI) {
+          window.UI.toast("NotificationManager module not loaded", "error");
+        }
+      };
+    }
+
+    const btnPush30s = container.querySelector("#btn-test-push-30s");
+    if (btnPush30s) {
+      btnPush30s.onclick = () => {
+        if (window.NotificationManager && typeof window.NotificationManager.sendDelayed30sTestNotification === "function") {
+          window.NotificationManager.sendDelayed30sTestNotification();
         } else if (window.UI) {
           window.UI.toast("NotificationManager module not loaded", "error");
         }

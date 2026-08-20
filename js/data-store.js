@@ -199,15 +199,20 @@ window.DataStore = (function () {
         });
       });
 
-      return Promise.all(promises);
+      return Promise.all(promises).then(() => {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+        }
+      });
     });
   }
 
   // Initialize DB & Preload
   if (typeof window !== "undefined") {
     openDatabase().then(() => {
-      autoMigrateLegacyStorage();
-      preloadFromIndexedDB();
+      autoMigrateLegacyStorage().then(() => {
+        preloadFromIndexedDB();
+      });
     });
   }
 

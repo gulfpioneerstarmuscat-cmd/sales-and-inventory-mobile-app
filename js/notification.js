@@ -231,6 +231,33 @@ window.NotificationManager = (function () {
     return success;
   }
 
+  // Developer 30-Second Delayed Test Notification Trigger (Gives user 30s to close app fully)
+  async function sendDelayed30sTestNotification() {
+    const perm = await requestPermission();
+    if (perm !== "granted") {
+      if (window.UI && typeof window.UI.toast === "function") {
+        window.UI.toast("Please enable browser notification permissions to receive alerts.", "warning");
+      }
+      return false;
+    }
+
+    if (window.UI && typeof window.UI.toast === "function") {
+      window.UI.toast("⏱️ 30-second timer started! Close/swipe away the app now to test background push.", "info", 5000);
+    }
+
+    setTimeout(async () => {
+      const title = "⏱️ 30s Background Push Test";
+      const body = "Background notification received after app was closed!";
+      await showNotification(title, {
+        body: body,
+        tag: "gps-delayed-30s-notif",
+        data: { url: "./index.html?view=view-sales" }
+      });
+    }, 30000);
+
+    return true;
+  }
+
   // Periodic alarm timer starter
   let schedulerInterval = null;
   function init() {
@@ -250,6 +277,7 @@ window.NotificationManager = (function () {
     triggerMonthlyAdminNotification,
     checkScheduledNotifications,
     sendTestNotification,
+    sendDelayed30sTestNotification,
     getDailySummaryData,
     getMonthlySummaryData
   };

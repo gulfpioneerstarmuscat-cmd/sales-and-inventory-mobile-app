@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v74";
+const CACHE_NAME = "gps-app-v75";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
@@ -179,6 +179,11 @@ self.addEventListener("sync", (event) => {
   if (event.tag === "gps-outbox-sync") {
     event.waitUntil(flushIndexedDBOutboxInSW());
   }
+});
+
+// Online Event Listener (Attempts SW outbox flush when network returns)
+self.addEventListener("online", () => {
+  flushIndexedDBOutboxInSW();
 });
 
 // Periodic Background Sync API (Fires periodically to refresh cached assets in background)

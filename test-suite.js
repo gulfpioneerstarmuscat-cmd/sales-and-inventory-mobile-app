@@ -704,6 +704,7 @@ async function runTestSuite() {
 
   const monthlyData = notifMgr.getMonthlySummaryData();
   assert(monthlyData !== null && typeof monthlyData.monthName === "string", "Monthly sales and revenue calculation computed previous calendar month metrics");
+  assert(typeof notifMgr.sendDelayed30sTestNotification === "function", "30-second delayed push notification handler configured for background testing");
 
   // ----------------------------------------------------------------------------
   // Final Summary Report
