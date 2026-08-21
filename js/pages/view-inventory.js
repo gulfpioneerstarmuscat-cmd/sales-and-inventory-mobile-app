@@ -209,6 +209,7 @@ window.initViewInventory = (function () {
     const isLow = qty <= alertThreshold;
     const unitPrice = Number(item.unitPrice || item.price || 0);
     const totalVal = qty * unitPrice;
+    const itemRemark = item.lastRemark || item.remark || item.remarks || item.lastAmendedRemark || item.notes || "No remarks entered.";
 
     const backdrop = document.createElement("div");
     backdrop.className = "dp-modal-backdrop inv-detail-modal-backdrop";
@@ -241,27 +242,19 @@ window.initViewInventory = (function () {
                 <span class="info-val info-val--highlight">${qty} Units</span>
               </div>
               <div class="info-item">
-                <span class="info-label">Min Alert Threshold</span>
-                <span class="info-val">${alertThreshold} Units</span>
-              </div>
-              <div class="info-item">
                 <span class="info-label">Stock Health</span>
                 <span class="info-val ${isLow ? "text-danger" : "text-success"}">${isLow ? "Low Stock Warning" : "Optimal Stock"}</span>
               </div>
             </div>
           </div>
 
-          <!-- Pricing & Valuation Card -->
+          <!-- Remark Card -->
           <div class="detail-card">
-            <h4 class="card-section-label">Pricing & Valuation</h4>
-            <div class="info-grid">
+            <h4 class="card-section-label">Remark</h4>
+            <div class="info-grid" style="grid-template-columns: 1fr;">
               <div class="info-item">
-                <span class="info-label">Unit Price</span>
-                <span class="info-val">OMR ${unitPrice.toFixed(3)}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">Total Inventory Value</span>
-                <span class="info-val info-val--highlight">OMR ${totalVal.toFixed(3)}</span>
+                <span class="info-label">Item Remark / Notes</span>
+                <span class="info-val" style="font-weight: 500; word-break: break-word;">${escapeHtml(itemRemark)}</span>
               </div>
             </div>
           </div>
