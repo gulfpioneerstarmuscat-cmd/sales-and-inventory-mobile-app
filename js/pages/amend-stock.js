@@ -21,7 +21,7 @@ window.initAmendStock = (function () {
       <div class="amend-stock-container">
         <form id="amend-stock-form" style="height:100%; display:flex; flex-direction:column;" novalidate>
           
-          <!-- Section 1: Select Item to Amend -->
+          <!-- Section 1: Select Item & Edit Fields Merged -->
           <div class="form-section form-section--active" data-section="1">
             <div class="section-header">
               <h3 class="section-title">Amend Stock</h3>
@@ -64,32 +64,7 @@ window.initAmendStock = (function () {
                 </div>
                 <span class="form-help-text">Select an existing item from the suggestion list.</span>
               </div>
-            </div>
 
-            <div class="section-nav">
-              <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
-              <span class="section-nav-title">1 / 3: Select Item</span>
-              <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next" data-section="1">Next &gt;</button>
-            </div>
-          </div>
-
-          <!-- Section 2: Fields to Amend -->
-          <div class="form-section" data-section="2" hidden>
-            <div class="section-header">
-              <h3 class="section-title">Amend Stock</h3>
-              <div class="header-actions">
-                <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                  Clear Section
-                </button>
-                <button type="button" class="btn-clear btn-clear--form" data-action="clear-form">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                  Clear Form
-                </button>
-              </div>
-            </div>
-
-            <div class="form-body">
               <!-- Field 1: Updated Item Name -->
               <div class="form-group">
                 <label class="form-label" for="amend-item-name">Updated Item Name</label>
@@ -97,7 +72,7 @@ window.initAmendStock = (function () {
                   type="text"
                   id="amend-item-name"
                   class="form-input"
-                  placeholder="Select an item in Section 1 first..."
+                  placeholder="Select an item above first..."
                 />
               </div>
 
@@ -108,7 +83,7 @@ window.initAmendStock = (function () {
                   type="text"
                   id="amend-category"
                   class="form-input"
-                  placeholder="Select an item in Section 1 first..."
+                  placeholder="Select an item above first..."
                 />
               </div>
 
@@ -119,7 +94,7 @@ window.initAmendStock = (function () {
                   type="number"
                   id="amend-stock-qty"
                   class="form-input form-input--number"
-                  placeholder="Select an item in Section 1 first..."
+                  placeholder="Select an item above first..."
                   min="0"
                   step="1"
                 />
@@ -133,7 +108,7 @@ window.initAmendStock = (function () {
                   type="number"
                   id="amend-alert-level"
                   class="form-input form-input--number"
-                  placeholder="Select an item in Section 1 first..."
+                  placeholder="Select an item above first..."
                   min="1"
                   step="1"
                 />
@@ -148,7 +123,7 @@ window.initAmendStock = (function () {
                 <textarea
                   id="amend-item-remark"
                   class="form-textarea"
-                  placeholder="Select an item in Section 1 first..."
+                  placeholder="Select an item above first..."
                   maxlength="200"
                   rows="2"
                 ></textarea>
@@ -157,18 +132,18 @@ window.initAmendStock = (function () {
             </div>
 
             <div class="section-nav">
-              <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back" data-section="2">&lt; Back</button>
-              <span class="section-nav-title">2 / 3: Edit Fields</span>
-              <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next" data-section="2">Next &gt;</button>
+              <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
+              <span class="section-nav-title">1 / 2: Edit info</span>
+              <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next" data-section="1">Next &gt;</button>
             </div>
           </div>
 
-          <!-- Section 3: Amendment Reason & Confirmation -->
-          <div class="form-section" data-section="3" hidden>
+          <!-- Section 2: Amendment Reason & Confirmation -->
+          <div class="form-section" data-section="2" hidden>
             <div class="section-header">
               <h3 class="section-title">Amend Stock</h3>
               <div class="header-actions">
-                <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="3">
+                <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                   Clear Section
                 </button>
@@ -198,8 +173,8 @@ window.initAmendStock = (function () {
             </div>
 
             <div class="section-nav">
-              <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back" data-section="3">&lt; Back</button>
-              <span class="section-nav-title">3 / 3: Reason</span>
+              <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back" data-section="2">&lt; Back</button>
+              <span class="section-nav-title">2 / 2: Reason</span>
               <button type="button" class="section-nav-btn section-nav-btn--danger" id="btn-review-amendment" data-action="review-amendment">Review Amendment</button>
             </div>
           </div>
@@ -369,15 +344,14 @@ window.initAmendStock = (function () {
       if (window.UI) window.UI.clearAllInlineErrors(root);
       if (secNum === 1) {
         selectItemInput.value = "";
-        selectedOriginalItem = null;
-      } else if (secNum === 2) {
         nameInput.value = "";
         categoryInput.value = "";
         stockQtyInput.value = "";
         alertLevelInput.value = "";
         itemRemarkInput.value = "";
         if (itemRemarkCounter) itemRemarkCounter.textContent = "0 / 200";
-      } else if (secNum === 3) {
+        selectedOriginalItem = null;
+      } else if (secNum === 2) {
         amendReasonInput.value = "";
         if (amendReasonCounter) amendReasonCounter.textContent = "0 / 200";
       }
@@ -447,7 +421,7 @@ window.initAmendStock = (function () {
       if (!amendReasonVal) {
         if (window.UI) window.UI.showInlineError(amendReasonInput, "Amendment reason is mandatory.");
         notifyUser("Amendment reason is mandatory. Please enter why you are making this amendment.", "error");
-        showSection(3);
+        showSection(2);
         amendReasonInput.focus();
         return;
       }
@@ -472,7 +446,7 @@ window.initAmendStock = (function () {
       if (isNaN(newQty) || newQty < 0) {
         if (window.UI) window.UI.showInlineError(stockQtyInput, "Corrected stock quantity must be 0 or greater.");
         notifyUser("Please enter a valid stock quantity (0 or greater).", "error");
-        showSection(2);
+        showSection(1);
         stockQtyInput.focus();
         return;
       }
@@ -513,8 +487,8 @@ window.initAmendStock = (function () {
       }
 
       if (diffs.length === 0) {
-        notifyUser("⚠️ No changes detected! Please modify at least one field in Section 2 (Item Name, Category, Stock Qty, Alert Level, or Remark) before reviewing amendment.", "error");
-        showSection(2);
+        notifyUser("⚠️ No changes detected! Please modify at least one field in Section 1 (Item Name, Category, Stock Qty, Alert Level, or Remark) before reviewing amendment.", "error");
+        showSection(1);
         return;
       }
 

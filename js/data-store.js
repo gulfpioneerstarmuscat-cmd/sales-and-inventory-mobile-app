@@ -621,7 +621,8 @@ window.DataStore = (function () {
         timestamp: new Date().toISOString(),
         date: saleData.date || new Date().toISOString().split("T")[0],
         customerName: saleData.customerName || "Walk-in Customer",
-        customerPhone: saleData.customerPhone || "",
+        customerPhone: saleData.customerPhone || saleData.customerNumber || "",
+        customerNumber: saleData.customerNumber || saleData.customerPhone || "",
         customerAddress: saleData.customerAddress || "",
         vatBill: saleData.vatBill || "no",
         itemsDetail: saleData.itemsDetail || "",
@@ -806,7 +807,8 @@ window.DataStore = (function () {
         amendedQty: targetQty,
         qtyDelta: Number(targetQty) - Number(originalItem.qty || 0),
         diffs: diffs,
-        remarks: updatedFields.remarks || updatedFields.amendReason || ""
+        remarks: updatedFields.remarks || updatedFields.amendReason || "",
+        reason: updatedFields.amendReason || updatedFields.remarks || ""
       };
 
       logs.unshift(auditRecord);

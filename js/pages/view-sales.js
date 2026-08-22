@@ -614,10 +614,6 @@ window.initViewSales = (function () {
                 <span class="info-lbl">Phone Number</span>
                 <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
               </div>
-              <div class="info-item">
-                <span class="info-lbl">Email Address</span>
-                <span class="info-val">${sale.customerEmail ? `<a href="mailto:${escapeHtml(sale.customerEmail)}" class="contact-link">${escapeHtml(sale.customerEmail)}</a>` : "N/A"}</span>
-              </div>
             </div>
           </div>
 

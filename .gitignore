@@ -3,6 +3,7 @@ CNAME
 
 # Developer Testing & Telemetry Script (Hidden from Git)
 js/developer.js
+test-suite.js
 
 # Google Apps Script Source Code & Local IDE Configs (Hidden from GitHub)
 apps-script/

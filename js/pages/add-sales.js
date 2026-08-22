@@ -40,7 +40,7 @@ window.initAddSales = (function () {
 
   const htmlTemplate = `
 <div class="add-sales-container">
-  <!-- Section 1: Customer Details -->
+  <!-- Section 1: Sales Info (Customer & Items Merged) -->
   <div class="form-section form-section--active" data-section="1">
     <div class="section-header">
       <h3 class="section-title">Add Sales</h3>
@@ -77,37 +77,7 @@ window.initAddSales = (function () {
         <input type="tel" id="customer-number" class="form-input" placeholder="Enter phone number" />
       </div>
 
-      <div class="form-group">
-        <label class="form-label" for="customer-email">Customer Email</label>
-        <input type="email" id="customer-email" class="form-input" placeholder="Enter email address" />
-      </div>
-    </div>
-
-    <div class="section-nav">
-      <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
-      <span class="section-nav-title">1 / 3: Customer Info</span>
-      <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next">Next &gt;</button>
-    </div>
-  </div>
-
-  <!-- Section 2: Item Details -->
-  <div class="form-section" data-section="2" hidden>
-    <div class="section-header">
-      <h3 class="section-title">Add Sales</h3>
-      <div class="header-actions">
-        <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-          Clear Section
-        </button>
-        <button type="button" class="btn-clear btn-clear--form" data-action="clear-form">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-          Clear Form
-        </button>
-      </div>
-    </div>
-
-    <div class="form-body">
-      <div class="items-list" id="items-list"></div>
+      <div class="items-list" id="items-list" style="margin-top: 12px;"></div>
 
       <button type="button" class="btn-add-row" id="btn-add-item-row">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"></path></svg>
@@ -121,18 +91,18 @@ window.initAddSales = (function () {
     </div>
 
     <div class="section-nav">
-      <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back">&lt; Back</button>
-      <span class="section-nav-title">2 / 3: Items Info</span>
-      <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next">&gt; Next</button>
+      <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
+      <span class="section-nav-title">1 / 2: Sales info</span>
+      <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next">Next &gt;</button>
     </div>
   </div>
 
-  <!-- Section 3: Payment Details -->
-  <div class="form-section" data-section="3" hidden>
+  <!-- Section 2: Payment Details -->
+  <div class="form-section" data-section="2" hidden>
     <div class="section-header">
       <h3 class="section-title">Add Sales</h3>
       <div class="header-actions">
-        <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="3">
+        <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
           Clear Section
         </button>
@@ -197,7 +167,7 @@ window.initAddSales = (function () {
 
     <div class="section-nav">
       <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back">&lt; Back</button>
-      <span class="section-nav-title">3 / 3: Payment Info</span>
+      <span class="section-nav-title">2 / 2: Payment info</span>
       <button type="button" class="section-nav-btn section-nav-btn--save" data-action="save">Save Sale</button>
     </div>
   </div>
@@ -249,7 +219,7 @@ window.initAddSales = (function () {
         sec.hidden = !isTarget;
         sec.classList.toggle("form-section--active", isTarget);
       });
-      if (sectionNum === 3) {
+      if (sectionNum === 2) {
         updatePaymentInputStates();
         calculateTotals();
       }
@@ -577,12 +547,10 @@ window.initAddSales = (function () {
           if (nameInput) nameInput.value = "";
           if (numberInput) numberInput.value = "";
           if (emailInput) emailInput.value = "";
-          UI.toast("Customer details cleared", "info");
-        } else if (secNum === 2) {
           items = [createDefaultItem()];
           renderItems();
-          UI.toast("Item details cleared", "info");
-        } else if (secNum === 3) {
+          UI.toast("Sales details cleared", "info");
+        } else if (secNum === 2) {
           vatBill = FORM_DEFAULTS.vatBill;
           paymentStatus = FORM_DEFAULTS.paymentStatus;
           paymentMethod = FORM_DEFAULTS.paymentMethod;
@@ -667,7 +635,6 @@ window.initAddSales = (function () {
       try {
         const hasData = (nameInput && nameInput.value.trim()) ||
           (numberInput && numberInput.value.trim()) ||
-          (emailInput && emailInput.value.trim()) ||
           (items && items.some((it) => it.name && it.name.trim()));
 
         if (!hasData) {
@@ -679,7 +646,7 @@ window.initAddSales = (function () {
           date: dateInput ? dateInput.value : getTodayString(),
           customerName: nameInput ? nameInput.value : "",
           customerNumber: numberInput ? numberInput.value : "",
-          customerEmail: emailInput ? emailInput.value : "",
+          customerEmail: "",
           vatBill: vatBill,
           paymentStatus: paymentStatus,
           paymentMethod: paymentMethod,
@@ -753,7 +720,7 @@ window.initAddSales = (function () {
       } else if (action === "back") {
         showSection(Math.max(1, currentSection - 1));
       } else if (action === "save") {
-        if (validateSection(3)) {
+        if (validateSection(2)) {
           saveSale();
         }
       }
@@ -774,19 +741,6 @@ window.initAddSales = (function () {
           nameInput.focus();
           return false;
         }
-        const emailVal = emailInput ? emailInput.value.trim() : "";
-        if (emailVal.length > 0) {
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(emailVal)) {
-            UI.showInlineError(emailInput, "Invalid email format (e.g. name@domain.com)");
-            emailInput.focus();
-            return false;
-          }
-        }
-        return true;
-      }
-
-      if (sectionNum === 2) {
         if (items.length === 0) {
           UI.toast("Please add at least one item to proceed.", "warning");
           return false;
@@ -813,7 +767,7 @@ window.initAddSales = (function () {
         return true;
       }
 
-      if (sectionNum === 3) {
+      if (sectionNum === 2) {
         if (paymentStatus === "paid") {
           const grandTotal = Math.round(getGrandTotalValue() * 1000) / 1000;
           const cashVal = Math.round((parseFloat(cashInput.value) || 0) * 1000) / 1000;
@@ -906,7 +860,7 @@ window.initAddSales = (function () {
         date: dateInput.value,
         customerName: nameInput.value.trim(),
         customerNumber: numberInput.value.trim(),
-        customerEmail: emailInput.value.trim(),
+        customerEmail: "",
         items: items,
         itemsDetail: itemsDetailStr,
         vatBill: vatBill,

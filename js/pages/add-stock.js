@@ -18,7 +18,7 @@ window.initAddStock = (function () {
       <div class="add-stock-container">
         <form id="add-stock-form" style="height:100%; display:flex; flex-direction:column;" novalidate>
           
-          <!-- Section 1: Item Identification -->
+          <!-- Section 1: Item Info & Quantities Merged -->
           <div class="form-section form-section--active" data-section="1">
             <div class="section-header">
               <h3 class="section-title">Add Stock</h3>
@@ -74,32 +74,7 @@ window.initAddStock = (function () {
                   placeholder="Category (e.g. Gate Automation, Remotes)"
                 />
               </div>
-            </div>
 
-            <div class="section-nav">
-              <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
-              <span class="section-nav-title">1 / 3: Item Info</span>
-              <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next" data-section="1">Next &gt;</button>
-            </div>
-          </div>
-
-          <!-- Section 2: Quantities & Thresholds -->
-          <div class="form-section" data-section="2" hidden>
-            <div class="section-header">
-              <h3 class="section-title">Add Stock</h3>
-              <div class="header-actions">
-                <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                  Clear Section
-                </button>
-                <button type="button" class="btn-clear btn-clear--form" data-action="clear-form">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                  Clear Form
-                </button>
-              </div>
-            </div>
-
-            <div class="form-body">
               <!-- Current Stock (View Only Read-only Field) -->
               <div class="form-group">
                 <label class="form-label">Current Stock (View Only)</label>
@@ -140,18 +115,18 @@ window.initAddStock = (function () {
             </div>
 
             <div class="section-nav">
-              <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back" data-section="2">&lt; Back</button>
-              <span class="section-nav-title">2 / 3: Quantities</span>
-              <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next" data-section="2">Next &gt;</button>
+              <button type="button" class="section-nav-btn section-nav-btn--back" disabled>&lt; Back</button>
+              <span class="section-nav-title">1 / 2: Item info</span>
+              <button type="button" class="section-nav-btn section-nav-btn--next" data-action="next" data-section="1">Next &gt;</button>
             </div>
           </div>
 
-          <!-- Section 3: Remarks & Confirmation -->
-          <div class="form-section" data-section="3" hidden>
+          <!-- Section 2: Remarks & Confirmation -->
+          <div class="form-section" data-section="2" hidden>
             <div class="section-header">
               <h3 class="section-title">Add Stock</h3>
               <div class="header-actions">
-                <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="3">
+                <button type="button" class="btn-clear btn-clear--section" data-action="clear-section" data-section="2">
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
                   Clear Section
                 </button>
@@ -181,8 +156,8 @@ window.initAddStock = (function () {
             </div>
 
             <div class="section-nav">
-              <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back" data-section="3">&lt; Back</button>
-              <span class="section-nav-title">3 / 3: Remarks</span>
+              <button type="button" class="section-nav-btn section-nav-btn--back" data-action="back" data-section="2">&lt; Back</button>
+              <span class="section-nav-title">2 / 2: Remark</span>
               <button type="submit" class="section-nav-btn section-nav-btn--save" data-action="save">Add Stock</button>
             </div>
           </div>
@@ -315,7 +290,7 @@ window.initAddStock = (function () {
           }
           selectedExistingItem = matched;
         }
-      } else if (secNum === 2) {
+
         const addQtyVal = parseInt(qtyInput.value, 10);
         if (isNaN(addQtyVal) || addQtyVal <= 0) {
           if (window.UI) window.UI.showInlineError(qtyInput, "Add stock quantity must be at least 1.");
@@ -332,12 +307,11 @@ window.initAddStock = (function () {
       if (secNum === 1) {
         nameInput.value = "";
         categoryInput.value = "";
+        qtyInput.value = "";
+        alertLevelInput.value = "";
         selectedExistingItem = null;
         updateCurrentStockPreview(0);
       } else if (secNum === 2) {
-        qtyInput.value = "";
-        alertLevelInput.value = "";
-      } else if (secNum === 3) {
         remarksInput.value = "";
         if (remarksCounter) remarksCounter.textContent = "0 / 200";
       }
