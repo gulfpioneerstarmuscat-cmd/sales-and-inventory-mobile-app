@@ -401,7 +401,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-// Register Service Worker for PWA / Standalone installability with auto-update checking
+// Register Service Worker for PWA / Standalone installability with safe update management
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker
@@ -413,8 +413,18 @@ if ("serviceWorker" in navigator) {
           if (newWorker) {
             newWorker.addEventListener("statechange", () => {
               if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                if (window.DevLogger) window.DevLogger.info("App", "New version available! Refreshing automatically...");
-                window.location.reload();
+                if (window.DevLogger) {
+                  window.DevLogger.info("App", "New Service Worker version activated silently.");
+                }
+                // Rate-limit notifications and prevent infinite reload loops when DevTools "Update on reload" is enabled
+                const lastReload = Number(sessionStorage.getItem("gps_sw_last_reload") || 0);
+                const now = Date.now();
+                if (now - lastReload > 60000) {
+                  sessionStorage.setItem("gps_sw_last_reload", String(now));
+                  if (window.UI && typeof window.UI.toast === "function") {
+                    window.UI.toast("App updated to latest version", "info");
+                  }
+                }
               }
             });
           }

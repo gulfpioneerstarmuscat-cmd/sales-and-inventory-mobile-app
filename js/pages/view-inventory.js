@@ -27,14 +27,22 @@ window.initViewInventory = (function () {
       if (statusFilter === "low_stock" && !isLowStock) return false;
       if (statusFilter === "no_stock" && !isNoStock) return false;
 
-      // 2. Normalized Case-Insensitive Search Query Filter (Product Name, SKU, Category)
+      // 2. Normalized Case-Insensitive Multi-Token Search Query Filter (Product Name, SKU, Category, Remarks)
       if (searchQuery) {
         const q = normalizeSearchText(searchQuery);
-        const matchName = normalizeSearchText(item.name).includes(q);
-        const matchSku = normalizeSearchText(item.sku).includes(q);
-        const matchCat = normalizeSearchText(item.category).includes(q);
+        const tokens = q.split(/\s+/).filter(Boolean);
 
-        if (!matchName && !matchSku && !matchCat) return false;
+        if (tokens.length > 0) {
+          const nameText = normalizeSearchText(item.name);
+          const skuText = normalizeSearchText(item.sku);
+          const catText = normalizeSearchText(item.category);
+          const remarkText = normalizeSearchText(item.lastRemark || item.remark);
+
+          const combinedItemText = `${nameText} ${skuText} ${catText} ${remarkText}`;
+          const matchesAllTokens = tokens.every((token) => combinedItemText.includes(token));
+
+          if (!matchesAllTokens) return false;
+        }
       }
 
       return true;

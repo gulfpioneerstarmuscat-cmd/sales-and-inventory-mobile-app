@@ -32,7 +32,7 @@ window.ItemAutocomplete = (function () {
       if (parentCard) parentCard.style.zIndex = "";
     }
 
-    function renderSuggestions(matches) {
+    function renderSuggestions(matches, queryTokens = []) {
       currentMatches = matches;
       selectedIndex = -1;
 
@@ -46,7 +46,7 @@ window.ItemAutocomplete = (function () {
         .map(
           (m, idx) => `
         <div class="autocomplete-item ${idx === selectedIndex ? "autocomplete-item--active" : ""}" data-index="${idx}">
-          <div class="autocomplete-name">${escapeHtml(m.name)}</div>
+          <div class="autocomplete-name">${highlightMatches(m.name, queryTokens)}</div>
           <div class="autocomplete-meta">
             <span class="autocomplete-cat">${escapeHtml(m.category || "General")}</span>
             <span class="autocomplete-stock">Stock: <strong>${m.qty ?? 0}</strong></span>
@@ -73,10 +73,25 @@ window.ItemAutocomplete = (function () {
         .replace(/"/g, "&quot;");
     }
 
+    function highlightMatches(text, queryTokens) {
+      const safeText = escapeHtml(text || "");
+      if (!queryTokens || !queryTokens.length) return safeText;
+
+      const escapedTokens = queryTokens
+        .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+        .filter(Boolean);
+      if (escapedTokens.length === 0) return safeText;
+
+      const pattern = new RegExp(`(${escapedTokens.join("|")})`, "gi");
+      return safeText.replace(pattern, "<mark class='search-highlight'>$1</mark>");
+    }
+
     function showSuggestions(val) {
       if (!window.DataStore) return;
+      const q = (val || "").trim().toLowerCase();
+      const tokens = q.split(/\s+/).filter(Boolean);
       const matches = window.DataStore.searchItems(val || "");
-      renderSuggestions(matches);
+      renderSuggestions(matches, tokens);
     }
 
     function selectItem(item) {

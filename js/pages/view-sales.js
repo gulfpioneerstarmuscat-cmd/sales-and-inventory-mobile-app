@@ -122,23 +122,26 @@ window.initViewSales = (function () {
 
       if (searchQuery) {
         const q = normalizeSearchText(searchQuery);
-        const matchCust = normalizeSearchText(sale.customerName).includes(q);
-        const matchPhone = normalizeSearchText(sale.customerNumber).includes(q);
-        const matchEmail = normalizeSearchText(sale.customerEmail).includes(q);
-        const matchItemsText = normalizeSearchText(sale.itemsDetail).includes(q);
+        const tokens = q.split(/\s+/).filter(Boolean);
 
-        let matchItemArray = false;
-        if (Array.isArray(sale.items)) {
-          matchItemArray = sale.items.some((it) => {
-            const nMatch = normalizeSearchText(it.name).includes(q);
-            const sMatch = normalizeSearchText(it.sku).includes(q);
-            const cMatch = normalizeSearchText(it.category).includes(q);
-            return nMatch || sMatch || cMatch;
-          });
-        }
+        if (tokens.length > 0) {
+          const custName = normalizeSearchText(sale.customerName);
+          const custPhone = normalizeSearchText(sale.customerNumber || sale.customerPhone);
+          const custEmail = normalizeSearchText(sale.customerEmail);
+          const itemsText = normalizeSearchText(sale.itemsDetail);
 
-        if (!matchCust && !matchPhone && !matchEmail && !matchItemsText && !matchItemArray) {
-          return false;
+          let itemArrayText = "";
+          if (Array.isArray(sale.items)) {
+            itemArrayText = sale.items
+              .map((it) => `${it.name || ""} ${it.sku || ""} ${it.category || ""}`)
+              .join(" ");
+            itemArrayText = normalizeSearchText(itemArrayText);
+          }
+
+          const combinedSaleText = `${custName} ${custPhone} ${custEmail} ${itemsText} ${itemArrayText}`;
+
+          const matchesAllTokens = tokens.every((token) => combinedSaleText.includes(token));
+          if (!matchesAllTokens) return false;
         }
       }
 

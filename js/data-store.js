@@ -593,20 +593,58 @@ window.DataStore = (function () {
     findItemByName: function (nameQuery, branch) {
       if (!nameQuery || typeof nameQuery !== "string") return null;
       const q = nameQuery.trim().toLowerCase();
+      if (!q) return null;
       const inv = loadBranchInventory(branch);
-      return inv.find((item) => (item.name || "").trim().toLowerCase() === q) || null;
+
+      const exact = inv.find((item) => (item.name || "").trim().toLowerCase() === q);
+      if (exact) return exact;
+
+      const tokens = q.split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) return null;
+
+      const tokenMatches = inv.filter((item) => {
+        const name = (item.name || "").toLowerCase();
+        return tokens.every((t) => name.includes(t));
+      });
+
+      return tokenMatches.length === 1 ? tokenMatches[0] : null;
     },
 
     searchItems: function (query, branch) {
       if (!query || typeof query !== "string") return [];
-      const q = query.trim().toLowerCase();
+      const trimmed = query.trim().toLowerCase();
+      if (!trimmed) return [];
+
+      const tokens = trimmed.split(/\s+/).filter(Boolean);
       const inv = loadBranchInventory(branch);
-      return inv.filter(
-        (item) =>
-          (item.name && item.name.toLowerCase().includes(q)) ||
-          (item.sku && item.sku.toLowerCase().includes(q)) ||
-          (item.category && item.category.toLowerCase().includes(q))
-      );
+
+      const matches = inv.filter((item) => {
+        const name = (item.name || "").toLowerCase();
+        const sku = (item.sku || "").toLowerCase();
+        const category = (item.category || "").toLowerCase();
+        const combined = `${name} ${category} ${sku}`;
+
+        return tokens.every((token) => combined.includes(token));
+      });
+
+      return matches.sort((a, b) => {
+        const nameA = (a.name || "").toLowerCase();
+        const nameB = (b.name || "").toLowerCase();
+
+        const exactA = nameA === trimmed ? 1 : 0;
+        const exactB = nameB === trimmed ? 1 : 0;
+        if (exactA !== exactB) return exactB - exactA;
+
+        const startsA = nameA.startsWith(trimmed) ? 1 : 0;
+        const startsB = nameB.startsWith(trimmed) ? 1 : 0;
+        if (startsA !== startsB) return startsB - startsA;
+
+        const nameMatchA = tokens.every((t) => nameA.includes(t)) ? 1 : 0;
+        const nameMatchB = tokens.every((t) => nameB.includes(t)) ? 1 : 0;
+        if (nameMatchA !== nameMatchB) return nameMatchB - nameMatchA;
+
+        return 0;
+      });
     },
 
     // Save New Sale for Active Branch

@@ -604,6 +604,14 @@ p {
   box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35);
 }
 
+mark.search-highlight {
+  background-color: rgba(69, 103, 250, 0.18);
+  color: #4567fa;
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
 .modal-btn--danger:hover,
 .danger-button:hover {
   background: #b91c1c;
