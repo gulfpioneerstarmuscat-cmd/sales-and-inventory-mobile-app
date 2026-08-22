@@ -17,6 +17,26 @@ window.DataStore = (function () {
   let dbInitPromise = null;
 
   // --------------------------------------------------------------------------
+  // One-Time Production Cache Reset (Clears dummy test sales once on v77)
+  // --------------------------------------------------------------------------
+  const ONE_TIME_RESET_KEY = "gps_one_time_reset_v77";
+  (function performOneTimeResetIfNeeded() {
+    try {
+      if (typeof localStorage !== "undefined" && !localStorage.getItem(ONE_TIME_RESET_KEY)) {
+        Object.keys(localStorage).forEach((k) => {
+          if (k.startsWith("gps_") && !k.endsWith("v77")) {
+            localStorage.removeItem(k);
+          }
+        });
+        localStorage.setItem(ONE_TIME_RESET_KEY, "true");
+        if (typeof indexedDB !== "undefined") {
+          indexedDB.deleteDatabase(DB_NAME);
+        }
+      }
+    } catch (e) {}
+  })();
+
+  // --------------------------------------------------------------------------
   // IndexedDB Core Engine
   // --------------------------------------------------------------------------
   function openDatabase() {
