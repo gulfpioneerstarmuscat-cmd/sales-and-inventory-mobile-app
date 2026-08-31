@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v78";
+const CACHE_NAME = "gps-app-v79";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [

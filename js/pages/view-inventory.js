@@ -262,7 +262,7 @@ window.initViewInventory = (function () {
             <div class="info-grid" style="grid-template-columns: 1fr;">
               <div class="info-item">
                 <span class="info-label">Item Remark / Notes</span>
-                <span class="info-val" style="font-weight: 500; word-break: break-word;">${escapeHtml(itemRemark)}</span>
+                <span class="info-val" style="font-weight: 500; word-break: break-word; white-space: pre-wrap;">${escapeHtml(itemRemark)}</span>
               </div>
             </div>
           </div>

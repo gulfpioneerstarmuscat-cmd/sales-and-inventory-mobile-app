@@ -234,8 +234,9 @@ window.initAmendStock = (function () {
       alertLevelInput.value = "";
       alertLevelInput.placeholder = String(item.alertLevel ?? 5);
 
-      itemRemarkInput.value = "";
-      itemRemarkInput.placeholder = item.lastRemark || item.remark || "Enter optional item remark...";
+      const existingRemark = item.lastRemark || item.remark || item.remarks || "";
+      itemRemarkInput.value = existingRemark;
+      itemRemarkInput.placeholder = "Enter optional item remark...";
       if (itemRemarkCounter) itemRemarkCounter.textContent = `${itemRemarkInput.value.length} / 200`;
 
       amendReasonInput.value = "";
@@ -439,9 +440,8 @@ window.initAmendStock = (function () {
       const newAlertLevelStr = alertLevelInput.value.trim();
       const newAlertLevel = newAlertLevelStr !== "" ? parseInt(newAlertLevelStr, 10) : (selectedOriginalItem.alertLevel ?? 5);
 
-      const origRemark = selectedOriginalItem.lastRemark || selectedOriginalItem.remark || "";
-      const enteredRemark = itemRemarkInput.value.trim();
-      const newItemRemark = enteredRemark !== "" ? enteredRemark : origRemark;
+      const origRemark = selectedOriginalItem.lastRemark || selectedOriginalItem.remark || selectedOriginalItem.remarks || "";
+      const newItemRemark = itemRemarkInput.value.trim();
 
       if (isNaN(newQty) || newQty < 0) {
         if (window.UI) window.UI.showInlineError(stockQtyInput, "Corrected stock quantity must be 0 or greater.");

@@ -65,9 +65,10 @@ document.addEventListener("DOMContentLoaded", () => {
     button.addEventListener("click", () => {
       const targetPageNum = String(index + 1);
       const isAdmin = window.Auth ? window.Auth.isAdmin() : true;
-      if (!isAdmin && targetPageNum === "5") {
+      if (!isAdmin && (targetPageNum === "4" || targetPageNum === "5")) {
         if (window.UI && typeof window.UI.toast === "function") {
-          window.UI.toast("Amend Stock is restricted", "warning");
+          const label = targetPageNum === "4" ? "Add Stock" : "Amend Stock";
+          window.UI.toast(`${label} is restricted to Administrators`, "warning");
         }
         showPage("3");
         return;
@@ -175,19 +176,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!targetPage) return;
 
-    // Role-based protection check: Page 5 (Amend Stock) is admin-only. Page 4 (Add Stock) is available to all staff.
+    // Role-based protection check: Page 4 (Add Stock) and Page 5 (Amend Stock) are admin-only.
     const isAdmin = window.Auth ? window.Auth.isAdmin() : true;
-    if (!isAdmin && targetPage === "5") {
+    if (!isAdmin && (targetPage === "4" || targetPage === "5")) {
       targetPage = "3";
     }
 
     showPage(targetPage);
   }
 
+  function updateRoleBasedNavVisibility() {
+    const isAdmin = window.Auth ? window.Auth.isAdmin() : true;
+    if (navButtons.length >= 5) {
+      navButtons[3].style.display = isAdmin ? "" : "none";
+      navButtons[4].style.display = isAdmin ? "" : "none";
+    }
+  }
+
   function showFullApp() {
     if (mainAppContainer) mainAppContainer.style.display = "block";
     if (loggedOutScreen) loggedOutScreen.classList.add("is-hidden");
     hideSplashScreen();
+    updateRoleBasedNavVisibility();
     handleShortcutRouting();
 
     // Trigger cloud data sync when entering full app
@@ -201,6 +211,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  window.addEventListener("sessionStateChanged", updateRoleBasedNavVisibility);
   window.addEventListener("popstate", handleShortcutRouting);
   window.addEventListener("hashchange", handleShortcutRouting);
 

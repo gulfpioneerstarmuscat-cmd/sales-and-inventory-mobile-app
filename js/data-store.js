@@ -17,14 +17,14 @@ window.DataStore = (function () {
   let dbInitPromise = null;
 
   // --------------------------------------------------------------------------
-  // One-Time Production Cache Reset (Clears dummy test sales once on v77)
+  // One-Time Production Cache Reset (Clears dummy test sales once on v79)
   // --------------------------------------------------------------------------
-  const ONE_TIME_RESET_KEY = "gps_one_time_reset_v77";
+  const ONE_TIME_RESET_KEY = "gps_one_time_reset_v79";
   (function performOneTimeResetIfNeeded() {
     try {
       if (typeof localStorage !== "undefined" && !localStorage.getItem(ONE_TIME_RESET_KEY)) {
         Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith("gps_") && !k.endsWith("v77")) {
+          if (k.startsWith("gps_") && k !== ONE_TIME_RESET_KEY) {
             localStorage.removeItem(k);
           }
         });
@@ -758,7 +758,12 @@ window.DataStore = (function () {
         inventory[index].lastUpdated = new Date().toLocaleTimeString();
         if (payload.category) inventory[index].category = payload.category;
         if (payload.alertLevel) inventory[index].alertLevel = Number(payload.alertLevel);
-        if (payload.remarks) inventory[index].lastRemark = payload.remarks;
+        if (payload.remarks) {
+          const existing = inventory[index].lastRemark || inventory[index].remark || "";
+          const combined = existing ? (existing + "\n• " + payload.remarks) : payload.remarks;
+          inventory[index].lastRemark = combined;
+          inventory[index].remark = combined;
+        }
       } else {
         inventory.push({
           sku: payload.sku || "SKU-" + Date.now().toString().slice(-5),
@@ -767,6 +772,7 @@ window.DataStore = (function () {
           qty: addQty,
           alertLevel: Number(payload.alertLevel) || 5,
           lastRemark: payload.remarks || "",
+          remark: payload.remarks || "",
           lastUpdated: new Date().toLocaleTimeString()
         });
       }
@@ -834,13 +840,16 @@ window.DataStore = (function () {
         ? Number(updatedFields.alertLevel)
         : (Number(currentItem.alertLevel) || 5);
 
+      const updatedRemark = updatedFields.lastRemark !== undefined ? updatedFields.lastRemark : (currentItem.lastRemark || currentItem.remark || "");
+
       inventory[index] = {
         ...currentItem,
         name: updatedFields.name || currentItem.name,
         category: updatedFields.category || currentItem.category,
         qty: targetQty,
         alertLevel: targetAlert,
-        lastRemark: updatedFields.lastRemark !== undefined ? updatedFields.lastRemark : (currentItem.lastRemark || currentItem.remark || ""),
+        lastRemark: updatedRemark,
+        remark: updatedRemark,
         lastAmendedBy: currentUser ? currentUser.name : "Staff",
         lastAmendedRemark: updatedFields.amendReason || updatedFields.remarks || "",
         lastUpdated: new Date().toLocaleTimeString()
@@ -865,6 +874,7 @@ window.DataStore = (function () {
         amendedQty: targetQty,
         qtyDelta: Number(targetQty) - Number(originalItem.qty || 0),
         diffs: diffs,
+        itemRemark: updatedRemark,
         remarks: updatedFields.remarks || updatedFields.amendReason || "",
         reason: updatedFields.amendReason || updatedFields.remarks || ""
       };
