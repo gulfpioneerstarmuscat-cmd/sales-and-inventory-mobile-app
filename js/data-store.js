@@ -392,9 +392,13 @@ window.DataStore = (function () {
       }
 
       const flushedTotal = queue.length - remainingQueue.length;
-      if (flushedTotal > 0 && window.NotificationManager && typeof window.NotificationManager.notifyOfflineSync === "function") {
+      if (flushedTotal > 0) {
         const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        window.NotificationManager.notifyOfflineSync(flushedTotal, timeNow);
+        if (window.PushNotification && typeof window.PushNotification.notifyOfflineSync === "function") {
+          window.PushNotification.notifyOfflineSync(flushedTotal, timeNow);
+        } else if (window.NotificationManager && typeof window.NotificationManager.notifyOfflineSync === "function") {
+          window.NotificationManager.notifyOfflineSync(flushedTotal, timeNow);
+        }
       }
       isFlushingMutations = false;
     };
@@ -1059,6 +1063,19 @@ window.DataStore = (function () {
         items: itemsToRestore && itemsToRestore.length > 0 ? itemsToRestore : (targetSale.items || []),
         refundStatus: "REFUNDED"
       }, webAppUrl);
+
+      // Trigger Refund Audit Push Notification
+      try {
+        if (window.PushNotification && typeof window.PushNotification.sendRefundAuditAlert === "function") {
+          const user = window.Auth ? window.Auth.getCurrentUser() : null;
+          window.PushNotification.sendRefundAuditAlert(
+            branch,
+            targetSale.grandTotal || 0,
+            targetSale.customerName || "Customer",
+            user ? user.name : "Staff User"
+          );
+        }
+      } catch (e) {}
 
       return { success: true, sale: targetSale };
     },

@@ -871,13 +871,35 @@ window.initAddSales = (function () {
         grandTotal: grandTotalVal,
       };
 
-      // Fire event & callback
       if (typeof onSaveSuccess === "function") {
         onSaveSuccess(saleData);
       }
       if (window.DataStore) {
         window.DataStore.recordSale(saleData, FORM_DEFAULTS.googleSheetWebAppUrl);
       }
+
+      // Check for Real-Time Low Stock Push Alert
+      try {
+        const branch = window.Auth && typeof window.Auth.getActiveBranch === "function" 
+          ? window.Auth.getActiveBranch() 
+          : null;
+        if (!branch) return;
+
+        const invList = window.DataStore ? window.DataStore.getInventory(branch) : [];
+        if (Array.isArray(items) && invList.length > 0) {
+          items.forEach((soldItem) => {
+            const soldName = (soldItem.name || "").trim().toLowerCase();
+            const match = invList.find((inv) => (inv.name || "").trim().toLowerCase() === soldName);
+            if (match) {
+              const remaining = Math.max(0, (Number(match.qty) || 0) - (Number(soldItem.qty) || 0));
+              const alertLvl = Number(match.alertLevel) || 5;
+              if (remaining <= alertLvl && window.PushNotification) {
+                window.PushNotification.sendLowStockAlert(match.name, branch, remaining, alertLvl);
+              }
+            }
+          });
+        }
+      } catch (e) {}
 
       UI.toast(`Sale recorded successfully! Total: ${formatOMR(saleData.grandTotal)}`, "success");
 

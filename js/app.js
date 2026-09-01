@@ -395,8 +395,10 @@ document.addEventListener("DOMContentLoaded", () => {
     window.SyncCountdownManager.start();
   }
 
-  // Initialize Notification Manager & scheduled daily/monthly push alarms
-  if (window.NotificationManager && typeof window.NotificationManager.init === "function") {
+  // Initialize Unified Push Notification & cloud scheduled alarms
+  if (window.PushNotification && typeof window.PushNotification.init === "function") {
+    window.PushNotification.init();
+  } else if (window.NotificationManager && typeof window.NotificationManager.init === "function") {
     window.NotificationManager.init();
   }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v79";
+const CACHE_NAME = "gps-app-v80";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
@@ -24,6 +24,7 @@ const ASSETS_TO_CACHE = [
   "./js/auth.js",
   "./js/data-store.js",
   "./js/notifications.js",
+  "./js/push_notifi.js",
   "./js/notification.js",
   "./js/components/date-picker.js",
   "./js/components/filter-pills.js",
@@ -181,27 +182,41 @@ self.addEventListener("sync", (event) => {
   }
 });
 
-// Message Listener: Handles background timer scheduling from client tabs
-self.addEventListener("message", (event) => {
-  if (!event.data) return;
+// Standard Web Push Event Listener (Wakes up device and displays background push notifications from Google Cloud)
+self.addEventListener("push", (event) => {
+  let payload = {
+    title: "GPS Alert",
+    body: "New notification from Gulf Pioneer Star.",
+    icon: "./assets/logo/icon-192.png",
+    badge: "./assets/logo/icon-192.png",
+    tag: "gps-general-alert",
+    url: "./index.html?view=view-sales"
+  };
 
-  if (event.data.action === "scheduleDelayedNotification") {
-    const delayMs = Number(event.data.delayMs) || 30000;
-    const title = event.data.title || "⏱️ Background Push Test";
-    const body = event.data.body || "Background push notification received after app was closed!";
-    const targetUrl = event.data.url || "./index.html?view=view-sales";
-
-    setTimeout(() => {
-      self.registration.showNotification(title, {
-        body: body,
-        icon: "./assets/logo/icon-192.png",
-        badge: "./assets/logo/icon-192.png",
-        vibrate: [200, 100, 200],
-        tag: "gps-delayed-30s-notif",
-        data: { url: targetUrl }
-      });
-    }, delayMs);
+  if (event.data) {
+    try {
+      const parsed = event.data.json();
+      payload = { ...payload, ...parsed };
+    } catch (e) {
+      payload.body = event.data.text();
+    }
   }
+
+  const notificationOptions = {
+    body: payload.body || "New update received.",
+    icon: payload.icon || "./assets/logo/icon-192.png",
+    badge: payload.badge || "./assets/logo/icon-192.png",
+    vibrate: [200, 100, 200],
+    tag: payload.tag || "gps-alert",
+    renotify: true,
+    data: {
+      url: payload.url || (payload.data && payload.data.url) || "./index.html?view=view-sales"
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || "GPS Alert", notificationOptions)
+  );
 });
 
 // Online Event Listener (Attempts SW outbox flush when network returns)
@@ -220,21 +235,23 @@ self.addEventListener("periodicsync", (event) => {
   }
 });
 
-// Notification Click Handler (Deep-links to specified view e.g. ?view=view-sales)
+// Notification Click Handler (Deep-links to specified view e.g. ?view=view-sales or ?view=view-inventory)
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const targetUrl = (event.notification.data && event.notification.data.url) || "./index.html?view=view-sales";
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      // 1. If an existing app window is already open, focus it and navigate to the target view
       for (const client of clientList) {
         if ("focus" in client) {
-          if (client.url.includes("index.html")) {
+          if (client.url.includes("index.html") || client.url.includes("./")) {
             client.navigate(targetUrl);
             return client.focus();
           }
         }
       }
+      // 2. If app is closed, open a new window directly to the target deep link
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }

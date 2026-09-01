@@ -193,25 +193,31 @@
           
           <!-- Sub-section: Notification Testing -->
           <div class="dev-test-group">
-            <div class="dev-group-label">Test Notifications</div>
+            <div class="dev-group-label">Test Notifications (In-App UI & Cloud Push)</div>
             <div class="dev-btns-grid">
               <button type="button" class="dev-action-btn dev-btn--success" id="btn-test-notif-success">
-                ✅ Success
+                ✅ Toast Success
               </button>
               <button type="button" class="dev-action-btn dev-btn--warning" id="btn-test-notif-warning">
-                ⚠️ Warning
+                ⚠️ Toast Warning
               </button>
               <button type="button" class="dev-action-btn dev-btn--error" id="btn-test-notif-error">
-                ❌ Error
+                ❌ Toast Error
               </button>
               <button type="button" class="dev-action-btn dev-btn--lowstock" id="btn-test-notif-lowstock">
-                🔔 Low Stock Alert
+                ⚠️ Low Stock Alert
+              </button>
+              <button type="button" class="dev-action-btn" id="btn-test-notif-refund" style="background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+                🔄 Refund Audit Alert
+              </button>
+              <button type="button" class="dev-action-btn" id="btn-test-notif-daily" style="background: rgba(99, 102, 241, 0.15); color: #6366f1; border: 1px solid rgba(99, 102, 241, 0.3);">
+                📊 Daily 9PM Summary
               </button>
               <button type="button" class="dev-action-btn" id="btn-test-push-notif" style="grid-column: span 2; background: linear-gradient(135deg, #4567fa, #6366f1); color: white; border: none; font-weight: 600;">
                 📲 Send Instant Push Notification
               </button>
               <button type="button" class="dev-action-btn" id="btn-test-push-30s" style="grid-column: span 2; background: linear-gradient(135deg, #059669, #10b981); color: white; border: none; font-weight: 600; margin-top: 4px;">
-                ⏱️ Test 30s Delayed Push (Close App Now)
+                ⏱️ Test 30s Cloud Push (Close App Now)
               </button>
             </div>
           </div>
@@ -261,26 +267,58 @@
       });
     });
 
-    // Test Notifications Click Handlers
+    // Test Notifications Click Handlers (Toasts & Push)
     const btnSuccess = container.querySelector("#btn-test-notif-success");
-    if (btnSuccess) btnSuccess.onclick = () => window.UI && window.UI.toast("✅ Test Success Notification!", "success");
+    if (btnSuccess) btnSuccess.onclick = () => window.UI && window.UI.toast("✅ Test Success In-App Notification!", "success");
 
     const btnWarning = container.querySelector("#btn-test-notif-warning");
-    if (btnWarning) btnWarning.onclick = () => window.UI && window.UI.toast("⚠️ Test Warning Notification!", "warning");
+    if (btnWarning) btnWarning.onclick = () => window.UI && window.UI.toast("⚠️ Test Warning In-App Notification!", "warning");
 
     const btnError = container.querySelector("#btn-test-notif-error");
-    if (btnError) btnError.onclick = () => window.UI && window.UI.toast("❌ Test Error Notification!", "error");
+    if (btnError) btnError.onclick = () => window.UI && window.UI.toast("❌ Test Error In-App Notification!", "error");
 
     const btnLowStock = container.querySelector("#btn-test-notif-lowstock");
-    if (btnLowStock) btnLowStock.onclick = () => window.UI && window.UI.toast("⚠️ Low Stock Alert: Beninca 600KG (Only 2 remaining!)", "warning");
+    if (btnLowStock) {
+      btnLowStock.onclick = () => {
+        if (window.PushNotification) {
+          window.PushNotification.sendLowStockAlert("Beninca 600KG Motor", window.Auth ? window.Auth.getActiveBranch() : "alkhoud", 2, 5);
+        } else if (window.UI) {
+          window.UI.toast("⚠️ Low Stock Alert: Beninca 600KG (Only 2 remaining!)", "warning");
+        }
+      };
+    }
+
+    const btnRefund = container.querySelector("#btn-test-notif-refund");
+    if (btnRefund) {
+      btnRefund.onclick = () => {
+        if (window.PushNotification) {
+          window.PushNotification.sendRefundAuditAlert(window.Auth ? window.Auth.getActiveBranch() : "alkhoud", 125.000, "Al Rashid Trading", user ? user.name : "Admin");
+        } else if (window.UI) {
+          window.UI.toast("🔄 Refund Audit Alert Dispatched", "info");
+        }
+      };
+    }
+
+    const btnDaily = container.querySelector("#btn-test-notif-daily");
+    if (btnDaily) {
+      btnDaily.onclick = () => {
+        if (window.PushNotification) {
+          window.PushNotification.sendDailySummaryNotification();
+        } else if (window.UI) {
+          window.UI.toast("📊 Daily summary triggered", "info");
+        }
+      };
+    }
 
     const btnPushNotif = container.querySelector("#btn-test-push-notif");
     if (btnPushNotif) {
       btnPushNotif.onclick = () => {
-        if (window.NotificationManager && typeof window.NotificationManager.sendTestNotification === "function") {
+        if (window.PushNotification && typeof window.PushNotification.sendTestNotification === "function") {
+          window.PushNotification.sendTestNotification();
+        } else if (window.NotificationManager && typeof window.NotificationManager.sendTestNotification === "function") {
           window.NotificationManager.sendTestNotification();
         } else if (window.UI) {
-          window.UI.toast("NotificationManager module not loaded", "error");
+          window.UI.toast("Push Notification module not loaded", "error");
         }
       };
     }
@@ -288,10 +326,12 @@
     const btnPush30s = container.querySelector("#btn-test-push-30s");
     if (btnPush30s) {
       btnPush30s.onclick = () => {
-        if (window.NotificationManager && typeof window.NotificationManager.sendDelayed30sTestNotification === "function") {
+        if (window.PushNotification && typeof window.PushNotification.sendDelayed30sCloudTest === "function") {
+          window.PushNotification.sendDelayed30sCloudTest();
+        } else if (window.NotificationManager && typeof window.NotificationManager.sendDelayed30sTestNotification === "function") {
           window.NotificationManager.sendDelayed30sTestNotification();
         } else if (window.UI) {
-          window.UI.toast("NotificationManager module not loaded", "error");
+          window.UI.toast("Push Notification module not loaded", "error");
         }
       };
     }
