@@ -198,6 +198,27 @@ window.Auth = (function () {
             }
             return { valid: true, user: currentUser };
           }
+
+          // Self-Healing Guard: If cloud reports false expiration but local token was created within 90 days, protect active session
+          if (data && data.message && (data.message.includes("Session has expired") || data.message.includes("exceeded 3-month"))) {
+            let sessionAgeMs = null;
+            if (sess.createdAt) {
+              const str = String(sess.createdAt).trim();
+              const dmyMatch = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+              if (dmyMatch) {
+                const d = new Date(parseInt(dmyMatch[3], 10), parseInt(dmyMatch[2], 10) - 1, parseInt(dmyMatch[1], 10));
+                if (!isNaN(d.getTime())) sessionAgeMs = Date.now() - d.getTime();
+              } else {
+                const parsed = new Date(str);
+                if (!isNaN(parsed.getTime())) sessionAgeMs = Date.now() - parsed.getTime();
+              }
+            }
+            if (sessionAgeMs !== null && sessionAgeMs < 90 * 24 * 60 * 60 * 1000) {
+              if (window.DevLogger) window.DevLogger.info("Auth", "Self-healed active session against cloud date inversion", sess.sessionId);
+              return { valid: true, user: currentUser };
+            }
+          }
+
           if (window.DevLogger) window.DevLogger.warn("Auth", "Session revoked or expired", data ? data.message : "Invalid");
           this.logout();
           if (window.UI) {
