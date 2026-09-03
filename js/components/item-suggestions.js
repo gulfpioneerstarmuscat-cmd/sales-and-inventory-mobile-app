@@ -28,8 +28,11 @@ window.ItemAutocomplete = (function () {
     function closeDropdown() {
       dropdown.hidden = true;
       container.style.zIndex = "";
-      const parentCard = container.closest(".item-row-card, .form-group");
-      if (parentCard) parentCard.style.zIndex = "";
+      const parentCard = container.closest(".item-row-card, .transfer-item-card, .form-group");
+      if (parentCard) {
+        parentCard.style.zIndex = "";
+        parentCard.style.position = "";
+      }
     }
 
     function renderSuggestions(matches, queryTokens = []) {
@@ -43,25 +46,41 @@ window.ItemAutocomplete = (function () {
       }
 
       dropdown.innerHTML = matches
-        .map(
-          (m, idx) => `
-        <div class="autocomplete-item ${idx === selectedIndex ? "autocomplete-item--active" : ""}" data-index="${idx}">
+        .map((m, idx) => {
+          const rawQty = m.qty;
+          const stockNum = rawQty === "" || rawQty === null || rawQty === undefined ? 0 : Number(rawQty) || 0;
+          const alertLvl = Number(m.alertLevel) || 5;
+
+          let stockBadgeHtml = "";
+          if (stockNum <= 0) {
+            stockBadgeHtml = `<span class="autocomplete-stock autocomplete-stock--out" style="color:#ef4444; font-weight:700; background:rgba(239,68,68,0.1); padding:2px 6px; border-radius:4px;">Out of Stock (0)</span>`;
+          } else if (stockNum <= alertLvl) {
+            stockBadgeHtml = `<span class="autocomplete-stock autocomplete-stock--low" style="color:#d97706; font-weight:600;">Stock: <strong>${stockNum}</strong> (Low)</span>`;
+          } else {
+            stockBadgeHtml = `<span class="autocomplete-stock">Stock: <strong>${stockNum}</strong></span>`;
+          }
+
+          return `
+        <div class="autocomplete-item ${idx === selectedIndex ? "autocomplete-item--active" : ""} ${stockNum <= 0 ? "autocomplete-item--out" : ""}" data-index="${idx}">
           <div class="autocomplete-name">${highlightMatches(m.name, queryTokens)}</div>
           <div class="autocomplete-meta">
             <span class="autocomplete-cat">${escapeHtml(m.category || "General")}</span>
-            <span class="autocomplete-stock">Stock: <strong>${m.qty ?? 0}</strong></span>
+            ${stockBadgeHtml}
           </div>
-        </div>`
-        )
+        </div>`;
+        })
         .join("");
 
       dropdown.hidden = false;
 
-      // Elevate z-index so dropdown floats above all subsequent cards & total summary
+      // Elevate z-index so dropdown floats above all cards, buttons, & modal elements
       container.style.position = "relative";
-      container.style.zIndex = "99999";
-      const parentCard = container.closest(".item-row-card, .form-group");
-      if (parentCard) parentCard.style.zIndex = "99998";
+      container.style.zIndex = "999999";
+      const parentCard = container.closest(".item-row-card, .transfer-item-card, .form-group");
+      if (parentCard) {
+        parentCard.style.position = "relative";
+        parentCard.style.zIndex = "999998";
+      }
     }
 
     function escapeHtml(str) {
@@ -97,6 +116,11 @@ window.ItemAutocomplete = (function () {
     function selectItem(item) {
       input.value = item.name;
       closeDropdown();
+      const rawQty = item.qty;
+      const stockNum = rawQty === "" || rawQty === null || rawQty === undefined ? 0 : Number(rawQty) || 0;
+      if (stockNum <= 0 && window.UI && typeof window.UI.toast === "function") {
+        window.UI.toast(`⚠️ Notice: "${item.name}" is currently out of stock (0 available).`, "warning");
+      }
       if (typeof onSelect === "function") {
         onSelect(item);
       }

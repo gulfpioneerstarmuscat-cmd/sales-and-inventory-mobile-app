@@ -110,7 +110,13 @@ window.initViewInventory = (function () {
         <div class="inv-page-header">
           <div class="header-titles">
             <h3 class="page-title">Stock Inventory</h3>
-            ${syncButtonHtml}
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" class="btn-inventory-transfer" id="btn-open-transfer-modal" title="Transfer Stock to Other Branch">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/></svg>
+                <span>Transfer</span>
+              </button>
+              ${syncButtonHtml}
+            </div>
           </div>
 
           ${statCardsHtml}
@@ -149,6 +155,17 @@ window.initViewInventory = (function () {
     const syncBtn = root.querySelector("#btn-sync-inventory");
     if (syncBtn && window.bindSyncButtonEvent) {
       window.bindSyncButtonEvent(syncBtn);
+    }
+
+    const transferBtn = root.querySelector("#btn-open-transfer-modal");
+    if (transferBtn) {
+      transferBtn.addEventListener("click", () => {
+        if (window.BranchTransferModal) {
+          window.BranchTransferModal.open({
+            fromBranch: window.Auth ? window.Auth.getActiveBranch() : "alkhoud"
+          });
+        }
+      });
     }
 
     // TARGETED SEARCH: Updates ONLY list body so input focus is NEVER destroyed!
@@ -280,7 +297,11 @@ window.initViewInventory = (function () {
         </div>
 
         <!-- Footer Actions -->
-        <div class="dp-footer" style="justify-content: flex-end;">
+        <div class="dp-footer" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+          <button type="button" class="btn-inventory-transfer" id="btn-detail-transfer-item" style="height:42px; padding:0 16px;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M7 16V4M7 4L3 8M7 4L11 8M17 8V20M17 20L21 16M17 20L13 16"/></svg>
+            <span>Transfer Product</span>
+          </button>
           <button type="button" class="dp-btn-confirm" id="btn-close-inv-modal">Close</button>
         </div>
       </div>
@@ -288,6 +309,20 @@ window.initViewInventory = (function () {
 
     backdrop.querySelector("#btn-close-inv-detail").addEventListener("click", () => backdrop.remove());
     backdrop.querySelector("#btn-close-inv-modal").addEventListener("click", () => backdrop.remove());
+
+    const transferItemBtn = backdrop.querySelector("#btn-detail-transfer-item");
+    if (transferItemBtn) {
+      transferItemBtn.addEventListener("click", () => {
+        backdrop.remove();
+        if (window.BranchTransferModal) {
+          window.BranchTransferModal.open({
+            initialItem: item,
+            fromBranch: window.Auth ? window.Auth.getActiveBranch() : "alkhoud"
+          });
+        }
+      });
+    }
+
     backdrop.addEventListener("click", (e) => {
       if (e.target === backdrop) backdrop.remove();
     });

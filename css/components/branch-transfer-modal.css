@@ -1,0 +1,423 @@
+/* css/components/branch-transfer-modal.css - Styling for Multi-Item Branch Transfer Modal */
+
+.transfer-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  background: rgba(15, 23, 42, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.transfer-modal-overlay--visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.transfer-modal-dialog {
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(12px) scale(0.97);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.transfer-modal-overlay--visible .transfer-modal-dialog {
+  transform: translateY(0) scale(1);
+}
+
+.transfer-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.transfer-modal-title-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.transfer-icon-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.transfer-modal-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.transfer-modal-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.transfer-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.transfer-modal-close:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.transfer-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Branch Direction Card */
+.transfer-direction-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 14px 18px;
+  gap: 8px;
+}
+
+.branch-pill-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.branch-pill-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.branch-pill-name {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.branch-pill-box--from .branch-pill-name {
+  color: #2563eb;
+}
+
+.branch-pill-box--to .branch-pill-name {
+  color: #059669;
+}
+
+.transfer-arrow-divider {
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+/* Dynamic Multi-Item Cards List */
+.transfer-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: visible !important;
+  position: relative;
+}
+
+.transfer-item-card {
+  background: #ffffff;
+  border: 1.5px solid #dbeafe;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.04);
+  position: relative;
+  transition: border-color 0.15s ease;
+}
+
+.transfer-item-name-group {
+  position: relative;
+}
+
+.transfer-modal-dialog .autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 99999999 !important;
+  background: #ffffff;
+  border: 1.5px solid #3b82f6;
+  border-radius: 12px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.28), 0 0 0 1px rgba(59, 130, 246, 0.15);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.transfer-item-card:hover {
+  border-color: #bfdbfe;
+}
+
+.transfer-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.transfer-card-number {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #2563eb;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.transfer-btn-delete-row {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: #fef2f2;
+  color: #ef4444;
+  font-size: 1.1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.transfer-btn-delete-row:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.transfer-card-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.transfer-card-row .form-group {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.transfer-card-row .form-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 0;
+}
+
+.transfer-card-row .required-star {
+  color: #ef4444;
+}
+
+.transfer-card-row .form-input {
+  height: 42px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  padding: 0 12px;
+  font-size: 0.9rem;
+  color: #0f172a;
+  background: #ffffff;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.transfer-card-row .form-input:focus {
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.transfer-card-row .transfer-qty-input {
+  text-align: center;
+  font-weight: 700;
+}
+
+.transfer-stock-status-row {
+  display: flex;
+  align-items: center;
+}
+
+.transfer-stock-hint {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+}
+
+.transfer-stock-hint--ok {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.transfer-stock-hint--error {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* Add New Item Dashed Button */
+.btn-add-transfer-item {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1.5px dashed #93c5fd;
+  background: rgba(37, 99, 235, 0.05);
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 0.88rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-add-transfer-item:hover {
+  background: rgba(37, 99, 235, 0.1);
+  border-color: #60a5fa;
+  transform: translateY(-1px);
+}
+
+.transfer-error-banner {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.transfer-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.transfer-btn-cancel {
+  flex: 1;
+  height: 46px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #64748b;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.transfer-btn-cancel:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.transfer-btn-submit {
+  flex: 2;
+  height: 46px;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.transfer-btn-submit:hover:not(:disabled) {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(79, 70, 229, 0.45);
+}
+
+.transfer-btn-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.transfer-btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Quick Transfer Button in Inventory Header */
+.btn-inventory-transfer {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid #e0e7ff;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-inventory-transfer:hover {
+  background: #e0e7ff;
+  color: #3730a3;
+  transform: translateY(-1px);
+}

@@ -110,14 +110,15 @@ window.initViewSales = (function () {
         return false;
       }
 
-      const isRefunded = sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded);
+      const isTransferred = sale.paymentStatus === "transferred" || sale.paymentMethod === "transferred";
+      const isRefunded = !isTransferred && (sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded));
 
       if (statusFilter === "today") {
         if (ymd !== todayStr) return false;
       } else if (statusFilter === "paid") {
-        if (sale.paymentStatus !== "paid" || isRefunded) return false;
+        if (isTransferred || sale.paymentStatus !== "paid" || isRefunded) return false;
       } else if (statusFilter === "not_paid") {
-        if (sale.paymentStatus !== "not_paid" || isRefunded) return false;
+        if (isTransferred || sale.paymentStatus !== "not_paid" || isRefunded) return false;
       }
 
       if (searchQuery) {
@@ -552,8 +553,9 @@ window.initViewSales = (function () {
     const existing = document.querySelector(".sale-detail-modal-backdrop");
     if (existing) existing.remove();
 
-    const isRefunded = sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded);
-    const isPaid = sale.paymentStatus === "paid";
+    const isTransferred = sale.paymentStatus === "transferred" || sale.paymentMethod === "transferred";
+    const isRefunded = !isTransferred && (sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded));
+    const isPaid = !isTransferred && sale.paymentStatus === "paid";
     const displayDateStr = formatDisplaySaleDate(sale.date);
 
     const grandTotal = Number(sale.grandTotal) || 0;
@@ -562,7 +564,8 @@ window.initViewSales = (function () {
     const isVat = sale.vatBill === "yes";
 
     let pMethodLabel = "Cash";
-    if (sale.paymentMethod === "card") pMethodLabel = "Card";
+    if (isTransferred) pMethodLabel = "Inter-Branch Transfer";
+    else if (sale.paymentMethod === "card") pMethodLabel = "Card";
     else if (sale.paymentMethod === "both") pMethodLabel = "Both (Cash + Card)";
 
     let itemsFormatted = [];
@@ -587,84 +590,112 @@ window.initViewSales = (function () {
     const backdrop = document.createElement("div");
     backdrop.className = "dp-modal-backdrop sale-detail-modal-backdrop";
 
-    const badgeClass = isRefunded ? "tile-badge--refunded" : isPaid ? "tile-badge--paid" : "tile-badge--unpaid";
-    const badgeText = isRefunded ? "↩ Refunded" : isPaid ? "✓ Paid" : "⏳ Unpaid";
+    let badgeClass = "tile-badge--unpaid";
+    let badgeText = "⏳ Unpaid";
+    if (isTransferred) {
+      badgeClass = "tile-badge--transferred";
+      badgeText = "⇄ Transferred";
+    } else if (isRefunded) {
+      badgeClass = "tile-badge--refunded";
+      badgeText = "↩ Refunded";
+    } else if (isPaid) {
+      badgeClass = "tile-badge--paid";
+      badgeText = "✓ Paid";
+    }
 
     backdrop.innerHTML = `
       <div class="dp-modal-card" style="max-width: 440px; width: 92vw;">
         <!-- Header Bar -->
         <div class="dp-header">
           <div class="dp-title-bar">
-            <span class="dp-title-text">SALE DETAILS</span>
+            <span class="dp-title-text">${isTransferred ? "TRANSFER DETAILS" : "SALE DETAILS"}</span>
             <button type="button" class="dp-btn-close" id="btn-close-sale-detail">&times;</button>
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 6px;">
-            <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${escapeHtml(sale.customerName || "Walk-in Customer")}</h3>
+            <h3 style="font-size: 16px; font-weight: 800; color: #0f172a; margin: 0;">${escapeHtml(sale.customerName || (isTransferred ? "Branch Transfer" : "Walk-in Customer"))}</h3>
             <span class="tile-badge ${badgeClass}">
               ${badgeText}
             </span>
           </div>
-          <span style="font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">Sale Date: ${escapeHtml(displayDateStr)}</span>
+          <span style="font-size: 11px; color: #64748b; font-weight: 600; margin-top: 2px;">${isTransferred ? "Transfer Date" : "Sale Date"}: ${escapeHtml(displayDateStr)}</span>
         </div>
 
         <!-- Body Container -->
         <div class="dp-body" style="max-height: 380px; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
-          <!-- Customer Info Card -->
+          <!-- Customer / Route Info Card -->
           <div class="detail-card">
-            <h4 class="card-section-label">Customer Info</h4>
+            <h4 class="card-section-label">${isTransferred ? "Transfer Route" : "Customer Info"}</h4>
             <div class="info-grid">
-              <div class="info-item">
-                <span class="info-lbl">Phone Number</span>
-                <span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Purchased Items Breakdown -->
-          <div class="detail-card">
-            <h4 class="card-section-label">Purchased Items (${itemsFormatted.length})</h4>
-            <div class="purchased-items-list">
               ${
-                itemsFormatted.length > 0
-                  ? itemsFormatted.map((it) => `<div class="purchased-item-row"><span class="bullet">•</span> <span>${escapeHtml(it)}</span></div>`).join("")
-                  : `<div class="purchased-item-row">• General Sale Item</div>`
+                isTransferred
+                  ? `<div class="info-item"><span class="info-lbl">Route</span><span class="info-val" style="font-weight:700; color:#2563eb;">${escapeHtml(sale.customerName || "Inter-Branch")}</span></div>`
+                  : `<div class="info-item"><span class="info-lbl">Phone Number</span><span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span></div>`
               }
             </div>
           </div>
 
-          <!-- Payment Breakdown -->
+          <!-- Items Breakdown -->
+          <div class="detail-card">
+            <h4 class="card-section-label">${isTransferred ? "Transferred Products" : "Purchased Items"} (${itemsFormatted.length})</h4>
+            <div class="purchased-items-list">
+              ${
+                itemsFormatted.length > 0
+                  ? itemsFormatted.map((it) => `<div class="purchased-item-row"><span class="bullet">•</span> <span>${escapeHtml(it)}</span></div>`).join("")
+                  : `<div class="purchased-item-row">• Product Item</div>`
+              }
+            </div>
+          </div>
+
+          <!-- Payment / Transaction Breakdown -->
           <div class="detail-card detail-card--payment">
-            <h4 class="card-section-label">Payment Breakdown</h4>
-            <div class="pay-row">
-              <span class="pay-lbl">VAT Status</span>
-              <span class="pay-val">${isVat ? "Yes (5% VAT)" : "No VAT (0%)"}</span>
-            </div>
-            <div class="pay-row">
-              <span class="pay-lbl">Payment Method</span>
-              <span class="pay-val">${escapeHtml(pMethodLabel)}</span>
-            </div>
+            <h4 class="card-section-label">${isTransferred ? "Transfer Status" : "Payment Breakdown"}</h4>
             ${
-              sale.paymentMethod === "both" || cashAmt > 0
-                ? `<div class="pay-row"><span class="pay-lbl">Cash Paid</span><span class="pay-val">OMR ${cashAmt.toFixed(3)}</span></div>`
-                : ""
+              isTransferred
+                ? `
+                <div class="pay-row">
+                  <span class="pay-lbl">Type</span>
+                  <span class="pay-val" style="color: #4338ca; font-weight: 700;">Inter-Branch Stock Movement</span>
+                </div>
+                <div class="pay-row">
+                  <span class="pay-lbl">Status</span>
+                  <span class="pay-val" style="color: #059669; font-weight: 700;">Completed (Transferred)</span>
+                </div>
+              `
+                : `
+                <div class="pay-row">
+                  <span class="pay-lbl">VAT Status</span>
+                  <span class="pay-val">${isVat ? "Yes (5% VAT)" : "No VAT (0%)"}</span>
+                </div>
+                <div class="pay-row">
+                  <span class="pay-lbl">Payment Method</span>
+                  <span class="pay-val">${escapeHtml(pMethodLabel)}</span>
+                </div>
+                ${
+                  sale.paymentMethod === "both" || cashAmt > 0
+                    ? `<div class="pay-row"><span class="pay-lbl">Cash Paid</span><span class="pay-val">OMR ${cashAmt.toFixed(3)}</span></div>`
+                    : ""
+                }
+                ${
+                  sale.paymentMethod === "both" || cardAmt > 0
+                    ? `<div class="pay-row"><span class="pay-lbl">Card Paid</span><span class="pay-val">OMR ${cardAmt.toFixed(3)}</span></div>`
+                    : ""
+                }
+                <div class="pay-row pay-row--total">
+                  <span class="pay-lbl bold">Grand Total</span>
+                  <span class="pay-val total-amount-big" style="${isRefunded ? "color: #dc2626; text-decoration: line-through;" : ""}">OMR ${grandTotal.toFixed(3)}</span>
+                </div>
+              `
             }
-            ${
-              sale.paymentMethod === "both" || cardAmt > 0
-                ? `<div class="pay-row"><span class="pay-lbl">Card Paid</span><span class="pay-val">OMR ${cardAmt.toFixed(3)}</span></div>`
-                : ""
-            }
-            <div class="pay-row pay-row--total">
-              <span class="pay-lbl bold">Grand Total</span>
-              <span class="pay-val total-amount-big" style="${isRefunded ? "color: #dc2626; text-decoration: line-through;" : ""}">OMR ${grandTotal.toFixed(3)}</span>
-            </div>
           </div>
         </div>
 
-        <!-- Footer Actions: Refund Sale (Red), Mark as Paid (Green if unpaid & not refunded), Close (Right) -->
+        <!-- Footer Actions -->
         <div class="dp-footer dp-footer-actions-row">
           <div class="dp-footer-btn-group">
             ${
-              isRefunded
+              isTransferred
+                ? `<span class="tile-badge tile-badge--transferred" style="font-size: 11px; padding: 5px 10px; border-radius: 8px;">⇄ Inter-Branch Transfer</span>`
+                : isRefunded
                 ? `<span class="tile-badge tile-badge--refunded" style="font-size: 11px; padding: 5px 10px; border-radius: 8px;">↩ Sale Refunded</span>`
                 : `<button type="button" class="btn-refund-sale" id="btn-refund-sale">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
@@ -672,7 +703,7 @@ window.initViewSales = (function () {
                    </button>`
             }
             ${
-              !isPaid && !isRefunded
+              !isTransferred && !isPaid && !isRefunded
                 ? `<button type="button" class="btn-mark-paid" id="btn-mark-paid-sale">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
                     Mark as Paid
@@ -911,13 +942,24 @@ window.initViewSales = (function () {
   }
 
   function renderCompactSaleTileHtml(sale, index) {
-    const isRefunded = sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded);
-    const isPaid = sale.paymentStatus === "paid";
+    const isTransferred = sale.paymentStatus === "transferred" || sale.paymentMethod === "transferred";
+    const isRefunded = !isTransferred && (sale.refundStatus === "REFUNDED" || sale.paymentStatus === "refunded" || Boolean(sale.isRefunded));
+    const isPaid = !isTransferred && sale.paymentStatus === "paid";
     const displayDateStr = formatDisplaySaleDate(sale.date);
     const grandTotal = Number(sale.grandTotal) || 0;
 
-    const badgeClass = isRefunded ? "tile-badge--refunded" : isPaid ? "tile-badge--paid" : "tile-badge--unpaid";
-    const badgeText = isRefunded ? "↩ Refunded" : isPaid ? "✓ Paid" : "⏳ Unpaid";
+    let badgeClass = "tile-badge--unpaid";
+    let badgeText = "⏳ Unpaid";
+    if (isTransferred) {
+      badgeClass = "tile-badge--transferred";
+      badgeText = "⇄ Transferred";
+    } else if (isRefunded) {
+      badgeClass = "tile-badge--refunded";
+      badgeText = "↩ Refunded";
+    } else if (isPaid) {
+      badgeClass = "tile-badge--paid";
+      badgeText = "✓ Paid";
+    }
 
     const badgeHtml = `
       <span class="tile-badge ${badgeClass}">
@@ -926,20 +968,24 @@ window.initViewSales = (function () {
     `;
 
     const containerClass = `compact-sale-tile ${
-      isRefunded
+      isTransferred
+        ? "compact-sale-tile--transferred"
+        : isRefunded
         ? "compact-sale-tile--refunded"
         : isPaid
         ? "compact-sale-tile--paid"
         : "compact-sale-tile--unpaid"
     }`;
 
+    const metricDisplay = isTransferred ? "Transfer" : `OMR ${grandTotal.toFixed(3)}`;
+
     if (window.renderCompactTileHtml) {
       return window.renderCompactTileHtml({
         containerClass: containerClass,
         index: index,
-        title: sale.customerName || "Walk-in Customer",
+        title: sale.customerName || (isTransferred ? "Branch Transfer" : "Walk-in Customer"),
         subtitle: displayDateStr,
-        metric: `OMR ${grandTotal.toFixed(3)}`,
+        metric: metricDisplay,
         badgeHtml: badgeHtml
       });
     }
@@ -947,11 +993,11 @@ window.initViewSales = (function () {
     return `
       <div class="compact-tile ${containerClass}" data-index="${index}">
         <div class="tile-left">
-          <span class="tile-title">${escapeHtml(sale.customerName || "Walk-in Customer")}</span>
+          <span class="tile-title">${escapeHtml(sale.customerName || (isTransferred ? "Branch Transfer" : "Walk-in Customer"))}</span>
           <span class="tile-subtitle">${escapeHtml(displayDateStr)}</span>
         </div>
         <div class="tile-right">
-          <span class="tile-metric" style="${isRefunded ? "text-decoration: line-through; opacity: 0.7;" : ""} ">OMR ${grandTotal.toFixed(3)}</span>
+          <span class="tile-metric" style="${isRefunded ? "text-decoration: line-through; opacity: 0.7;" : ""}">${metricDisplay}</span>
           ${badgeHtml}
         </div>
       </div>

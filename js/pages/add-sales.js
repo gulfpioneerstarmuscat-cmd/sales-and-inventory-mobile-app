@@ -748,19 +748,101 @@ window.initAddSales = (function () {
         const nameInputs = root.querySelectorAll(".item-name-input");
         const qtyInputs = root.querySelectorAll(".item-qty-input");
 
+        const activeBranch = window.Auth && typeof window.Auth.getActiveBranch === "function"
+          ? window.Auth.getActiveBranch()
+          : "alkhoud";
+        const branchLabel = activeBranch.toLowerCase() === "ghala" ? "Ghala" : "Al Khoud";
+        const branchInventory = window.DataStore ? window.DataStore.getInventory(activeBranch) : [];
+
+        const priceInputs = root.querySelectorAll(".item-price-input");
+
+        // 1. Basic field-level validation and sanitization
         for (let i = 0; i < items.length; i++) {
-          if (!items[i].name.trim()) {
+          const rawItemName = (items[i].name || "").trim();
+          if (!rawItemName) {
             if (nameInputs[i]) {
               UI.showInlineError(nameInputs[i], "Please enter item name.");
               nameInputs[i].focus();
             }
             return false;
           }
-          if (items[i].qty < 1) {
+
+          const parsedQty = parseInt(items[i].qty, 10);
+          if (isNaN(parsedQty) || parsedQty < 1 || parsedQty !== Number(items[i].qty)) {
             if (qtyInputs[i]) {
-              UI.showInlineError(qtyInputs[i], "Quantity must be at least 1.");
+              UI.showInlineError(qtyInputs[i], "Quantity must be a positive whole number (e.g. 1, 2, 5).");
               qtyInputs[i].focus();
             }
+            return false;
+          }
+
+          const parsedPrice = parseFloat(items[i].unitPrice);
+          if (isNaN(parsedPrice) || parsedPrice < 0) {
+            if (priceInputs[i]) {
+              UI.showInlineError(priceInputs[i], "Unit price must be a valid number (0.000 or greater).");
+              priceInputs[i].focus();
+            }
+            return false;
+          }
+
+          // Verify item exists in branch inventory
+          const match = branchInventory.find(
+            (inv) => (inv.name || "").trim().toLowerCase() === rawItemName.toLowerCase()
+          );
+
+          if (!match) {
+            if (nameInputs[i]) {
+              UI.showInlineError(nameInputs[i], `Item '${rawItemName}' not found in ${branchLabel} inventory.`);
+              nameInputs[i].focus();
+            }
+            UI.toast(`⚠️ Sale blocked: "${rawItemName}" does not exist in ${branchLabel} inventory.`, "error");
+            return false;
+          }
+        }
+
+        // 2. Multi-row Cart Aggregation Check: verify total requested across all cart rows <= available stock
+        const aggregatedRequested = {};
+        items.forEach((it, idx) => {
+          const key = (it.name || "").trim().toLowerCase();
+          aggregatedRequested[key] = (aggregatedRequested[key] || 0) + (parseInt(it.qty, 10) || 0);
+        });
+
+        for (let i = 0; i < items.length; i++) {
+          const rawItemName = (items[i].name || "").trim();
+          const key = rawItemName.toLowerCase();
+          const totalRequested = aggregatedRequested[key] || 0;
+
+          const match = branchInventory.find(
+            (inv) => (inv.name || "").trim().toLowerCase() === key
+          );
+
+          const rawQty = match ? match.qty : null;
+          const availableStock = rawQty === "" || rawQty === null || rawQty === undefined ? 0 : Number(rawQty) || 0;
+
+          if (availableStock <= 0) {
+            if (nameInputs[i]) {
+              UI.showInlineError(nameInputs[i], `Out of stock. Current stock in ${branchLabel} is 0 units.`);
+              nameInputs[i].focus();
+            }
+            if (qtyInputs[i]) {
+              UI.showInlineError(qtyInputs[i], `0 units available in ${branchLabel}.`);
+            }
+            UI.toast(`⚠️ Sale blocked: "${match.name}" is out of stock (0 available) in ${branchLabel}!`, "error");
+            return false;
+          }
+
+          if (totalRequested > availableStock) {
+            if (qtyInputs[i]) {
+              UI.showInlineError(
+                qtyInputs[i],
+                `Total cart requested (${totalRequested}) exceeds available stock (${availableStock}) in ${branchLabel}.`
+              );
+              qtyInputs[i].focus();
+            }
+            UI.toast(
+              `⚠️ Sale blocked: Total requested for "${match.name}" across cart (${totalRequested}) exceeds available stock (${availableStock}) in ${branchLabel}!`,
+              "error"
+            );
             return false;
           }
         }

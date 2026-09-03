@@ -671,11 +671,46 @@ window.DataStore = (function () {
       });
     },
 
-    // Save New Sale for Active Branch
+    // Save New Sale for Active Branch (with strict stock availability validation)
     recordSale: function (saleData, webAppUrl) {
       const branch = getActiveBranch();
       const sales = loadBranchSales(branch);
       const inventory = loadBranchInventory(branch);
+
+      // Pre-validation: verify all items exist and have sufficient stock (including multi-row cart totals)
+      if (Array.isArray(saleData.items) && saleData.items.length > 0) {
+        const aggregated = {};
+        for (const item of saleData.items) {
+          const name = (item.name || "").trim().toLowerCase();
+          const qty = Number(item.qty) || 0;
+          if (!name || qty <= 0) continue;
+          aggregated[name] = (aggregated[name] || 0) + qty;
+        }
+
+        for (const name in aggregated) {
+          const totalRequested = aggregated[name];
+          const match = inventory.find(
+            (inv) => (inv.name || "").trim().toLowerCase() === name
+          );
+
+          const rawQty = match ? match.qty : null;
+          const availableStock = rawQty === "" || rawQty === null || rawQty === undefined ? 0 : Number(rawQty) || 0;
+
+          if (!match || availableStock <= 0 || totalRequested > availableStock) {
+            const displayName = match ? match.name : name;
+            if (window.DevLogger) {
+              window.DevLogger.warn(
+                "DataStore",
+                `recordSale rejected: Insufficient stock for '${displayName}' (available: ${availableStock}, requested: ${totalRequested})`
+              );
+            }
+            return {
+              success: false,
+              error: `Insufficient stock for '${displayName}' (available: ${availableStock}, requested: ${totalRequested})`
+            };
+          }
+        }
+      }
 
       // 1. Add Sale locally to branch history
       const newSale = {
@@ -716,20 +751,9 @@ window.DataStore = (function () {
               (inv) => (inv.name || "").trim().toLowerCase() === name
             );
             if (existingIndex >= 0) {
-              inventory[existingIndex].qty = Math.max(
-                0,
-                (Number(inventory[existingIndex].qty) || 0) - qtySold
-              );
+              const currentStock = Number(inventory[existingIndex].qty) || 0;
+              inventory[existingIndex].qty = Math.max(0, currentStock - qtySold);
               inventory[existingIndex].lastUpdated = new Date().toLocaleTimeString();
-            } else {
-              inventory.push({
-                sku: "SKU-" + Date.now().toString().slice(-5),
-                name: soldItem.name.trim(),
-                category: "General",
-                qty: 0,
-                alertLevel: 5,
-                lastUpdated: new Date().toLocaleTimeString()
-              });
             }
           }
         });
@@ -791,13 +815,196 @@ window.DataStore = (function () {
         addQty: addQty,
         alertLevel: Number(payload.alertLevel) || 5,
         remarks: payload.remarks || "",
-        addedBy: payload.addedBy || "Staff"
+addedBy: payload.addedBy || "Staff"
       }, webAppUrl);
 
       return { success: true };
     },
 
-    // Amend Stock Item with NaN protection and Audit Trail recording
+    // Transfer Stock between branches (e.g. Al Khoud <-> Ghala)
+    // Records directly in Sales view & Sales sheet with paymentStatus='transferred'
+    transferStock: function (payload, webAppUrl) {
+      const fromBranch = (payload.fromBranch || getActiveBranch()).toLowerCase();
+      const toBranch = (payload.toBranch || (fromBranch === "alkhoud" ? "ghala" : "alkhoud")).toLowerCase();
+
+      if (fromBranch === toBranch) {
+        return { success: false, error: "Sending and receiving branches cannot be identical" };
+      }
+
+      const fromInventory = loadBranchInventory(fromBranch);
+      const toInventory = loadBranchInventory(toBranch);
+      const fromSales = loadBranchSales(fromBranch);
+
+      // Normalize items list
+      let items = [];
+      if (Array.isArray(payload.items) && payload.items.length > 0) {
+        items = payload.items;
+      } else if (payload.itemName || payload.name) {
+        items = [{
+          name: (payload.itemName || payload.name).trim(),
+          category: payload.category || "General",
+          sku: payload.sku || "",
+          qty: Number(payload.qty || payload.transferQty) || 1
+        }];
+      }
+
+      if (items.length === 0) {
+        return { success: false, error: "Please provide at least one item to transfer." };
+      }
+
+      const fromLabel = fromBranch === "ghala" ? "Ghala" : "Al Khoud";
+      const toLabel = toBranch === "ghala" ? "Ghala" : "Al Khoud";
+
+      // 1. Validation phase for all items
+      const aggregatedQty = {};
+      for (const it of items) {
+        const rawName = (it.name || "").trim();
+        const cleanKey = rawName.toLowerCase();
+        const qty = Number(it.qty) || 0;
+
+        if (!rawName) return { success: false, error: "Item name cannot be empty." };
+        if (qty <= 0) return { success: false, error: `Quantity for '${rawName}' must be at least 1.` };
+
+        const matchFrom = fromInventory.find((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
+        if (!matchFrom) {
+          return { success: false, error: `Product '${rawName}' not found in ${fromLabel} inventory.` };
+        }
+
+        const itemCategory = (matchFrom.category || it.category || "General").trim();
+        it.category = itemCategory;
+        it.sku = matchFrom.sku || it.sku || "";
+
+        // Check destination branch catalog for matching Name AND Category
+        const matchTo = toInventory.find(
+          (inv) => (inv.name || "").trim().toLowerCase() === cleanKey &&
+                   (inv.category || "General").trim().toLowerCase() === itemCategory.toLowerCase()
+        );
+
+        if (!matchTo) {
+          return {
+            success: false,
+            error: `Product '${matchFrom.name}' (Category: '${itemCategory}') not found in ${toLabel} catalog. Both Name and Category must match in receiving branch.`
+          };
+        }
+
+        aggregatedQty[cleanKey] = (aggregatedQty[cleanKey] || 0) + qty;
+      }
+
+      // Check cumulative quantities against sender stock
+      for (const cleanKey in aggregatedQty) {
+        const totalReq = aggregatedQty[cleanKey];
+        const matchFrom = fromInventory.find((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
+        const rawStock = matchFrom ? matchFrom.qty : null;
+        const availableStock = rawStock === "" || rawStock === null || rawStock === undefined ? 0 : Number(rawStock) || 0;
+
+        if (availableStock <= 0) {
+          return { success: false, error: `Product '${matchFrom.name}' is out of stock (0 available) in ${fromLabel}.` };
+        }
+
+        if (totalReq > availableStock) {
+          return {
+            success: false,
+            error: `Insufficient stock for '${matchFrom.name}' in ${fromLabel} (Available: ${availableStock}, Total requested: ${totalReq}).`
+          };
+        }
+      }
+
+      // 2. Execution Phase: Update inventory in both branches
+      const nowTimeStr = new Date().toLocaleTimeString();
+
+      for (const it of items) {
+        const cleanKey = (it.name || "").trim().toLowerCase();
+        const itemCat = (it.category || "General").trim().toLowerCase();
+        const transferQty = Number(it.qty) || 1;
+
+        // Deduct from sender
+        const fromIdx = fromInventory.findIndex((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
+        if (fromIdx >= 0) {
+          const currentQty = Number(fromInventory[fromIdx].qty) || 0;
+          fromInventory[fromIdx].qty = Math.max(0, currentQty - transferQty);
+          fromInventory[fromIdx].lastUpdated = nowTimeStr;
+          fromInventory[fromIdx].lastRemark = `Transferred ${transferQty} to ${toLabel}`;
+        }
+
+        // Add to receiver
+        const toIdx = toInventory.findIndex(
+          (inv) => (inv.name || "").trim().toLowerCase() === cleanKey &&
+                   (inv.category || "General").trim().toLowerCase() === itemCat
+        );
+        if (toIdx >= 0) {
+          const rawDest = toInventory[toIdx].qty;
+          const currentDestQty = rawDest === "" || rawDest === null || rawDest === undefined ? 0 : Number(rawDest) || 0;
+          toInventory[toIdx].qty = currentDestQty + transferQty;
+          toInventory[toIdx].lastUpdated = nowTimeStr;
+          toInventory[toIdx].lastRemark = `Received ${transferQty} from ${fromLabel}`;
+        }
+      }
+
+      saveBranchData("inventory", fromInventory, fromBranch);
+      saveBranchData("inventory", toInventory, toBranch);
+
+      // 3. Record in Sales View as a Transferred transaction
+      const nowIso = new Date().toISOString();
+      const customerName = payload.customerName || `${fromLabel} to ${toLabel}`;
+      const user = payload.transferredBy || (window.Auth && window.Auth.getUser() ? window.Auth.getUser().name : "Staff");
+
+      const itemsDetailStr = items
+        .map((it) => `${it.name.trim()} (Qty: ${Number(it.qty) || 1})`)
+        .join("\n");
+
+      const transferSaleRecord = {
+        id: Date.now(),
+        timestamp: nowIso,
+        date: nowIso.split("T")[0],
+        customerName: customerName,
+        customerPhone: "",
+        customerNumber: "",
+        customerEmail: "",
+        customerAddress: "",
+        vatBill: "no",
+        itemsDetail: itemsDetailStr,
+        items: items.map((it) => ({
+          name: it.name.trim(),
+          category: it.category || "General",
+          qty: Number(it.qty) || 1,
+          unitPrice: 0
+        })),
+        subtotal: 0,
+        vatAmount: 0,
+        discountAmount: 0,
+        grandTotal: 0,
+        paymentStatus: "transferred",
+        paymentMethod: "transferred",
+        cashAmount: 0,
+        cardAmount: 0,
+        refundStatus: "NO",
+        notes: `Inter-Branch Transfer: ${items.length} product(s) transferred from ${fromLabel} to ${toLabel}`,
+        recordedBy: user
+      };
+
+      fromSales.unshift(transferSaleRecord);
+      saveBranchData("sales", fromSales, fromBranch);
+
+      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+      window.dispatchEvent(new CustomEvent("salesDataChanged"));
+
+      // 4. Send Cloud Mutation to Google Apps Script
+      sendMutation("transfer_stock", fromBranch, {
+        fromBranch: fromBranch,
+        toBranch: toBranch,
+        customerName: customerName,
+        items: items,
+        itemsDetail: itemsDetailStr,
+        transferredBy: user
+      }, webAppUrl);
+
+      return {
+        success: true,
+        fromBranch: fromBranch,
+        toBranch: toBranch,
+        transferRecord: transferSaleRecord
+      };
+    },
     amendStockItem: function (arg1, arg2, arg3, arg4) {
       let originalItem, updatedFields, diffs, webAppUrl;
       if (arg1 && typeof arg1 === "object" && arg1.originalItem) {

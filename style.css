@@ -10,6 +10,7 @@
 @import "./css/components/compact-tile.css";
 @import "./css/components/detail-view.css";
 @import "./css/components/stat-card.css";
+@import "./css/components/branch-transfer-modal.css";
 
 /* Pages */
 @import "./css/pages/add-sales.css";
