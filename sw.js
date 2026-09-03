@@ -1,4 +1,4 @@
-const CACHE_NAME = "gps-app-v80";
+const CACHE_NAME = "gps-app-v81";
 const DB_NAME = "gps_app_db_v1";
 
 const ASSETS_TO_CACHE = [
@@ -13,6 +13,7 @@ const ASSETS_TO_CACHE = [
   "./css/components/compact-tile.css",
   "./css/components/detail-view.css",
   "./css/components/stat-card.css",
+  "./css/components/branch-transfer-modal.css",
   "./css/pages/add-sales.css",
   "./css/pages/add-stock.css",
   "./css/pages/amend-stock.css",
@@ -20,12 +21,12 @@ const ASSETS_TO_CACHE = [
   "./css/pages/view-sales.css",
   "./css/pages/view-inventory.css",
   "./config.js",
+  "./js/utils.js",
   "./js/developer.js",
   "./js/auth.js",
   "./js/data-store.js",
   "./js/notifications.js",
   "./js/push_notifi.js",
-  "./js/notification.js",
   "./js/components/date-picker.js",
   "./js/components/filter-pills.js",
   "./js/components/search-box.js",
@@ -34,6 +35,7 @@ const ASSETS_TO_CACHE = [
   "./js/components/detail-view.js",
   "./js/components/stat-card.js",
   "./js/components/item-suggestions.js",
+  "./js/components/branch-transfer-modal.js",
   "./js/app.js",
   "./js/pages/add-sales.js",
   "./js/pages/add-stock.js",
@@ -42,15 +44,19 @@ const ASSETS_TO_CACHE = [
   "./js/pages/view-sales.js",
   "./js/pages/view-inventory.js",
   "./manifest.json",
-  "./manifest.json?v=52",
+  "./assets/icons/add_cart.svg",
+  "./assets/icons/add_inventory.svg",
+  "./assets/icons/al_khoud_profile.svg",
+  "./assets/icons/amend_inventory.svg",
+  "./assets/icons/ghala_profile.svg",
+  "./assets/icons/unselected_profile.svg",
+  "./assets/icons/view_cart.svg",
+  "./assets/icons/view_inventory.svg",
   "./assets/logo/gps_logo_2000x2000_white_over_black.svg",
-  "./assets/logo/gps_logo_2000x2000_white_over_black.svg?v=52",
   "./assets/logo/gps_logo_2000x2000_color_over_white.svg",
-  "./assets/logo/gps_logo_2000x2000_color_over_white.svg?v=52",
+  "./assets/logo/logo_short_blue_black_onwhite.svg",
   "./assets/logo/icon-192.png",
-  "./assets/logo/icon-192.png?v=52",
-  "./assets/logo/icon-512.png",
-  "./assets/logo/icon-512.png?v=52"
+  "./assets/logo/icon-512.png"
 ];
 
 // Helper: Open IndexedDB inside Service Worker context

@@ -17,26 +17,6 @@ window.DataStore = (function () {
   let dbInitPromise = null;
 
   // --------------------------------------------------------------------------
-  // One-Time Production Cache Reset (Clears dummy test sales once on v79)
-  // --------------------------------------------------------------------------
-  const ONE_TIME_RESET_KEY = "gps_one_time_reset_v79";
-  (function performOneTimeResetIfNeeded() {
-    try {
-      if (typeof localStorage !== "undefined" && !localStorage.getItem(ONE_TIME_RESET_KEY)) {
-        Object.keys(localStorage).forEach((k) => {
-          if (k.startsWith("gps_") && k !== ONE_TIME_RESET_KEY) {
-            localStorage.removeItem(k);
-          }
-        });
-        localStorage.setItem(ONE_TIME_RESET_KEY, "true");
-        if (typeof indexedDB !== "undefined") {
-          indexedDB.deleteDatabase(DB_NAME);
-        }
-      }
-    } catch (e) {}
-  })();
-
-  // --------------------------------------------------------------------------
   // IndexedDB Core Engine
   // --------------------------------------------------------------------------
   function openDatabase() {
@@ -396,8 +376,6 @@ window.DataStore = (function () {
         const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         if (window.PushNotification && typeof window.PushNotification.notifyOfflineSync === "function") {
           window.PushNotification.notifyOfflineSync(flushedTotal, timeNow);
-        } else if (window.NotificationManager && typeof window.NotificationManager.notifyOfflineSync === "function") {
-          window.NotificationManager.notifyOfflineSync(flushedTotal, timeNow);
         }
       }
       isFlushingMutations = false;

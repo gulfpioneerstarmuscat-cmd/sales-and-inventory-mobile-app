@@ -1,8 +1,9 @@
 // js/components/stat-card.js - Reusable Header Stat Card Component
 
 window.renderStatCardHtml = function (config) {
+  const escape = (window.Utils && window.Utils.escapeHtml) || window.escapeHtml || ((s) => String(s || ""));
   const idAttr = config.id ? `id="${config.id}"` : "";
-  const titleAttr = config.title ? `title="${escapeHtml(config.title)}"` : "";
+  const titleAttr = config.title ? `title="${escape(config.title)}"` : "";
   const isButton = Boolean(config.id || config.interactive);
   const cardClass = config.cardClass || "";
   const label = config.label || "";
@@ -15,17 +16,10 @@ window.renderStatCardHtml = function (config) {
   return `
     <${tag} ${typeAttr} class="stat-card ${cardClass}" ${idAttr} ${titleAttr}>
       <div class="stat-card-header">
-        <span class="stat-label">${escapeHtml(label)}</span>
+        <span class="stat-label">${escape(label)}</span>
         ${showChevron ? `<span class="stat-chevron">▾</span>` : ""}
       </div>
-      <span class="stat-value">${escapeHtml(value)}</span>
+      <span class="stat-value">${escape(value)}</span>
     </${tag}>
   `;
 };
-
-function escapeHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

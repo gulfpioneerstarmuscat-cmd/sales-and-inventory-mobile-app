@@ -13,32 +13,19 @@ window.DatePicker = (function () {
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
   ];
 
-  function padZero(num) {
-    return String(num).padStart(2, "0");
-  }
-
-  function formatYMD(year, monthIndex, day) {
-    return `${year}-${padZero(monthIndex + 1)}-${padZero(day)}`;
-  }
-
-  function parseYMD(dateStr) {
-    if (!dateStr || typeof dateStr !== "string") return null;
-    const parts = dateStr.trim().split("-");
-    if (parts.length === 3) {
-      const y = parseInt(parts[0], 10);
-      const m = parseInt(parts[1], 10) - 1;
-      const d = parseInt(parts[2], 10);
-      if (!isNaN(y) && !isNaN(m) && !isNaN(d) && m >= 0 && m <= 11) {
-        return { year: y, month: m, day: d };
-      }
-    }
-    return null;
-  }
-
-  function getTodayYMD() {
-    const now = new Date();
-    return formatYMD(now.getFullYear(), now.getMonth(), now.getDate());
-  }
+  const U = window.Utils || {};
+  const padZero = U.padZero || ((n) => String(n).padStart(2, "0"));
+  const formatYMD = U.formatYMD || ((y, m, d) => `${y}-${padZero(m + 1)}-${padZero(d)}`);
+  const parseYMD = U.parseYMD || function (s) {
+    if (!s || typeof s !== "string") return null;
+    const p = s.trim().split("-");
+    return p.length === 3 ? { year: parseInt(p[0], 10), month: parseInt(p[1], 10) - 1, day: parseInt(p[2], 10) } : null;
+  };
+  const getTodayYMD = U.getTodayYMD || (() => {
+    const n = new Date();
+    return formatYMD(n.getFullYear(), n.getMonth(), n.getDate());
+  });
+  const escapeHtml = U.escapeHtml || window.escapeHtml || ((s) => String(s || ""));
 
   function openDatePicker(options = {}) {
     closeDatePicker(); // Close any active instance
@@ -270,13 +257,6 @@ window.DatePicker = (function () {
       activeModalEl.parentNode.removeChild(activeModalEl);
     }
     activeModalEl = null;
-  }
-
-  function escapeHtml(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
   }
 
   return {

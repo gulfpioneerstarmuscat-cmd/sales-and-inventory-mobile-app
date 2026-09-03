@@ -367,12 +367,7 @@ window.initViewInventory = (function () {
     `;
   }
 
-  function escapeHtml(str) {
-    return String(str || "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
-  }
+    const escapeHtml = (window.Utils && window.Utils.escapeHtml) || window.escapeHtml || ((s) => String(s || ""));
 
   return function initViewInventory() {
     if (!initialized) {

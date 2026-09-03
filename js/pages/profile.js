@@ -315,8 +315,6 @@
       btnPushNotif.onclick = () => {
         if (window.PushNotification && typeof window.PushNotification.sendTestNotification === "function") {
           window.PushNotification.sendTestNotification();
-        } else if (window.NotificationManager && typeof window.NotificationManager.sendTestNotification === "function") {
-          window.NotificationManager.sendTestNotification();
         } else if (window.UI) {
           window.UI.toast("Push Notification module not loaded", "error");
         }
@@ -328,8 +326,6 @@
       btnPush30s.onclick = () => {
         if (window.PushNotification && typeof window.PushNotification.sendDelayed30sCloudTest === "function") {
           window.PushNotification.sendDelayed30sCloudTest();
-        } else if (window.NotificationManager && typeof window.NotificationManager.sendDelayed30sTestNotification === "function") {
-          window.NotificationManager.sendDelayed30sTestNotification();
         } else if (window.UI) {
           window.UI.toast("Push Notification module not loaded", "error");
         }

@@ -9,20 +9,15 @@ const FORM_DEFAULTS = {
 };
 
 function formatOMR(val) {
-  const num = Number(val) || 0;
-  return `OMR ${num.toFixed(3)}`;
+  return window.Utils ? window.Utils.formatOMR(val) : `OMR ${(Number(val) || 0).toFixed(3)}`;
 }
 
 function roundOMR(val) {
-  return Math.round((Number(val) || 0) * 1000) / 1000;
+  return window.Utils ? window.Utils.roundOMR(val) : Math.round(((Number(val) || 0) + Number.EPSILON) * 1000) / 1000;
 }
 
 function getTodayString() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return window.Utils ? window.Utils.getTodayYMD() : new Date().toISOString().split("T")[0];
 }
 
 function createDefaultItem() {

@@ -568,13 +568,6 @@ window.initAmendStock = (function () {
       }
     }
 
-    function escapeHtml(str) {
-      if (!str) return "";
-      return String(str)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;");
-    }
+    const escapeHtml = (window.Utils && window.Utils.escapeHtml) || window.escapeHtml || ((s) => String(s || ""));
   }
 })();

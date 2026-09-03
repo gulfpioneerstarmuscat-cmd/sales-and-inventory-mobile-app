@@ -449,3 +449,7 @@ window.PushNotification = (function () {
     getMonthlySummaryCalculation
   };
 })();
+
+// Backward compatibility: alias legacy NotificationManager to PushNotification
+window.NotificationManager = window.PushNotification;
+

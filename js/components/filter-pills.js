@@ -2,6 +2,7 @@
 
 window.renderFilterPillsHtml = function (pillsConfig) {
   if (!Array.isArray(pillsConfig)) return "";
+  const escape = (window.Utils && window.Utils.escapeHtml) || window.escapeHtml || ((s) => String(s || ""));
 
   return `
     <div class="filter-pills-row">
@@ -12,8 +13,8 @@ window.renderFilterPillsHtml = function (pillsConfig) {
           const colorClass = pill.colorTheme ? `filter-pill--${pill.colorTheme}` : "";
           const disabledAttr = pill.disabled ? "disabled" : "";
           const disabledClass = pill.disabled ? "filter-pill--disabled" : "";
-          const titleAttr = pill.title ? `title="${escapeHtml(pill.title)}"` : "";
-          const statusAttr = pill.status ? `data-status="${escapeHtml(pill.status)}"` : "";
+          const titleAttr = pill.title ? `title="${escape(pill.title)}"` : "";
+          const statusAttr = pill.status ? `data-status="${escape(pill.status)}"` : "";
 
           return `
             <button 
@@ -24,7 +25,7 @@ window.renderFilterPillsHtml = function (pillsConfig) {
               ${disabledAttr} 
               ${titleAttr}
             >
-              ${escapeHtml(pill.label)}${pill.count !== undefined ? ` (${pill.count})` : ""}
+              ${escape(pill.label)}${pill.count !== undefined ? ` (${pill.count})` : ""}
             </button>
           `;
         })
@@ -32,10 +33,3 @@ window.renderFilterPillsHtml = function (pillsConfig) {
     </div>
   `;
 };
-
-function escapeHtml(str) {
-  return String(str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
-}

@@ -398,8 +398,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize Unified Push Notification & cloud scheduled alarms
   if (window.PushNotification && typeof window.PushNotification.init === "function") {
     window.PushNotification.init();
-  } else if (window.NotificationManager && typeof window.NotificationManager.init === "function") {
-    window.NotificationManager.init();
   }
 
   // Re-sync and reset countdown on branch change
