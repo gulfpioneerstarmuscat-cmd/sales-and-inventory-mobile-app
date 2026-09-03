@@ -133,8 +133,29 @@ window.Auth = (function () {
       const sess = loadSessionToken();
       if (currentUser && (currentUser.email || currentUser.role)) {
         if (sess && sess.expiresAt) {
-          const expTime = new Date(sess.expiresAt).getTime();
-          if (!isNaN(expTime) && Date.now() > expTime) {
+          let expTime = null;
+          if (typeof sess.expiresAt === "number") {
+            expTime = sess.expiresAt;
+          } else {
+            const str = String(sess.expiresAt).trim();
+            const dmyMatch = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})(?:[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+            if (dmyMatch) {
+              const d = new Date(
+                parseInt(dmyMatch[3], 10),
+                parseInt(dmyMatch[2], 10) - 1,
+                parseInt(dmyMatch[1], 10),
+                dmyMatch[4] ? parseInt(dmyMatch[4], 10) : 0,
+                dmyMatch[5] ? parseInt(dmyMatch[5], 10) : 0,
+                dmyMatch[6] ? parseInt(dmyMatch[6], 10) : 0
+              );
+              if (!isNaN(d.getTime())) expTime = d.getTime();
+            }
+            if (!expTime) {
+              const parsed = new Date(str);
+              if (!isNaN(parsed.getTime())) expTime = parsed.getTime();
+            }
+          }
+          if (expTime && !isNaN(expTime) && Date.now() > expTime) {
             this.logout();
             return null;
           }
