@@ -650,13 +650,21 @@ window.DataStore = (function () {
       });
     },
 
-    // Save New Sale for Active Branch (with strict stock availability validation)
+    // Save New Sale for Active Branch (Direct Online Sale with strict stock availability validation)
     recordSale: function (saleData, webAppUrl) {
+      const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
+      if (!targetUrl || !targetUrl.startsWith("http")) {
+        return Promise.reject(new Error("Backend Google Sheet URL not configured."));
+      }
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        return Promise.reject(new Error("You are currently offline. Please reconnect to the internet to complete this sale."));
+      }
+
       const branch = getActiveBranch();
-      const sales = loadBranchSales(branch);
       const inventory = loadBranchInventory(branch);
 
-      // Pre-validation: verify all items exist and have sufficient stock (including multi-row cart totals)
+      // Pre-validation: verify all items exist and have sufficient stock locally
       if (Array.isArray(saleData.items) && saleData.items.length > 0) {
         const aggregated = {};
         for (const item of saleData.items) {
@@ -677,74 +685,111 @@ window.DataStore = (function () {
 
           if (!match || availableStock <= 0 || totalRequested > availableStock) {
             const displayName = match ? match.name : name;
-            if (window.DevLogger) {
-              window.DevLogger.warn(
-                "DataStore",
-                `recordSale rejected: Insufficient stock for '${displayName}' (available: ${availableStock}, requested: ${totalRequested})`
-              );
-            }
-            return {
-              success: false,
-              error: `Insufficient stock for '${displayName}' (available: ${availableStock}, requested: ${totalRequested})`
-            };
+            return Promise.reject(
+              new Error(`Insufficient stock for '${displayName}' (available: ${availableStock}, requested: ${totalRequested})`)
+            );
           }
         }
       }
 
-      // 1. Add Sale locally to branch history
-      const newSale = {
-        id: Date.now(),
+      const auth = getAuthPayload();
+      const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
+      const staffName = saleData.recordedBy || (user ? (user.name || user.email || "Staff") : "Staff");
+
+      const salePayload = {
+        action: "add_sale",
+        branch: branch,
+        ...auth,
+        ...saleData,
+        recordedBy: staffName,
         timestamp: new Date().toISOString(),
-        date: saleData.date || new Date().toISOString().split("T")[0],
-        customerName: saleData.customerName || "Walk-in Customer",
-        customerPhone: saleData.customerPhone || saleData.customerNumber || "",
-        customerNumber: saleData.customerNumber || saleData.customerPhone || "",
-        customerAddress: saleData.customerAddress || "",
-        vatBill: saleData.vatBill || "no",
-        itemsDetail: saleData.itemsDetail || "",
-        items: saleData.items || [],
-        subtotal: Number(saleData.subtotal) || 0,
-        vatAmount: Number(saleData.vatAmount) || 0,
-        discountAmount: Number(saleData.discountAmount) || 0,
-        grandTotal: Number(saleData.grandTotal) || 0,
-        paymentStatus: saleData.paymentStatus || "paid",
-        paymentMethod: saleData.paymentMethod || "cash",
-        cashAmount: Number(saleData.cashAmount || 0),
-        cardAmount: Number(saleData.cardAmount || 0),
-        notes: saleData.notes || "",
-        recordedBy: saleData.recordedBy || "Staff",
-        refundStatus: "NO"
       };
 
-      sales.unshift(newSale);
-      saveBranchData("sales", sales, branch);
+      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+      const timeoutId = controller ? setTimeout(() => controller.abort(), 16000) : null;
 
-      // 2. Deduct Inventory Stock locally
-      if (Array.isArray(saleData.items)) {
-        saleData.items.forEach((soldItem) => {
-          const name = (soldItem.name || "").trim().toLowerCase();
-          const qtySold = Number(soldItem.qty) || 0;
+      return fetch(targetUrl, {
+        method: "POST",
+        mode: "cors",
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify(salePayload),
+        signal: controller ? controller.signal : undefined
+      })
+        .then((res) => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          if (data && data.status === "success") {
+            // 1. Add Sale locally to branch history upon cloud confirmation
+            const sales = loadBranchSales(branch);
+            const newSale = {
+              id: Date.now(),
+              timestamp: new Date().toISOString(),
+              date: saleData.date || new Date().toISOString().split("T")[0],
+              customerName: saleData.customerName || "Walk-in Customer",
+              customerPhone: saleData.customerPhone || saleData.customerNumber || "",
+              customerNumber: saleData.customerNumber || saleData.customerPhone || "",
+              customerAddress: saleData.customerAddress || "",
+              vatBill: saleData.vatBill || "no",
+              itemsDetail: saleData.itemsDetail || "",
+              items: saleData.items || [],
+              subtotal: Number(saleData.subtotal) || 0,
+              vatAmount: Number(saleData.vatAmount) || 0,
+              discountAmount: Number(saleData.discountAmount) || 0,
+              grandTotal: Number(saleData.grandTotal) || 0,
+              paymentStatus: saleData.paymentStatus || "paid",
+              paymentMethod: saleData.paymentMethod || "cash",
+              cashAmount: Number(saleData.cashAmount || 0),
+              cardAmount: Number(saleData.cardAmount || 0),
+              notes: saleData.notes || "",
+              recordedBy: staffName,
+              refundStatus: "NO"
+            };
 
-          if (name && qtySold > 0) {
-            const existingIndex = inventory.findIndex(
-              (inv) => (inv.name || "").trim().toLowerCase() === name
-            );
-            if (existingIndex >= 0) {
-              const currentStock = Number(inventory[existingIndex].qty) || 0;
-              inventory[existingIndex].qty = Math.max(0, currentStock - qtySold);
-              inventory[existingIndex].lastUpdated = new Date().toLocaleTimeString();
+            sales.unshift(newSale);
+            saveBranchData("sales", sales, branch);
+
+            // 2. Deduct Inventory Stock locally
+            if (data.updatedInventory && Array.isArray(data.updatedInventory)) {
+              saveBranchData("inventory", data.updatedInventory, branch);
+            } else if (Array.isArray(saleData.items)) {
+              saleData.items.forEach((soldItem) => {
+                const name = (soldItem.name || "").trim().toLowerCase();
+                const qtySold = Number(soldItem.qty) || 0;
+
+                if (name && qtySold > 0) {
+                  const existingIndex = inventory.findIndex(
+                    (inv) => (inv.name || "").trim().toLowerCase() === name
+                  );
+                  if (existingIndex >= 0) {
+                    const currentStock = Number(inventory[existingIndex].qty) || 0;
+                    inventory[existingIndex].qty = Math.max(0, currentStock - qtySold);
+                    inventory[existingIndex].lastUpdated = new Date().toLocaleTimeString();
+                    inventory[existingIndex].lastUpdatedBy = staffName + " (Sale)";
+                  }
+                }
+              });
+              saveBranchData("inventory", inventory, branch);
             }
+
+            window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+            if (window.DevLogger) {
+              window.DevLogger.success("DataStore", `Sale recorded online successfully for ${branch}`, newSale);
+            }
+            return { success: true, sale: newSale };
+          } else {
+            throw new Error(data ? (data.message || "Failed to record sale in cloud") : "Invalid response from server");
           }
+        })
+        .catch((err) => {
+          if (timeoutId) clearTimeout(timeoutId);
+          if (window.DevLogger) {
+            window.DevLogger.warn("DataStore", `Online sale failed: ${err.message || err}`, { branch, error: err.message || err });
+          }
+          throw err;
         });
-        saveBranchData("inventory", inventory, branch);
-      }
-
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-
-      // 3. Reliable Mutation Sync with Offline Queueing
-      sendMutation("add_sale", branch, newSale, webAppUrl);
-
-      return { success: true };
     },
 
     // Add Stock Quantity (increments existing stock or creates new item)

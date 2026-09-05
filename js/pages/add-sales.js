@@ -886,7 +886,7 @@ window.initAddSales = (function () {
             }
           }
 
-          if (paymentMethod === "both") {
+          if (paymentMethod === "both" || paymentMethod === "split") {
             if (cashVal <= 0) {
               UI.showInlineError(cashInput, "Please enter cash amount.");
               cashInput.focus();
@@ -897,13 +897,9 @@ window.initAddSales = (function () {
               cardInput.focus();
               return false;
             }
-            const splitSum = Math.round((cashVal + cardVal) * 1000) / 1000;
-            if (Math.abs(splitSum - grandTotal) > 0.0001) {
-              UI.showInlineError(
-                cardInput,
-                `Split sum (${formatOMR(splitSum)}) does not match Grand Total (${formatOMR(grandTotal)}).`
-              );
-              cardInput.focus();
+            const totalPaid = Math.round((cashVal + cardVal) * 1000) / 1000;
+            if (Math.abs(totalPaid - grandTotal) > 0.002) {
+              UI.toast(`Split payments sum (${formatOMR(totalPaid)}) must equal Grand Total (${formatOMR(grandTotal)}).`, "warning");
               return false;
             }
           }
@@ -914,8 +910,20 @@ window.initAddSales = (function () {
       return true;
     }
 
-    // Save Sale Logic
-    function saveSale() {
+    // Save Sale Logic (Online-Only with Double-Click Protection & Form Preservation)
+    function saveSale(btn) {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        UI.toast("⚠️ You are offline. Please reconnect to the internet to complete this sale.", "warning");
+        return;
+      }
+
+      const saveBtn = btn || root.querySelector('.section-nav-btn[data-action="save"]');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.dataset.originalHtml = saveBtn.innerHTML;
+        saveBtn.innerHTML = 'wait...';
+      }
+
       const grandTotalVal = getGrandTotalValue();
       const cashVal = parseFloat(cashInput.value) || 0;
       const cardVal = parseFloat(cardInput.value) || 0;
@@ -933,6 +941,9 @@ window.initAddSales = (function () {
           .join("\n");
       }
 
+      const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
+      const staffName = user ? (user.name || user.email || "Staff") : "Staff";
+
       const saleData = {
         date: dateInput.value,
         customerName: nameInput.value.trim(),
@@ -946,42 +957,61 @@ window.initAddSales = (function () {
         cashAmount: cashVal,
         cardAmount: cardVal,
         grandTotal: grandTotalVal,
+        recordedBy: staffName,
       };
 
-      if (typeof onSaveSuccess === "function") {
-        onSaveSuccess(saleData);
-      }
-      if (window.DataStore) {
-        window.DataStore.recordSale(saleData, FORM_DEFAULTS.googleSheetWebAppUrl);
+      if (!window.DataStore || typeof window.DataStore.recordSale !== "function") {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = saveBtn.dataset.originalHtml || "Complete Sale";
+        }
+        UI.toast("⚠️ DataStore service unavailable. Please refresh the page.", "error");
+        return;
       }
 
-      // Check for Real-Time Low Stock Push Alert
-      try {
-        const branch = window.Auth && typeof window.Auth.getActiveBranch === "function" 
-          ? window.Auth.getActiveBranch() 
-          : null;
-        if (!branch) return;
+      window.DataStore.recordSale(saleData, FORM_DEFAULTS.googleSheetWebAppUrl)
+        .then((res) => {
+          if (typeof onSaveSuccess === "function") {
+            onSaveSuccess(saleData);
+          }
 
-        const invList = window.DataStore ? window.DataStore.getInventory(branch) : [];
-        if (Array.isArray(items) && invList.length > 0) {
-          items.forEach((soldItem) => {
-            const soldName = (soldItem.name || "").trim().toLowerCase();
-            const match = invList.find((inv) => (inv.name || "").trim().toLowerCase() === soldName);
-            if (match) {
-              const remaining = Math.max(0, (Number(match.qty) || 0) - (Number(soldItem.qty) || 0));
-              const alertLvl = Number(match.alertLevel) || 5;
-              if (remaining <= alertLvl && window.PushNotification) {
-                window.PushNotification.sendLowStockAlert(match.name, branch, remaining, alertLvl);
+          // Check for Real-Time Low Stock Push Alert
+          try {
+            const branch = window.Auth && typeof window.Auth.getActiveBranch === "function" 
+              ? window.Auth.getActiveBranch() 
+              : null;
+            if (branch) {
+              const invList = window.DataStore.getInventory(branch) || [];
+              if (Array.isArray(items) && invList.length > 0) {
+                items.forEach((soldItem) => {
+                  const soldName = (soldItem.name || "").trim().toLowerCase();
+                  const match = invList.find((inv) => (inv.name || "").trim().toLowerCase() === soldName);
+                  if (match) {
+                    const remaining = Math.max(0, (Number(match.qty) || 0) - (Number(soldItem.qty) || 0));
+                    const alertLvl = Number(match.alertLevel) || 5;
+                    if (remaining <= alertLvl && window.PushNotification) {
+                      window.PushNotification.sendLowStockAlert(match.name, branch, remaining, alertLvl);
+                    }
+                  }
+                });
               }
             }
-          });
-        }
-      } catch (e) {}
+          } catch (e) {}
 
-      UI.toast(`Sale recorded successfully! Total: ${formatOMR(saleData.grandTotal)}`, "success");
+          UI.toast(`Sale recorded successfully! Total: ${formatOMR(saleData.grandTotal)}`, "success");
 
-      // Reset form for next sale & return to Section 1
-      clearEntireForm();
+          // Reset form for next sale & return to Section 1
+          clearEntireForm();
+        })
+        .catch((err) => {
+          UI.toast(`⚠️ Sale not saved: ${err.message || "Network error. Please try again."}`, "error");
+        })
+        .finally(() => {
+          if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = saveBtn.dataset.originalHtml || "Complete Sale";
+          }
+        });
     }
 
     // Re-render & cloud sync on branch change

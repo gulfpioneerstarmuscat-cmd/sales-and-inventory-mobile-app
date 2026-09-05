@@ -631,6 +631,7 @@ window.initViewSales = (function () {
                   ? `<div class="info-item"><span class="info-lbl">Route</span><span class="info-val" style="font-weight:700; color:#2563eb;">${escapeHtml(sale.customerName || "Inter-Branch")}</span></div>`
                   : `<div class="info-item"><span class="info-lbl">Phone Number</span><span class="info-val">${sale.customerNumber ? `<a href="tel:${escapeHtml(sale.customerNumber)}" class="contact-link">${escapeHtml(sale.customerNumber)}</a>` : "N/A"}</span></div>`
               }
+              ${sale.recordedBy ? `<div class="info-item"><span class="info-lbl">Recorded By</span><span class="info-val" style="color:#0284c7; font-weight:700;">${escapeHtml(sale.recordedBy)}</span></div>` : ""}
             </div>
           </div>
 

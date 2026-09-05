@@ -286,12 +286,22 @@ window.initViewInventory = (function () {
 
           <!-- System Metadata Card -->
           <div class="detail-card">
-            <h4 class="card-section-label">Product SKU / ID</h4>
+            <h4 class="card-section-label">Product SKU & Audit</h4>
             <div class="info-grid">
               <div class="info-item">
                 <span class="info-label">Product SKU / ID</span>
                 <span class="info-val">${escapeHtml(item.sku || item.id || "N/A")}</span>
               </div>
+              ${item.lastUpdated ? `
+              <div class="info-item">
+                <span class="info-label">Last Updated</span>
+                <span class="info-val">${escapeHtml(item.lastUpdated)}</span>
+              </div>` : ''}
+              ${item.lastUpdatedBy ? `
+              <div class="info-item">
+                <span class="info-label">Updated By</span>
+                <span class="info-val" style="color: #0284c7; font-weight: 700;">${escapeHtml(item.lastUpdatedBy)}</span>
+              </div>` : ''}
             </div>
           </div>
         </div>
