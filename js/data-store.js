@@ -422,7 +422,8 @@ window.DataStore = (function () {
   // --------------------------------------------------------------------------
   const inFlightSyncs = {};
   function syncFromCloud(webAppUrl, retryCount, targetBranch) {
-    if (!webAppUrl || !webAppUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
+    const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
+    if (!targetUrl || !targetUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
 
     const branch = targetBranch || getActiveBranch();
     if (inFlightSyncs[branch]) {
@@ -430,7 +431,7 @@ window.DataStore = (function () {
     }
 
     // Flush any pending mutations in the background without blocking the sync fetch
-    flushPendingMutations(webAppUrl);
+    flushPendingMutations(targetUrl);
 
     const retriesSoFar = typeof retryCount === "number" ? retryCount : (retryCount ? 1 : 0);
     const cacheBuster = `_t=${Date.now()}`;
@@ -440,9 +441,9 @@ window.DataStore = (function () {
     const auth = getAuthPayload();
     const authParams = `&apiKey=${encodeURIComponent(auth.apiKey)}` + (auth.sessionId ? `&sessionId=${encodeURIComponent(auth.sessionId)}` : "");
 
-    const syncUrl = webAppUrl.includes("?")
-      ? `${webAppUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`
-      : `${webAppUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`;
+    const syncUrl = targetUrl.includes("?")
+      ? `${targetUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`
+      : `${targetUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`;
 
     // Generous serverless window for Google Apps Script cold starts (20s initial, 12s retry)
     const timeoutMs = retriesSoFar === 0 ? 20000 : 12000;
@@ -546,7 +547,7 @@ window.DataStore = (function () {
             window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1.5s...`, { branch, attempt: retriesSoFar + 1, error: err.message }, 3);
           }
           return new Promise((resolve) => setTimeout(resolve, 1500)).then(() =>
-            syncFromCloud(webAppUrl, retriesSoFar + 1, branch)
+            syncFromCloud(targetUrl, retriesSoFar + 1, branch)
           );
         }
         if (window.DevLogger) {

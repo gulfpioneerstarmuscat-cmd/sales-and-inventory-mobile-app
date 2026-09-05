@@ -200,9 +200,16 @@ window.Auth = (function () {
           }
 
           // Self-Healing Guard: If cloud reports false expiration but local token was created within 90 days, protect active session
-          if (data && data.message && (data.message.includes("Session has expired") || data.message.includes("exceeded 3-month"))) {
+          if (data && data.message && (data.message.includes("Session has expired") || data.message.includes("exceeded 3-month") || data.message.includes("Invalid or expired Session") || data.message.includes("Session invalid or expired"))) {
             let sessionAgeMs = null;
-            if (sess.createdAt) {
+            if (sess.sessionId) {
+              const parts = String(sess.sessionId).split("_");
+              const epochMs = parseInt(parts[parts.length - 1], 36);
+              if (!isNaN(epochMs) && epochMs > 1700000000000 && epochMs < 2200000000000) {
+                sessionAgeMs = Date.now() - epochMs;
+              }
+            }
+            if (sessionAgeMs === null && sess.createdAt) {
               const str = String(sess.createdAt).trim();
               const dmyMatch = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
               if (dmyMatch) {
