@@ -723,23 +723,61 @@ window.initViewSales = (function () {
     const refundBtn = backdrop.querySelector("#btn-refund-sale");
     if (refundBtn) {
       refundBtn.addEventListener("click", () => {
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          if (window.UI && typeof window.UI.toast === "function") {
+            window.UI.toast("⚠️ You are offline. Please reconnect to the internet to refund sale.", "warning");
+          }
+          return;
+        }
+
         const formattedTotal = grandTotal.toFixed(3);
         const confirmMsg = `Are you sure you want to refund this sale of OMR ${formattedTotal}?\n\nThis will return all purchased items back to inventory stock and revert monthly revenue and sales metrics.`;
 
         const doRefund = () => {
-          const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
-          const res = window.DataStore ? window.DataStore.refundSale(sale.id || sale, webAppUrl) : { success: false };
-          if (res.success) {
+          if (typeof navigator !== "undefined" && navigator.onLine === false) {
             if (window.UI && typeof window.UI.toast === "function") {
-              window.UI.toast("Sale refunded & stock returned to inventory!", "success");
+              window.UI.toast("⚠️ You are offline. Please reconnect to the internet to refund sale.", "warning");
             }
-            backdrop.remove();
-            renderViewSalesUI();
-          } else {
-            if (window.UI && typeof window.UI.toast === "function") {
-              window.UI.toast(res.message || "Failed to refund sale", "error");
-            }
+            return;
           }
+
+          if (refundBtn) {
+            refundBtn.disabled = true;
+            refundBtn.dataset.originalHtml = refundBtn.innerHTML;
+            refundBtn.innerHTML = "Refunding...";
+          }
+
+          const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
+          if (!window.DataStore || typeof window.DataStore.refundSale !== "function") {
+            if (refundBtn) {
+              refundBtn.disabled = false;
+              refundBtn.innerHTML = refundBtn.dataset.originalHtml || "Refund Sale";
+            }
+            if (window.UI && typeof window.UI.toast === "function") {
+              window.UI.toast("DataStore service unavailable.", "error");
+            }
+            return;
+          }
+
+          Promise.resolve(window.DataStore.refundSale(sale.id || sale, webAppUrl))
+            .then((res) => {
+              if (window.UI && typeof window.UI.toast === "function") {
+                window.UI.toast("Sale refunded & stock returned to inventory!", "success");
+              }
+              backdrop.remove();
+              renderViewSalesUI();
+            })
+            .catch((err) => {
+              if (window.UI && typeof window.UI.toast === "function") {
+                window.UI.toast(err.message || "Failed to refund sale", "error");
+              }
+            })
+            .finally(() => {
+              if (refundBtn) {
+                refundBtn.disabled = false;
+                refundBtn.innerHTML = refundBtn.dataset.originalHtml || "Refund Sale";
+              }
+            });
         };
 
         if (window.UI && typeof window.UI.modal === "function") {
@@ -907,6 +945,15 @@ window.initViewSales = (function () {
 
     if (confirmBtn) {
       confirmBtn.addEventListener("click", () => {
+        if (typeof navigator !== "undefined" && navigator.onLine === false) {
+          if (window.UI) {
+            window.UI.toast("⚠️ You are offline. Please reconnect to the internet to record payment.", "warning");
+          }
+          return;
+        }
+
+        if (confirmBtn.disabled) return;
+
         const cashVal = parseFloat(cashIn.value) || 0;
         const cardVal = parseFloat(cardIn.value) || 0;
         const enteredTotal = Math.round((cashVal + cardVal) * 1000) / 1000;
@@ -918,24 +965,41 @@ window.initViewSales = (function () {
           return;
         }
 
+        confirmBtn.disabled = true;
+        confirmBtn.dataset.originalHtml = confirmBtn.innerHTML;
+        confirmBtn.innerHTML = "Recording...";
+
         const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
-        const res = window.DataStore ? window.DataStore.markSaleAsPaid(sale.id || sale, {
+        if (!window.DataStore || typeof window.DataStore.markSaleAsPaid !== "function") {
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = confirmBtn.dataset.originalHtml || "Confirm & Record Payment";
+          if (window.UI) {
+            window.UI.toast("DataStore service unavailable.", "error");
+          }
+          return;
+        }
+
+        Promise.resolve(window.DataStore.markSaleAsPaid(sale.id || sale, {
           paymentMethod: selectedMethod,
           cashAmount: cashVal,
           cardAmount: cardVal
-        }, webAppUrl) : { success: false };
-
-        if (res.success) {
-          if (window.UI) {
-            window.UI.toast(`Payment of OMR ${grandTotal.toFixed(3)} recorded! Sale marked as Paid.`, "success");
-          }
-          backdrop.remove();
-          if (typeof onComplete === "function") onComplete();
-        } else {
-          if (window.UI) {
-            window.UI.toast(res.message || "Failed to record payment", "error");
-          }
-        }
+        }, webAppUrl))
+          .then((res) => {
+            if (window.UI) {
+              window.UI.toast(`Payment of OMR ${grandTotal.toFixed(3)} recorded! Sale marked as Paid.`, "success");
+            }
+            backdrop.remove();
+            if (typeof onComplete === "function") onComplete();
+          })
+          .catch((err) => {
+            if (window.UI) {
+              window.UI.toast(err.message || "Failed to record payment", "error");
+            }
+          })
+          .finally(() => {
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = confirmBtn.dataset.originalHtml || "Confirm & Record Payment";
+          });
       });
     }
 

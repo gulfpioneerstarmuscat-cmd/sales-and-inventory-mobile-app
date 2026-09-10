@@ -398,8 +398,15 @@ window.initAmendStock = (function () {
       });
     }
 
+    let isSubmitting = false;
+
     // Core Handler for Review Amendment
     function handleReviewAmendment() {
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        notifyUser("⚠️ You are offline. Please reconnect to the internet to amend stock.", "warning");
+        return;
+      }
+
       if (window.UI) window.UI.clearAllInlineErrors(root);
 
       // Check 1: Must have selected an item
@@ -549,17 +556,51 @@ window.initAmendStock = (function () {
           cancelText: "Cancel",
           dangerConfirm: true,
           onConfirm: function () {
+            if (typeof navigator !== "undefined" && navigator.onLine === false) {
+              notifyUser("⚠️ You are offline. Please reconnect to the internet to amend stock.", "warning");
+              return;
+            }
+
+            if (isSubmitting) return;
+            isSubmitting = true;
+
+            const reviewBtn = root.querySelector("#btn-review-amendment");
+            if (reviewBtn) {
+              reviewBtn.disabled = true;
+              reviewBtn.dataset.originalHtml = reviewBtn.innerHTML;
+              reviewBtn.innerHTML = "wait...";
+            }
+
             const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
 
             if (window.DataStore && typeof window.DataStore.amendStockItem === "function") {
-              const res = window.DataStore.amendStockItem(currentPendingChanges, webAppUrl);
-              if (res.success) {
-                notifyUser("Stock amendment successfully committed & logged!", "success");
-                // Reset form & return to Section 1
-                clearEntireForm();
-              } else {
-                notifyUser(res.message || "Failed to commit amendment.", "error");
+              const promise = window.DataStore.amendStockItem(currentPendingChanges, webAppUrl);
+              Promise.resolve(promise)
+                .then((res) => {
+                  if (res && res.success === false) {
+                    notifyUser(res.message || "Failed to commit amendment.", "error");
+                  } else {
+                    notifyUser("Stock amendment successfully committed & logged!", "success");
+                    clearEntireForm();
+                  }
+                })
+                .catch((err) => {
+                  notifyUser(`⚠️ Amendment not saved: ${err.message || "Network error. Please try again."}`, "error");
+                })
+                .finally(() => {
+                  isSubmitting = false;
+                  if (reviewBtn) {
+                    reviewBtn.disabled = false;
+                    reviewBtn.innerHTML = reviewBtn.dataset.originalHtml || "Review Amendment";
+                  }
+                });
+            } else {
+              isSubmitting = false;
+              if (reviewBtn) {
+                reviewBtn.disabled = false;
+                reviewBtn.innerHTML = reviewBtn.dataset.originalHtml || "Review Amendment";
               }
+              notifyUser("DataStore service unavailable.", "error");
             }
           }
         });

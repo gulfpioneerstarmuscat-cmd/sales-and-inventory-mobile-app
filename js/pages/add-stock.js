@@ -462,13 +462,42 @@ window.initAddStock = (function () {
       }
     });
 
-    // Form Submit Handler
+    // Form Submit Handler (Single Online Funnel with Multi-Click Locking)
+    let isSubmitting = false;
     form.addEventListener("submit", (e) => {
       e.preventDefault();
+
+      if (isSubmitting) return;
+
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        const offlineMsg = "⚠️ You are offline. Please reconnect to the internet to add stock.";
+        if (window.UI && typeof window.UI.toast === "function") {
+          window.UI.toast(offlineMsg, "warning");
+        } else if (window.showNotification) {
+          window.showNotification(offlineMsg, "warning");
+        }
+        return;
+      }
 
       if (!validateSection(1) || !validateSection(2)) {
         return;
       }
+
+      const saveBtn = form.querySelector('.section-nav-btn[data-action="save"]') || form.querySelector('button[type="submit"]');
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.dataset.originalHtml = saveBtn.innerHTML;
+        saveBtn.innerHTML = 'wait...';
+      }
+      isSubmitting = true;
+
+      const unlockButton = () => {
+        isSubmitting = false;
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = saveBtn.dataset.originalHtml || "Add Stock";
+        }
+      };
 
       const nameVal = nameInput.value.trim();
       const addQtyVal = parseInt(qtyInput.value, 10);
@@ -488,21 +517,36 @@ window.initAddStock = (function () {
 
       const webAppUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
 
-      if (window.DataStore && typeof window.DataStore.addStockQuantity === "function") {
-        const res = window.DataStore.addStockQuantity(payload, webAppUrl);
-        if (res.success) {
+      if (!window.DataStore || typeof window.DataStore.addStockQuantity !== "function") {
+        unlockButton();
+        if (window.showNotification) {
+          window.showNotification("DataStore service unavailable.", "error");
+        }
+        return;
+      }
+
+      Promise.resolve(window.DataStore.addStockQuantity(payload, webAppUrl))
+        .then((res) => {
+          unlockButton();
+          const successMsg = `Successfully added +${addQtyVal} units to ${payload.name}!`;
           if (window.showNotification) {
-            window.showNotification(`Successfully added +${addQtyVal} units to ${payload.name}!`, "success");
+            window.showNotification(successMsg, "success");
+          } else if (window.UI && typeof window.UI.toast === "function") {
+            window.UI.toast(successMsg, "success");
           }
           // Reset form & go back to Section 1
           clearDraft();
           clearEntireForm();
-        } else {
+        })
+        .catch((err) => {
+          unlockButton();
+          const errMsg = (err && err.message) ? err.message : "Failed to add stock.";
           if (window.showNotification) {
-            window.showNotification(res.message || "Failed to add stock.", "error");
+            window.showNotification(errMsg, "error");
+          } else if (window.UI && typeof window.UI.toast === "function") {
+            window.UI.toast(errMsg, "error");
           }
-        }
-      }
+        });
     });
 
     // Restore draft if present

@@ -230,10 +230,17 @@ window.BranchTransferModal = (function () {
     // Form Submit Handler
     form?.addEventListener("submit", (e) => {
       e.preventDefault();
+      if (typeof navigator !== "undefined" && navigator.onLine === false) {
+        showError("⚠️ You are offline. Please reconnect to the internet to transfer stock.");
+        return;
+      }
+
       const errBanner = root.querySelector("#transfer-error-banner");
       const submitBtn = root.querySelector("#btn-submit-transfer");
       const spinner = root.querySelector("#transfer-btn-spinner");
       const btnText = submitBtn.querySelector(".btn-text");
+
+      if (submitBtn.disabled) return;
 
       if (errBanner) errBanner.hidden = true;
 
@@ -350,16 +357,16 @@ window.BranchTransferModal = (function () {
         transferredBy: transferredBy
       };
 
-      const result = window.DataStore
-        ? window.DataStore.transferStock(payload, targetUrl)
-        : { success: false, error: "DataStore unavailable" };
-
-      setTimeout(() => {
+      if (!window.DataStore || typeof window.DataStore.transferStock !== "function") {
         submitBtn.disabled = false;
         if (spinner) spinner.hidden = true;
         if (btnText) btnText.textContent = "Confirm & Transfer";
+        showError("DataStore service unavailable.");
+        return;
+      }
 
-        if (result && result.success) {
+      Promise.resolve(window.DataStore.transferStock(payload, targetUrl))
+        .then((result) => {
           closeModal();
           const totalUnits = transferItems.reduce((acc, it) => acc + (parseInt(it.qty, 10) || 1), 0);
 
@@ -370,10 +377,15 @@ window.BranchTransferModal = (function () {
           if (typeof activeCallback === "function") {
             activeCallback(result);
           }
-        } else {
-          showError(result ? result.error : "Failed to record stock transfer");
-        }
-      }, 350);
+        })
+        .catch((err) => {
+          showError(err.message || "Failed to record stock transfer");
+        })
+        .finally(() => {
+          submitBtn.disabled = false;
+          if (spinner) spinner.hidden = true;
+          if (btnText) btnText.textContent = "Confirm & Transfer";
+        });
     });
 
     function showError(msg) {

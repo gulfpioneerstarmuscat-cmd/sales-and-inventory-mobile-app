@@ -242,179 +242,63 @@ window.DataStore = (function () {
   }
 
   // --------------------------------------------------------------------------
-  // Offline Mutation Queue (IndexedDB Outbox + LocalStorage Backup + Background Sync)
+  // Single Unified Online Transaction Funnel
   // --------------------------------------------------------------------------
-  function triggerBackgroundSync() {
-    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-      navigator.serviceWorker.ready
-        .then((reg) => {
-          if (reg && reg.sync && typeof reg.sync.register === "function") {
-            reg.sync.register("gps-outbox-sync").catch((err) => {
-              if (window.DevLogger) window.DevLogger.info("DataStore", "SyncManager register notice", err);
-            });
-          }
-          if (reg && "periodicSync" in reg && typeof reg.periodicSync.register === "function") {
-            reg.periodicSync.register("gps-catalog-refresh", { minInterval: 24 * 60 * 60 * 1000 }).catch((err) => {
-              if (window.DevLogger) window.DevLogger.info("DataStore", "PeriodicSync register notice", err);
-            });
-          }
-        })
-        .catch((err) => {
-          if (window.DevLogger) window.DevLogger.info("DataStore", "Background sync registration notice", err);
-        });
-    }
-  }
-
-  function getPendingMutations() {
-    try {
-      const stored = localStorage.getItem(PENDING_MUTATIONS_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function savePendingMutations(queue) {
-    try {
-      localStorage.setItem(PENDING_MUTATIONS_KEY, JSON.stringify(queue));
-    } catch (e) {}
-
-    // Also persist queue into IndexedDB mutations_outbox atomically
-    openDatabase().then((db) => {
-      if (!db) return;
-      try {
-        const tx = db.transaction("mutations_outbox", "readwrite");
-        const store = tx.objectStore("mutations_outbox");
-        store.clear();
-        queue.forEach((item) => store.put(item));
-      } catch (e) {
-        if (window.DevLogger) window.DevLogger.warn("DataStore", "Outbox save error in IndexedDB:", e);
-      }
-    });
-  }
-
-  function enqueueMutation(action, branch, payload, explicitTargetUrl) {
-    const queue = getPendingMutations();
-    const auth = getAuthPayload();
+  function executeOnlineMutation(action, branch, payload, explicitTargetUrl) {
     const targetUrl = explicitTargetUrl || (typeof window !== "undefined" && window.APP_CONFIG && window.APP_CONFIG.googleSheetWebAppUrl ? window.APP_CONFIG.googleSheetWebAppUrl : "");
 
-    const item = {
-      id: "mut_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
-      action: action,
-      branch: branch,
-      apiKey: auth ? (auth.apiKey || "") : "",
-      sessionId: auth ? (auth.sessionId || "") : "",
-      targetUrl: targetUrl,
-      payload: payload,
-      queuedAt: new Date().toISOString()
-    };
-    queue.push(item);
-    savePendingMutations(queue);
-
-    // Register Background Sync with Service Worker
-    triggerBackgroundSync();
-
-    if (window.DevLogger) {
-      window.DevLogger.info("DataStore", `Enqueued offline mutation [${action}] for branch ${branch}. Total pending: ${queue.length}`);
-    }
-  }
-
-  let isFlushingMutations = false;
-  function flushPendingMutations(webAppUrl) {
-    if (isFlushingMutations) return Promise.resolve();
-    const queue = getPendingMutations();
-    if (!queue.length) return Promise.resolve();
-
-    const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
-    if (!targetUrl || !targetUrl.startsWith("http") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
-      return Promise.resolve();
+    if (!targetUrl || !targetUrl.startsWith("http")) {
+      return Promise.reject(new Error("Backend Google Sheet URL not configured."));
     }
 
-    isFlushingMutations = true;
-    const auth = getAuthPayload();
-
-    const processQueue = async () => {
-      const remainingQueue = [...queue];
-      while (remainingQueue.length > 0) {
-        const item = remainingQueue[0];
-        try {
-          const bodyPayload = {
-            action: item.action,
-            branch: item.branch,
-            ...auth,
-            ...(item.payload || {})
-          };
-          await fetch(targetUrl, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain" },
-            body: JSON.stringify(bodyPayload)
-          });
-          remainingQueue.shift();
-          savePendingMutations(remainingQueue);
-
-          // Clean from IndexedDB
-          openDatabase().then((db) => {
-            if (!db) return;
-            try {
-              const tx = db.transaction("mutations_outbox", "readwrite");
-              tx.objectStore("mutations_outbox").delete(item.id);
-            } catch (e) {}
-          });
-
-          if (window.DevLogger) {
-            window.DevLogger.log("DataStore", `Flushed queued mutation [${item.action}] for ${item.branch}. Remaining: ${remainingQueue.length}`);
-          }
-        } catch (err) {
-          if (window.DevLogger) window.DevLogger.warn("DataStore", `Failed to flush mutation [${item.action}], will retry later`, { item, error: err });
-          break;
-        }
-      }
-
-      const flushedTotal = queue.length - remainingQueue.length;
-      if (flushedTotal > 0) {
-        const timeNow = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        if (window.PushNotification && typeof window.PushNotification.notifyOfflineSync === "function") {
-          window.PushNotification.notifyOfflineSync(flushedTotal, timeNow);
-        }
-      }
-      isFlushingMutations = false;
-    };
-
-    return processQueue();
-  }
-
-  function sendMutation(action, branch, payload, webAppUrl) {
-    const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
-    if (!targetUrl || !targetUrl.startsWith("http") || (typeof navigator !== "undefined" && navigator.onLine === false)) {
-      enqueueMutation(action, branch, payload, targetUrl);
-      return Promise.resolve({ queued: true });
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      return Promise.reject(new Error("You are currently offline. Please reconnect to the internet to complete this action."));
     }
 
     const auth = getAuthPayload();
+    const requestId = "req_" + Date.now() + "_" + Math.random().toString(36).substr(2, 7);
     const bodyPayload = {
       action: action,
       branch: branch,
+      requestId: requestId,
+      clientTimestamp: new Date().toISOString(),
       ...auth,
       ...(payload || {})
     };
 
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), 16000) : null;
+
     return fetch(targetUrl, {
       method: "POST",
-      mode: "no-cors",
+      mode: "cors",
       headers: { "Content-Type": "text/plain" },
-      body: JSON.stringify(bodyPayload)
+      body: JSON.stringify(bodyPayload),
+      signal: controller ? controller.signal : undefined
     })
-      .then(() => {
-        if (window.DevLogger) {
-          window.DevLogger.log("DataStore", `Direct mutation [${action}] sent successfully for ${branch}`);
+      .then((res) => {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data) => {
+        if (data && data.status === "success") {
+          return data;
+        } else {
+          throw new Error(data ? (data.message || `Failed to process ${action} in cloud`) : "Invalid response from server");
         }
-        return flushPendingMutations(targetUrl);
       })
       .catch((err) => {
-        if (window.DevLogger) window.DevLogger.warn("DataStore", `Direct mutation [${action}] failed, enqueuing for background retry`, err);
-        enqueueMutation(action, branch, payload, targetUrl);
+        if (timeoutId) clearTimeout(timeoutId);
+        if (window.DevLogger) {
+          window.DevLogger.warn("DataStore", `Online mutation [${action}] failed: ${err.message || err}`, { branch, error: err.message || err });
+        }
+        throw err;
       });
+  }
+
+  function flushPendingMutations() {
+    return Promise.resolve();
   }
 
   // --------------------------------------------------------------------------
@@ -650,17 +534,8 @@ window.DataStore = (function () {
       });
     },
 
-    // Save New Sale for Active Branch (Direct Online Sale with strict stock availability validation)
+    // Save New Sale for Active Branch (Direct Online Funnel with strict stock validation)
     recordSale: function (saleData, webAppUrl) {
-      const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
-      if (!targetUrl || !targetUrl.startsWith("http")) {
-        return Promise.reject(new Error("Backend Google Sheet URL not configured."));
-      }
-
-      if (typeof navigator !== "undefined" && navigator.onLine === false) {
-        return Promise.reject(new Error("You are currently offline. Please reconnect to the internet to complete this sale."));
-      }
-
       const branch = getActiveBranch();
       const inventory = loadBranchInventory(branch);
 
@@ -692,172 +567,156 @@ window.DataStore = (function () {
         }
       }
 
-      const auth = getAuthPayload();
       const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
       const staffName = saleData.recordedBy || (user ? (user.name || user.email || "Staff") : "Staff");
 
       const salePayload = {
-        action: "add_sale",
-        branch: branch,
-        ...auth,
         ...saleData,
         recordedBy: staffName,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString()
       };
 
-      const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-      const timeoutId = controller ? setTimeout(() => controller.abort(), 16000) : null;
-
-      return fetch(targetUrl, {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify(salePayload),
-        signal: controller ? controller.signal : undefined
-      })
-        .then((res) => {
-          if (timeoutId) clearTimeout(timeoutId);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.json();
-        })
+      return executeOnlineMutation("add_sale", branch, salePayload, webAppUrl)
         .then((data) => {
-          if (data && data.status === "success") {
-            // 1. Add Sale locally to branch history upon cloud confirmation
-            const sales = loadBranchSales(branch);
-            const newSale = {
-              id: Date.now(),
-              timestamp: new Date().toISOString(),
-              date: saleData.date || new Date().toISOString().split("T")[0],
-              customerName: saleData.customerName || "Walk-in Customer",
-              customerPhone: saleData.customerPhone || saleData.customerNumber || "",
-              customerNumber: saleData.customerNumber || saleData.customerPhone || "",
-              customerAddress: saleData.customerAddress || "",
-              vatBill: saleData.vatBill || "no",
-              itemsDetail: saleData.itemsDetail || "",
-              items: saleData.items || [],
-              subtotal: Number(saleData.subtotal) || 0,
-              vatAmount: Number(saleData.vatAmount) || 0,
-              discountAmount: Number(saleData.discountAmount) || 0,
-              grandTotal: Number(saleData.grandTotal) || 0,
-              paymentStatus: saleData.paymentStatus || "paid",
-              paymentMethod: saleData.paymentMethod || "cash",
-              cashAmount: Number(saleData.cashAmount || 0),
-              cardAmount: Number(saleData.cardAmount || 0),
-              notes: saleData.notes || "",
-              recordedBy: staffName,
-              refundStatus: "NO"
-            };
+          // 1. Add Sale locally to branch history upon cloud confirmation
+          const sales = loadBranchSales(branch);
+          const newSale = {
+            id: Date.now(),
+            timestamp: new Date().toISOString(),
+            date: saleData.date || new Date().toISOString().split("T")[0],
+            customerName: saleData.customerName || "Walk-in Customer",
+            customerPhone: saleData.customerPhone || saleData.customerNumber || "",
+            customerNumber: saleData.customerNumber || saleData.customerPhone || "",
+            customerAddress: saleData.customerAddress || "",
+            vatBill: saleData.vatBill || "no",
+            itemsDetail: saleData.itemsDetail || "",
+            items: saleData.items || [],
+            subtotal: Number(saleData.subtotal) || 0,
+            vatAmount: Number(saleData.vatAmount) || 0,
+            discountAmount: Number(saleData.discountAmount) || 0,
+            grandTotal: Number(saleData.grandTotal) || 0,
+            paymentStatus: saleData.paymentStatus || "paid",
+            paymentMethod: saleData.paymentMethod || "cash",
+            cashAmount: Number(saleData.cashAmount || 0),
+            cardAmount: Number(saleData.cardAmount || 0),
+            notes: saleData.notes || "",
+            recordedBy: staffName,
+            refundStatus: "NO"
+          };
 
-            sales.unshift(newSale);
-            saveBranchData("sales", sales, branch);
+          sales.unshift(newSale);
+          saveBranchData("sales", sales, branch);
 
-            // 2. Deduct Inventory Stock locally
-            if (data.updatedInventory && Array.isArray(data.updatedInventory)) {
-              saveBranchData("inventory", data.updatedInventory, branch);
-            } else if (Array.isArray(saleData.items)) {
-              saleData.items.forEach((soldItem) => {
-                const name = (soldItem.name || "").trim().toLowerCase();
-                const qtySold = Number(soldItem.qty) || 0;
+          // 2. Deduct Inventory Stock locally
+          if (data.updatedInventory && Array.isArray(data.updatedInventory)) {
+            saveBranchData("inventory", data.updatedInventory, branch);
+          } else if (Array.isArray(saleData.items)) {
+            saleData.items.forEach((soldItem) => {
+              const name = (soldItem.name || "").trim().toLowerCase();
+              const qtySold = Number(soldItem.qty) || 0;
 
-                if (name && qtySold > 0) {
-                  const existingIndex = inventory.findIndex(
-                    (inv) => (inv.name || "").trim().toLowerCase() === name
-                  );
-                  if (existingIndex >= 0) {
-                    const currentStock = Number(inventory[existingIndex].qty) || 0;
-                    inventory[existingIndex].qty = Math.max(0, currentStock - qtySold);
-                    inventory[existingIndex].lastUpdated = new Date().toLocaleTimeString();
-                    inventory[existingIndex].lastUpdatedBy = staffName + " (Sale)";
-                  }
+              if (name && qtySold > 0) {
+                const existingIndex = inventory.findIndex(
+                  (inv) => (inv.name || "").trim().toLowerCase() === name
+                );
+                if (existingIndex >= 0) {
+                  const currentStock = Number(inventory[existingIndex].qty) || 0;
+                  inventory[existingIndex].qty = Math.max(0, currentStock - qtySold);
+                  inventory[existingIndex].lastUpdated = new Date().toLocaleTimeString();
+                  inventory[existingIndex].lastUpdatedBy = staffName + " (Sale)";
                 }
-              });
-              saveBranchData("inventory", inventory, branch);
-            }
+              }
+            });
+            saveBranchData("inventory", inventory, branch);
+          }
 
-            window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-            if (window.DevLogger) {
-              window.DevLogger.success("DataStore", `Sale recorded online successfully for ${branch}`, newSale);
-            }
-            return { success: true, sale: newSale };
-          } else {
-            throw new Error(data ? (data.message || "Failed to record sale in cloud") : "Invalid response from server");
-          }
-        })
-        .catch((err) => {
-          if (timeoutId) clearTimeout(timeoutId);
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+          window.dispatchEvent(new CustomEvent("salesDataChanged"));
           if (window.DevLogger) {
-            window.DevLogger.warn("DataStore", `Online sale failed: ${err.message || err}`, { branch, error: err.message || err });
+            window.DevLogger.success("DataStore", `Sale recorded online successfully for ${branch}`, newSale);
           }
-          throw err;
+          return { success: true, sale: newSale };
         });
     },
 
-    // Add Stock Quantity (increments existing stock or creates new item)
+    // Add Stock Quantity (Single Online Funnel with Server-Side De-duplication)
     addStockQuantity: function (payload, webAppUrl) {
       const branch = getActiveBranch();
-      const inventory = loadBranchInventory(branch);
       const name = (payload.name || "").trim();
       const addQty = Number(payload.addQty) || 0;
 
-      if (!name) return { success: false, message: "Item name required" };
+      if (!name) return Promise.reject(new Error("Item name required"));
+      if (isNaN(addQty) || addQty <= 0) return Promise.reject(new Error("Stock quantity must be at least 1"));
 
-      const index = inventory.findIndex(
-        (inv) => (inv.name || "").trim().toLowerCase() === name.toLowerCase()
-      );
+      const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
+      const staffName = payload.addedBy || (user ? (user.name || user.email || "Staff") : "Staff");
 
-      if (index >= 0) {
-        inventory[index].qty = (Number(inventory[index].qty) || 0) + addQty;
-        inventory[index].lastUpdated = new Date().toLocaleTimeString();
-        if (payload.category) inventory[index].category = payload.category;
-        if (payload.alertLevel) inventory[index].alertLevel = Number(payload.alertLevel);
-        if (payload.remarks) {
-          const existing = inventory[index].lastRemark || inventory[index].remark || "";
-          const combined = existing ? (existing + "\n• " + payload.remarks) : payload.remarks;
-          inventory[index].lastRemark = combined;
-          inventory[index].remark = combined;
-        }
-      } else {
-        inventory.push({
-          sku: payload.sku || "SKU-" + Date.now().toString().slice(-5),
-          name: name,
-          category: payload.category || "General",
-          qty: addQty,
-          alertLevel: Number(payload.alertLevel) || 5,
-          lastRemark: payload.remarks || "",
-          remark: payload.remarks || "",
-          lastUpdated: new Date().toLocaleTimeString()
-        });
-      }
-
-      saveBranchData("inventory", inventory, branch);
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-
-      sendMutation("add_stock_qty", branch, {
+      const mutationPayload = {
         name: name,
         sku: payload.sku || "",
         category: payload.category || "General",
         addQty: addQty,
         alertLevel: Number(payload.alertLevel) || 5,
         remarks: payload.remarks || "",
-addedBy: payload.addedBy || "Staff"
-      }, webAppUrl);
+        addedBy: staffName
+      };
 
-      return { success: true };
+      return executeOnlineMutation("add_stock_qty", branch, mutationPayload, webAppUrl)
+        .then((data) => {
+          const inventory = loadBranchInventory(branch);
+          const index = inventory.findIndex(
+            (inv) => (inv.name || "").trim().toLowerCase() === name.toLowerCase()
+          );
+
+          if (data.inventory && Array.isArray(data.inventory)) {
+            saveBranchData("inventory", data.inventory, branch);
+          } else if (index >= 0) {
+            inventory[index].qty = (Number(inventory[index].qty) || 0) + addQty;
+            inventory[index].lastUpdated = new Date().toLocaleTimeString();
+            inventory[index].lastUpdatedBy = staffName + " (+" + addQty + ")";
+            if (payload.category) inventory[index].category = payload.category;
+            if (payload.alertLevel) inventory[index].alertLevel = Number(payload.alertLevel);
+            if (payload.remarks) {
+              const existing = inventory[index].lastRemark || inventory[index].remark || "";
+              const combined = existing ? (existing + "\n• " + payload.remarks) : payload.remarks;
+              inventory[index].lastRemark = combined;
+              inventory[index].remark = combined;
+            }
+            saveBranchData("inventory", inventory, branch);
+          } else {
+            inventory.push({
+              sku: payload.sku || "SKU-" + Date.now().toString().slice(-5),
+              name: name,
+              category: payload.category || "General",
+              qty: addQty,
+              alertLevel: Number(payload.alertLevel) || 5,
+              lastRemark: payload.remarks || "",
+              remark: payload.remarks || "",
+              lastUpdated: new Date().toLocaleTimeString(),
+              lastUpdatedBy: staffName + " (+" + addQty + ")"
+            });
+            saveBranchData("inventory", inventory, branch);
+          }
+
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+          if (window.DevLogger) {
+            window.DevLogger.success("DataStore", `Stock added online successfully for ${branch}: +${addQty} ${name}`);
+          }
+          return { success: true, message: data.message || `Added +${addQty} stock to ${name}` };
+        });
     },
 
-    // Transfer Stock between branches (e.g. Al Khoud <-> Ghala)
-    // Records directly in Sales view & Sales sheet with paymentStatus='transferred'
+    // Transfer Stock between branches (Single Online Funnel with Server-Side De-duplication)
     transferStock: function (payload, webAppUrl) {
       const fromBranch = (payload.fromBranch || getActiveBranch()).toLowerCase();
       const toBranch = (payload.toBranch || (fromBranch === "alkhoud" ? "ghala" : "alkhoud")).toLowerCase();
 
       if (fromBranch === toBranch) {
-        return { success: false, error: "Sending and receiving branches cannot be identical" };
+        return Promise.reject(new Error("Sending and receiving branches cannot be identical"));
       }
 
       const fromInventory = loadBranchInventory(fromBranch);
       const toInventory = loadBranchInventory(toBranch);
-      const fromSales = loadBranchSales(fromBranch);
 
       // Normalize items list
       let items = [];
@@ -873,48 +732,43 @@ addedBy: payload.addedBy || "Staff"
       }
 
       if (items.length === 0) {
-        return { success: false, error: "Please provide at least one item to transfer." };
+        return Promise.reject(new Error("Please provide at least one item to transfer."));
       }
 
       const fromLabel = fromBranch === "ghala" ? "Ghala" : "Al Khoud";
       const toLabel = toBranch === "ghala" ? "Ghala" : "Al Khoud";
 
-      // 1. Validation phase for all items
+      // Validation phase
       const aggregatedQty = {};
       for (const it of items) {
         const rawName = (it.name || "").trim();
         const cleanKey = rawName.toLowerCase();
         const qty = Number(it.qty) || 0;
 
-        if (!rawName) return { success: false, error: "Item name cannot be empty." };
-        if (qty <= 0) return { success: false, error: `Quantity for '${rawName}' must be at least 1.` };
+        if (!rawName) return Promise.reject(new Error("Item name cannot be empty."));
+        if (qty <= 0) return Promise.reject(new Error(`Quantity for '${rawName}' must be at least 1.`));
 
         const matchFrom = fromInventory.find((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
         if (!matchFrom) {
-          return { success: false, error: `Product '${rawName}' not found in ${fromLabel} inventory.` };
+          return Promise.reject(new Error(`Product '${rawName}' not found in ${fromLabel} inventory.`));
         }
 
         const itemCategory = (matchFrom.category || it.category || "General").trim();
         it.category = itemCategory;
         it.sku = matchFrom.sku || it.sku || "";
 
-        // Check destination branch catalog for matching Name AND Category
         const matchTo = toInventory.find(
           (inv) => (inv.name || "").trim().toLowerCase() === cleanKey &&
                    (inv.category || "General").trim().toLowerCase() === itemCategory.toLowerCase()
         );
 
         if (!matchTo) {
-          return {
-            success: false,
-            error: `Product '${matchFrom.name}' (Category: '${itemCategory}') not found in ${toLabel} catalog. Both Name and Category must match in receiving branch.`
-          };
+          return Promise.reject(new Error(`Product '${matchFrom.name}' (Category: '${itemCategory}') not found in ${toLabel} catalog. Both Name and Category must match in receiving branch.`));
         }
 
         aggregatedQty[cleanKey] = (aggregatedQty[cleanKey] || 0) + qty;
       }
 
-      // Check cumulative quantities against sender stock
       for (const cleanKey in aggregatedQty) {
         const totalReq = aggregatedQty[cleanKey];
         const matchFrom = fromInventory.find((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
@@ -922,52 +776,14 @@ addedBy: payload.addedBy || "Staff"
         const availableStock = rawStock === "" || rawStock === null || rawStock === undefined ? 0 : Number(rawStock) || 0;
 
         if (availableStock <= 0) {
-          return { success: false, error: `Product '${matchFrom.name}' is out of stock (0 available) in ${fromLabel}.` };
+          return Promise.reject(new Error(`Product '${matchFrom.name}' is out of stock (0 available) in ${fromLabel}.`));
         }
 
         if (totalReq > availableStock) {
-          return {
-            success: false,
-            error: `Insufficient stock for '${matchFrom.name}' in ${fromLabel} (Available: ${availableStock}, Total requested: ${totalReq}).`
-          };
+          return Promise.reject(new Error(`Insufficient stock for '${matchFrom.name}' in ${fromLabel} (Available: ${availableStock}, Total requested: ${totalReq}).`));
         }
       }
 
-      // 2. Execution Phase: Update inventory in both branches
-      const nowTimeStr = new Date().toLocaleTimeString();
-
-      for (const it of items) {
-        const cleanKey = (it.name || "").trim().toLowerCase();
-        const itemCat = (it.category || "General").trim().toLowerCase();
-        const transferQty = Number(it.qty) || 1;
-
-        // Deduct from sender
-        const fromIdx = fromInventory.findIndex((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
-        if (fromIdx >= 0) {
-          const currentQty = Number(fromInventory[fromIdx].qty) || 0;
-          fromInventory[fromIdx].qty = Math.max(0, currentQty - transferQty);
-          fromInventory[fromIdx].lastUpdated = nowTimeStr;
-          fromInventory[fromIdx].lastRemark = `Transferred ${transferQty} to ${toLabel}`;
-        }
-
-        // Add to receiver
-        const toIdx = toInventory.findIndex(
-          (inv) => (inv.name || "").trim().toLowerCase() === cleanKey &&
-                   (inv.category || "General").trim().toLowerCase() === itemCat
-        );
-        if (toIdx >= 0) {
-          const rawDest = toInventory[toIdx].qty;
-          const currentDestQty = rawDest === "" || rawDest === null || rawDest === undefined ? 0 : Number(rawDest) || 0;
-          toInventory[toIdx].qty = currentDestQty + transferQty;
-          toInventory[toIdx].lastUpdated = nowTimeStr;
-          toInventory[toIdx].lastRemark = `Received ${transferQty} from ${fromLabel}`;
-        }
-      }
-
-      saveBranchData("inventory", fromInventory, fromBranch);
-      saveBranchData("inventory", toInventory, toBranch);
-
-      // 3. Record in Sales View as a Transferred transaction
       const nowIso = new Date().toISOString();
       const customerName = payload.customerName || `${fromLabel} to ${toLabel}`;
       const user = payload.transferredBy || (window.Auth && window.Auth.getUser() ? window.Auth.getUser().name : "Staff");
@@ -976,59 +792,95 @@ addedBy: payload.addedBy || "Staff"
         .map((it) => `${it.name.trim()} (Qty: ${Number(it.qty) || 1})`)
         .join("\n");
 
-      const transferSaleRecord = {
-        id: Date.now(),
-        timestamp: nowIso,
-        date: nowIso.split("T")[0],
-        customerName: customerName,
-        customerPhone: "",
-        customerNumber: "",
-        customerEmail: "",
-        customerAddress: "",
-        vatBill: "no",
-        itemsDetail: itemsDetailStr,
-        items: items.map((it) => ({
-          name: it.name.trim(),
-          category: it.category || "General",
-          qty: Number(it.qty) || 1,
-          unitPrice: 0
-        })),
-        subtotal: 0,
-        vatAmount: 0,
-        discountAmount: 0,
-        grandTotal: 0,
-        paymentStatus: "transferred",
-        paymentMethod: "transferred",
-        cashAmount: 0,
-        cardAmount: 0,
-        refundStatus: "NO",
-        notes: `Inter-Branch Transfer: ${items.length} product(s) transferred from ${fromLabel} to ${toLabel}`,
-        recordedBy: user
-      };
-
-      fromSales.unshift(transferSaleRecord);
-      saveBranchData("sales", fromSales, fromBranch);
-
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-      window.dispatchEvent(new CustomEvent("salesDataChanged"));
-
-      // 4. Send Cloud Mutation to Google Apps Script
-      sendMutation("transfer_stock", fromBranch, {
+      const transferMutationPayload = {
         fromBranch: fromBranch,
         toBranch: toBranch,
         customerName: customerName,
         items: items,
         itemsDetail: itemsDetailStr,
         transferredBy: user
-      }, webAppUrl);
-
-      return {
-        success: true,
-        fromBranch: fromBranch,
-        toBranch: toBranch,
-        transferRecord: transferSaleRecord
       };
+
+      return executeOnlineMutation("transfer_stock", fromBranch, transferMutationPayload, webAppUrl)
+        .then(() => {
+          const nowTimeStr = new Date().toLocaleTimeString();
+
+          for (const it of items) {
+            const cleanKey = (it.name || "").trim().toLowerCase();
+            const itemCat = (it.category || "General").trim().toLowerCase();
+            const transferQty = Number(it.qty) || 1;
+
+            const fromIdx = fromInventory.findIndex((inv) => (inv.name || "").trim().toLowerCase() === cleanKey);
+            if (fromIdx >= 0) {
+              const currentQty = Number(fromInventory[fromIdx].qty) || 0;
+              fromInventory[fromIdx].qty = Math.max(0, currentQty - transferQty);
+              fromInventory[fromIdx].lastUpdated = nowTimeStr;
+              fromInventory[fromIdx].lastRemark = `Transferred ${transferQty} to ${toLabel}`;
+            }
+
+            const toIdx = toInventory.findIndex(
+              (inv) => (inv.name || "").trim().toLowerCase() === cleanKey &&
+                       (inv.category || "General").trim().toLowerCase() === itemCat
+            );
+            if (toIdx >= 0) {
+              const rawDest = toInventory[toIdx].qty;
+              const currentDestQty = rawDest === "" || rawDest === null || rawDest === undefined ? 0 : Number(rawDest) || 0;
+              toInventory[toIdx].qty = currentDestQty + transferQty;
+              toInventory[toIdx].lastUpdated = nowTimeStr;
+              toInventory[toIdx].lastRemark = `Received ${transferQty} from ${fromLabel}`;
+            }
+          }
+
+          saveBranchData("inventory", fromInventory, fromBranch);
+          saveBranchData("inventory", toInventory, toBranch);
+
+          const fromSales = loadBranchSales(fromBranch);
+          const transferSaleRecord = {
+            id: Date.now(),
+            timestamp: nowIso,
+            date: nowIso.split("T")[0],
+            customerName: customerName,
+            customerPhone: "",
+            customerNumber: "",
+            customerEmail: "",
+            customerAddress: "",
+            vatBill: "no",
+            itemsDetail: itemsDetailStr,
+            items: items.map((it) => ({
+              name: it.name.trim(),
+              category: it.category || "General",
+              qty: Number(it.qty) || 1,
+              unitPrice: 0
+            })),
+            subtotal: 0,
+            vatAmount: 0,
+            discountAmount: 0,
+            grandTotal: 0,
+            paymentStatus: "transferred",
+            paymentMethod: "transferred",
+            cashAmount: 0,
+            cardAmount: 0,
+            refundStatus: "NO",
+            notes: `Inter-Branch Transfer: ${items.length} product(s) transferred from ${fromLabel} to ${toLabel}`,
+            recordedBy: user
+          };
+
+          fromSales.unshift(transferSaleRecord);
+          saveBranchData("sales", fromSales, fromBranch);
+
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+          window.dispatchEvent(new CustomEvent("salesDataChanged"));
+
+          return {
+            success: true,
+            fromBranch: fromBranch,
+            toBranch: toBranch,
+            transferRecord: transferSaleRecord
+          };
+        });
     },
+
+    // Amend Stock Item (Single Online Funnel with Server-Side De-duplication)
     amendStockItem: function (arg1, arg2, arg3, arg4) {
       let originalItem, updatedFields, diffs, webAppUrl;
       if (arg1 && typeof arg1 === "object" && arg1.originalItem) {
@@ -1046,14 +898,13 @@ addedBy: payload.addedBy || "Staff"
       const branch = getActiveBranch();
       const inventory = loadBranchInventory(branch);
 
-      const targetIdentifier = originalItem.sku || originalItem.name;
       const index = inventory.findIndex((inv) => {
         if (originalItem.sku && inv.sku) return inv.sku === originalItem.sku;
         return (inv.name || "").trim().toLowerCase() === (originalItem.name || "").trim().toLowerCase();
       });
 
       if (index < 0) {
-        return { success: false, message: "Original item not found for amendment" };
+        return Promise.reject(new Error("Original item not found for amendment"));
       }
 
       const currentItem = inventory[index];
@@ -1066,7 +917,6 @@ addedBy: payload.addedBy || "Staff"
 
       const currentUser = getCurrentUserSafe();
 
-      // Safe number assignment preventing NaN corruption
       const targetQty = updatedFields.qty !== undefined && !isNaN(Number(updatedFields.qty))
         ? Number(updatedFields.qty)
         : (Number(currentItem.qty) || 0);
@@ -1076,25 +926,6 @@ addedBy: payload.addedBy || "Staff"
         : (Number(currentItem.alertLevel) || 5);
 
       const updatedRemark = updatedFields.lastRemark !== undefined ? updatedFields.lastRemark : (currentItem.lastRemark || currentItem.remark || "");
-
-      inventory[index] = {
-        ...currentItem,
-        name: updatedFields.name || currentItem.name,
-        category: updatedFields.category || currentItem.category,
-        qty: targetQty,
-        alertLevel: targetAlert,
-        lastRemark: updatedRemark,
-        remark: updatedRemark,
-        lastAmendedBy: currentUser ? currentUser.name : "Staff",
-        lastAmendedRemark: updatedFields.amendReason || updatedFields.remarks || "",
-        lastUpdated: new Date().toLocaleTimeString()
-      };
-
-      saveBranchData("inventory", inventory, branch);
-
-      // Record Audit Trail locally
-      const auditLogKey = getStorageKey("amend_logs", branch);
-      let logs = loadBranchAuditLogs(branch);
 
       const auditRecord = {
         id: Date.now(),
@@ -1114,55 +945,87 @@ addedBy: payload.addedBy || "Staff"
         reason: updatedFields.amendReason || updatedFields.remarks || ""
       };
 
-      logs.unshift(auditRecord);
-      saveBranchData("amend_logs", logs, branch);
+      const mutationPayload = {
+        name: originalItem.name,
+        auditRecord: auditRecord,
+        updatedFields: updatedFields,
+        diffs: diffs,
+        updatedBy: currentUser ? currentUser.name : "Staff"
+      };
 
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+      return executeOnlineMutation("amend_stock", branch, mutationPayload, webAppUrl)
+        .then((data) => {
+          if (data.inventory && Array.isArray(data.inventory)) {
+            saveBranchData("inventory", data.inventory, branch);
+          } else {
+            inventory[index] = {
+              ...currentItem,
+              name: updatedFields.name || currentItem.name,
+              category: updatedFields.category || currentItem.category,
+              qty: targetQty,
+              alertLevel: targetAlert,
+              lastRemark: updatedRemark,
+              remark: updatedRemark,
+              lastAmendedBy: currentUser ? currentUser.name : "Staff",
+              lastAmendedRemark: updatedFields.amendReason || updatedFields.remarks || "",
+              lastUpdated: new Date().toLocaleTimeString()
+            };
+            saveBranchData("inventory", inventory, branch);
+          }
 
-      sendMutation("amend_stock", branch, { auditRecord: auditRecord }, webAppUrl);
+          let logs = loadBranchAuditLogs(branch);
+          logs.unshift(auditRecord);
+          saveBranchData("amend_logs", logs, branch);
 
-      return { success: true, auditRecord: auditRecord };
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+
+          return { success: true, auditRecord: auditRecord };
+        });
     },
 
     // Add or Update Stock Item for Active Branch
     updateStockItem: function (itemData, webAppUrl) {
       const branch = getActiveBranch();
-      const inventory = loadBranchInventory(branch);
       const name = (itemData.name || "").trim();
 
-      if (!name) return { success: false, message: "Item name required" };
+      if (!name) return Promise.reject(new Error("Item name required"));
 
-      const index = inventory.findIndex(
-        (inv) => (inv.name || "").trim().toLowerCase() === name.toLowerCase()
-      );
+      return executeOnlineMutation("update_stock", branch, { item: itemData }, webAppUrl)
+        .then((data) => {
+          const inventory = loadBranchInventory(branch);
+          if (data.inventory && Array.isArray(data.inventory)) {
+            saveBranchData("inventory", data.inventory, branch);
+          } else {
+            const index = inventory.findIndex(
+              (inv) => (inv.name || "").trim().toLowerCase() === name.toLowerCase()
+            );
 
-      if (index >= 0) {
-        inventory[index] = {
-          ...inventory[index],
-          ...itemData,
-          lastUpdated: new Date().toLocaleTimeString()
-        };
-      } else {
-        inventory.push({
-          sku: itemData.sku || "SKU-" + Date.now().toString().slice(-5),
-          name: name,
-          category: itemData.category || "General",
-          qty: Number(itemData.qty) || 0,
-          alertLevel: Number(itemData.alertLevel) || 5,
-          lastUpdated: new Date().toLocaleTimeString()
+            if (index >= 0) {
+              inventory[index] = {
+                ...inventory[index],
+                ...itemData,
+                lastUpdated: new Date().toLocaleTimeString()
+              };
+            } else {
+              inventory.push({
+                sku: itemData.sku || "SKU-" + Date.now().toString().slice(-5),
+                name: name,
+                category: itemData.category || "General",
+                qty: Number(itemData.qty) || 0,
+                alertLevel: Number(itemData.alertLevel) || 5,
+                lastUpdated: new Date().toLocaleTimeString()
+              });
+            }
+            saveBranchData("inventory", inventory, branch);
+          }
+
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+          return { success: true };
         });
-      }
-
-      saveBranchData("inventory", inventory, branch);
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-
-      sendMutation("update_stock", branch, { item: itemData }, webAppUrl);
-
-      return { success: true };
     },
 
-    flushPendingMutations: function (webAppUrl) {
-      return flushPendingMutations(webAppUrl);
+    flushPendingMutations: function () {
+      return Promise.resolve();
     },
 
     syncFromCloud: syncFromCloud,
@@ -1193,7 +1056,6 @@ addedBy: payload.addedBy || "Staff"
     refundSale: function (saleIdentifier, webAppUrl) {
       const branch = getActiveBranch();
       const sales = loadBranchSales(branch);
-      const inventory = loadBranchInventory(branch);
 
       const targetIndex = sales.findIndex((s) => {
         if (!s) return false;
@@ -1210,25 +1072,15 @@ addedBy: payload.addedBy || "Staff"
       });
 
       if (targetIndex < 0) {
-        return { success: false, message: "Target sale not found" };
+        return Promise.reject(new Error("Target sale not found"));
       }
 
       const targetSale = sales[targetIndex];
 
       if (targetSale.refundStatus === "REFUNDED" || targetSale.isRefunded) {
-        return { success: false, message: "Sale is already refunded" };
+        return Promise.reject(new Error("Sale is already refunded"));
       }
 
-      // 1. Update Sale Ledger to REFUNDED
-      targetSale.refundStatus = "REFUNDED";
-      targetSale.isRefunded = true;
-      targetSale.paymentStatus = "refunded";
-      targetSale.refundedAt = new Date().toISOString();
-
-      sales[targetIndex] = targetSale;
-      saveBranchData("sales", sales, branch);
-
-      // 2. Restore Inventory Quantities accurately
       const itemsToRestore = [];
       if (Array.isArray(targetSale.items) && targetSale.items.length > 0) {
         targetSale.items.forEach((it) => {
@@ -1252,39 +1104,10 @@ addedBy: payload.addedBy || "Staff"
         });
       }
 
-      if (itemsToRestore.length > 0) {
-        itemsToRestore.forEach((soldItem) => {
-          const rawName = (soldItem.name || "").trim();
-          const name = rawName.toLowerCase();
-          const qtyToReturn = Number(soldItem.qty) || 0;
+      const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
+      const refundedBy = user ? (user.name || user.email || "Staff") : "Staff";
 
-          if (name && qtyToReturn > 0) {
-            const invIndex = inventory.findIndex((inv) => {
-              if (soldItem.sku && inv.sku && inv.sku === soldItem.sku) return true;
-              return (inv.name || "").trim().toLowerCase() === name;
-            });
-            if (invIndex >= 0) {
-              inventory[invIndex].qty = (Number(inventory[invIndex].qty) || 0) + qtyToReturn;
-              inventory[invIndex].lastUpdated = new Date().toLocaleTimeString();
-            } else {
-              inventory.push({
-                sku: soldItem.sku || "SKU-" + Date.now().toString().slice(-5),
-                name: rawName || name,
-                category: soldItem.category || "General",
-                qty: qtyToReturn,
-                alertLevel: 5,
-                lastUpdated: new Date().toLocaleTimeString()
-              });
-            }
-          }
-        });
-        saveBranchData("inventory", inventory, branch);
-      }
-
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-
-      // 3. Reliable Mutation Sync with Offline Queueing
-      sendMutation("refund_sale", branch, {
+      const mutationPayload = {
         saleId: targetSale.id,
         timestamp: targetSale.timestamp || "",
         saleDate: targetSale.date || "",
@@ -1292,23 +1115,59 @@ addedBy: payload.addedBy || "Staff"
         grandTotal: targetSale.grandTotal || 0,
         itemsDetail: targetSale.itemsDetail || "",
         items: itemsToRestore && itemsToRestore.length > 0 ? itemsToRestore : (targetSale.items || []),
-        refundStatus: "REFUNDED"
-      }, webAppUrl);
+        refundStatus: "REFUNDED",
+        refundedBy: refundedBy
+      };
 
-      // Trigger Refund Audit Push Notification
-      try {
-        if (window.PushNotification && typeof window.PushNotification.sendRefundAuditAlert === "function") {
-          const user = window.Auth ? window.Auth.getCurrentUser() : null;
-          window.PushNotification.sendRefundAuditAlert(
-            branch,
-            targetSale.grandTotal || 0,
-            targetSale.customerName || "Customer",
-            user ? user.name : "Staff User"
-          );
-        }
-      } catch (e) {}
+      return executeOnlineMutation("refund_sale", branch, mutationPayload, webAppUrl)
+        .then((data) => {
+          targetSale.refundStatus = "REFUNDED";
+          targetSale.isRefunded = true;
+          targetSale.paymentStatus = "refunded";
+          targetSale.refundedAt = new Date().toISOString();
 
-      return { success: true, sale: targetSale };
+          sales[targetIndex] = targetSale;
+          saveBranchData("sales", sales, branch);
+
+          if (data.updatedInventory && Array.isArray(data.updatedInventory)) {
+            saveBranchData("inventory", data.updatedInventory, branch);
+          } else if (itemsToRestore.length > 0) {
+            const inventory = loadBranchInventory(branch);
+            itemsToRestore.forEach((soldItem) => {
+              const rawName = (soldItem.name || "").trim();
+              const name = rawName.toLowerCase();
+              const qtyToReturn = Number(soldItem.qty) || 0;
+
+              if (name && qtyToReturn > 0) {
+                const invIndex = inventory.findIndex((inv) => {
+                  if (soldItem.sku && inv.sku && inv.sku === soldItem.sku) return true;
+                  return (inv.name || "").trim().toLowerCase() === name;
+                });
+                if (invIndex >= 0) {
+                  inventory[invIndex].qty = (Number(inventory[invIndex].qty) || 0) + qtyToReturn;
+                  inventory[invIndex].lastUpdated = new Date().toLocaleTimeString();
+                }
+              }
+            });
+            saveBranchData("inventory", inventory, branch);
+          }
+
+          window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
+          window.dispatchEvent(new CustomEvent("salesDataChanged"));
+
+          try {
+            if (window.PushNotification && typeof window.PushNotification.sendRefundAuditAlert === "function") {
+              window.PushNotification.sendRefundAuditAlert(
+                branch,
+                targetSale.grandTotal || 0,
+                targetSale.customerName || "Customer",
+                refundedBy
+              );
+            }
+          } catch (e) {}
+
+          return { success: true, sale: targetSale };
+        });
     },
 
     markSaleAsPaid: function (saleIdentifier, paymentData, webAppUrl) {
@@ -1330,41 +1189,47 @@ addedBy: payload.addedBy || "Staff"
       });
 
       if (targetIndex < 0) {
-        return { success: false, message: "Target sale not found" };
+        return Promise.reject(new Error("Target sale not found"));
       }
 
       const targetSale = sales[targetIndex];
 
       if (targetSale.paymentStatus === "paid") {
-        return { success: false, message: "Sale is already marked as paid" };
+        return Promise.reject(new Error("Sale is already marked as paid"));
       }
 
-      // 1. Update Sale Payment Status & Breakdown locally
-      targetSale.paymentStatus = "paid";
-      targetSale.paymentMethod = paymentData.paymentMethod || "cash";
-      targetSale.cashAmount = Number(paymentData.cashAmount || 0);
-      targetSale.cardAmount = Number(paymentData.cardAmount || 0);
-      targetSale.paidAt = new Date().toISOString();
-
-      sales[targetIndex] = targetSale;
-      saveBranchData("sales", sales, branch);
-
-      window.dispatchEvent(new CustomEvent("inventoryDataChanged"));
-
-      // 2. Reliable Mutation Sync with Offline Queueing
-      sendMutation("mark_sale_paid", branch, {
+      const mutationPayload = {
         saleId: targetSale.id,
         timestamp: targetSale.timestamp || "",
         saleDate: targetSale.date || "",
         customerName: targetSale.customerName || "",
         grandTotal: targetSale.grandTotal || 0,
         paymentStatus: "paid",
-        paymentMethod: targetSale.paymentMethod,
-        cashAmount: targetSale.cashAmount,
-        cardAmount: targetSale.cardAmount
-      }, webAppUrl);
+        paymentMethod: paymentData.paymentMethod || "cash",
+        cashAmount: Number(paymentData.cashAmount || 0),
+        cardAmount: Number(paymentData.cardAmount || 0)
+      };
 
-      return { success: true, sale: targetSale };
+      return executeOnlineMutation("mark_sale_paid", branch, mutationPayload, webAppUrl)
+        .then(() => {
+          targetSale.paymentStatus = "paid";
+          targetSale.paymentMethod = paymentData.paymentMethod || "cash";
+          targetSale.cashAmount = Number(paymentData.cashAmount || 0);
+          targetSale.cardAmount = Number(paymentData.cardAmount || 0);
+          targetSale.paidAt = new Date().toISOString();
+
+          sales[targetIndex] = targetSale;
+          saveBranchData("sales", sales, branch);
+
+          window.dispatchEvent(new CustomEvent("salesDataChanged"));
+
+          return { success: true, sale: targetSale };
+        });
+    },
+
+    // Backward compatibility alias
+    markSalePaid: function (saleIdentifier, paymentData, webAppUrl) {
+      return this.markSaleAsPaid(saleIdentifier, paymentData, webAppUrl);
     },
 
     clearCacheAndSync: function (webAppUrl) {
