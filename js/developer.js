@@ -200,9 +200,28 @@ window.DevLogger = (function () {
       } catch (err) {
         const duration = (performance.now() - startTime).toFixed(1);
         const pTag = "[P7]";
+
+        const isAbort = err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("abort"));
+        const isOffline = (err instanceof TypeError && String(err.message || "").toLowerCase().includes("failed to fetch")) || (!navigator.onLine);
+
+        let detailedReason = err && err.message ? err.message : String(err);
+        let failureType = "SERVER_ERROR";
+
+        if (options && options.signal && options.signal.reason) {
+          const r = options.signal.reason;
+          detailedReason = r instanceof Error ? r.message : String(r);
+          failureType = "TIMEOUT";
+        } else if (isAbort) {
+          detailedReason = `Request timed out (Client cut off connection after ${duration} ms because server took too long)`;
+          failureType = "TIMEOUT";
+        } else if (isOffline) {
+          detailedReason = "Device offline, DNS unreachable, or Google Apps Script endpoint blocked by CORS/network";
+          failureType = "NETWORK_OFFLINE";
+        }
+
         isInternalLogging = true;
         console.log(
-          `%c${pTag} [CLOUD FAIL ❌] ${method} (${actionName}) - ${duration} ms | Sent: ${formatBytes(reqBodySize)}`,
+          `%c${pTag} [CLOUD FAIL ❌] ${method} (${actionName}) - ${duration} ms | Sent: ${formatBytes(reqBodySize)} | Reason: ${detailedReason}`,
           getLogStyle("red"),
           {
             priority: pTag,
@@ -210,9 +229,11 @@ window.DevLogger = (function () {
             category: "CLOUD ERROR",
             action: actionName,
             method: method,
+            failureType: failureType,
             durationMs: Number(duration),
             sentPayloadSize: formatBytes(reqBodySize),
-            error: err.message || String(err),
+            error: detailedReason,
+            rawError: err && err.message ? err.message : String(err),
             url: url,
             timestamp: new Date().toISOString()
           }

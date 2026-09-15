@@ -269,8 +269,17 @@ window.DataStore = (function () {
 
     // 35-second generous timeout for Google Apps Script serverless execution and sheet locking
     const timeoutMs = 35000;
+    const timeoutError = new Error(`Mutation ${action} timed out after ${timeoutMs}ms (Google Apps Script took too long to respond)`);
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const timeoutId = controller
+      ? setTimeout(() => {
+          try {
+            controller.abort(timeoutError);
+          } catch (e) {
+            controller.abort();
+          }
+        }, timeoutMs)
+      : null;
 
     return fetch(targetUrl, {
       method: "POST",
@@ -373,15 +382,24 @@ window.DataStore = (function () {
       ? `${targetUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}${bypassParam}&${cacheBuster}`
       : `${targetUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}${bypassParam}&${cacheBuster}`;
 
-    // 22-second window for initial sync, 15-second on retry
-    const timeoutMs = retriesSoFar === 0 ? 22000 : 15000;
+    // 30-second window to accommodate Google Apps Script cold starts comfortably
+    const timeoutMs = 30000;
+    const timeoutError = new Error(`Cloud sync timed out after ${timeoutMs}ms (Google Apps Script took too long to respond)`);
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const timeoutId = controller
+      ? setTimeout(() => {
+          try {
+            controller.abort(timeoutError);
+          } catch (e) {
+            controller.abort();
+          }
+        }, timeoutMs)
+      : null;
 
     // Safety timeout to ensure inFlight lock is never stuck
     const safetyClearTimer = setTimeout(() => {
       delete inFlightSyncs[branch];
-    }, 25000);
+    }, 35000);
 
     const syncPromise = fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
       .then((res) => {
@@ -490,18 +508,22 @@ window.DataStore = (function () {
         if (timeoutId) clearTimeout(timeoutId);
         clearTimeout(safetyClearTimer);
 
+        const effectiveErr = (err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("abort")))
+          ? timeoutError
+          : err;
+
         if (retriesSoFar < 1) {
           if (window.DevLogger) {
-            window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt 1 failed: ${err.message}), retrying on warm container in 1s...`, { branch, error: err.message }, 3);
+            window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt 1 failed: ${effectiveErr.message}), retrying on warm container in 1s...`, { branch, error: effectiveErr.message }, 3);
           }
           return new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
             syncFromCloud(targetUrl, retriesSoFar + 1, branch, true)
           );
         }
         if (window.DevLogger) {
-          window.DevLogger.warn("DataStore", `PWA Cloud sync notice for ${branch}: ${err.message || err}`, { branch, error: err.message || err }, 2);
+          window.DevLogger.warn("DataStore", `PWA Cloud sync notice for ${branch}: ${effectiveErr.message || effectiveErr}`, { branch, error: effectiveErr.message || effectiveErr }, 2);
         }
-        return { success: false, error: err };
+        return { success: false, error: effectiveErr };
       });
 
     inFlightSyncs[branch] = syncPromise;

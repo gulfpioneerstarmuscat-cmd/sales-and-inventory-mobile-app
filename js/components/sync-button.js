@@ -39,7 +39,7 @@
         remainingSeconds = SYNC_INTERVAL_SEC;
         updateAllButtonLabels();
       }
-    }, 18000);
+    }, 32000);
 
     const webAppUrl = getWebAppUrl();
     if (window.DataStore && webAppUrl) {
@@ -51,18 +51,21 @@
               window.UI.toast("Live Google Sheets cloud data synced successfully!", "success");
             }
           } else {
-            if (window.UI) {
-              if (manualButton) {
+            if (window.UI && manualButton) {
+              const errMsg = res && res.error ? (res.error.message || String(res.error)) : "";
+              if (errMsg && (errMsg.includes("offline") || errMsg.includes("Failed to fetch"))) {
+                window.UI.toast("Offline mode: Using cached local data.", "warning");
+              } else if (errMsg) {
+                window.UI.toast(`Sync notice: ${errMsg}`, "warning");
+              } else {
                 window.UI.toast("Cloud sync updated using cached local data.", "warning");
               }
             }
           }
         })
-        .catch(() => {
-          if (window.UI) {
-            if (manualButton) {
-              window.UI.toast("Cloud sync failed. Operating in offline mode.", "error");
-            }
+        .catch((err) => {
+          if (window.UI && manualButton) {
+            window.UI.toast(`Cloud sync failed: ${err.message || "Operating in offline mode"}`, "error");
           }
         })
         .finally(() => {

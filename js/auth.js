@@ -88,17 +88,33 @@ window.Auth = (function () {
     } catch (e) {}
   }
 
-  function fetchWithTimeout(url, options, timeoutMs = 6000) {
+  function fetchWithTimeout(url, options, timeoutMs = 15000) {
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    const timeoutError = new Error(`Request timed out after ${timeoutMs}ms (Server took too long to respond)`);
+    const timeoutId = controller
+      ? setTimeout(() => {
+          try {
+            controller.abort(timeoutError);
+          } catch (e) {
+            controller.abort();
+          }
+        }, timeoutMs)
+      : null;
     const opts = {
       ...(options || {}),
       signal: controller ? controller.signal : undefined
     };
 
-    return fetch(url, opts).finally(() => {
-      if (timeoutId) clearTimeout(timeoutId);
-    });
+    return fetch(url, opts)
+      .catch((err) => {
+        if (err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("abort"))) {
+          throw timeoutError;
+        }
+        throw err;
+      })
+      .finally(() => {
+        if (timeoutId) clearTimeout(timeoutId);
+      });
   }
 
   return {
@@ -184,7 +200,7 @@ window.Auth = (function () {
           sessionId: sess.sessionId,
           deviceId: devId
         })
-      }, 4500)
+      }, 12000)
         .then((res) => res.json())
         .then((data) => {
           if (data && data.status === "success" && data.valid) {
@@ -294,7 +310,7 @@ window.Auth = (function () {
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
           })
-        }, 8000)
+        }, 15000)
           .then((res) => res.json())
           .then((data) => {
             if (data && data.status === "success" && data.user) {
@@ -310,7 +326,7 @@ window.Auth = (function () {
             return { success: false, message: data.message || "Invalid Credentials. Check Username/PIN Code." };
           })
           .catch((err) => {
-            return { success: false, message: "Network error checking login credentials" };
+            return { success: false, message: `Network error: ${err.message || "Check connection"}` };
           });
       }
 
@@ -337,7 +353,7 @@ window.Auth = (function () {
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
           })
-        }, 8000)
+        }, 15000)
           .then((res) => res.json())
           .then((data) => {
             if (data && data.status === "success" && data.user) {
@@ -353,7 +369,7 @@ window.Auth = (function () {
             return { success: false, message: data.message || "Google email not authorized." };
           })
           .catch((err) => {
-            return { success: false, message: "Network error checking Google account" };
+            return { success: false, message: `Network error: ${err.message || "Check connection"}` };
           });
       }
 
@@ -380,7 +396,7 @@ window.Auth = (function () {
             deviceId: getDeviceId(),
             deviceName: getDeviceName()
           })
-        }, 8000)
+        }, 15000)
           .then((res) => res.json())
           .then((data) => {
             if (data && data.status === "success" && data.user) {
@@ -396,7 +412,7 @@ window.Auth = (function () {
             return { success: false, message: data.message || "Invalid Emergency Backup Code." };
           })
           .catch((err) => {
-            return { success: false, message: "Network error verifying Emergency Code" };
+            return { success: false, message: `Network error: ${err.message || "Check connection"}` };
           });
       }
 
