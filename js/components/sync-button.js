@@ -24,15 +24,27 @@
     });
   }
 
+  let failsafeTimer = null;
+
   function triggerSync(manualButton) {
     if (isSyncing) return Promise.resolve();
 
     isSyncing = true;
     updateAllButtonLabels();
 
+    if (failsafeTimer) clearTimeout(failsafeTimer);
+    failsafeTimer = setTimeout(() => {
+      if (isSyncing) {
+        isSyncing = false;
+        remainingSeconds = SYNC_INTERVAL_SEC;
+        updateAllButtonLabels();
+      }
+    }, 18000);
+
     const webAppUrl = getWebAppUrl();
     if (window.DataStore && webAppUrl) {
-      return window.DataStore.syncFromCloud(webAppUrl)
+      const bypassCache = Boolean(manualButton);
+      return window.DataStore.syncFromCloud(webAppUrl, 0, null, bypassCache)
         .then((res) => {
           if (res && res.success) {
             if (window.UI && manualButton) {
@@ -42,8 +54,6 @@
             if (window.UI) {
               if (manualButton) {
                 window.UI.toast("Cloud sync updated using cached local data.", "warning");
-              } else {
-                window.UI.toast("Sync failed. Waiting for next retry...", "warning");
               }
             }
           }
@@ -52,12 +62,11 @@
           if (window.UI) {
             if (manualButton) {
               window.UI.toast("Cloud sync failed. Operating in offline mode.", "error");
-            } else {
-              window.UI.toast("Sync failed. Waiting for next retry...", "warning");
             }
           }
         })
         .finally(() => {
+          if (failsafeTimer) clearTimeout(failsafeTimer);
           isSyncing = false;
           remainingSeconds = SYNC_INTERVAL_SEC;
           updateAllButtonLabels();
@@ -66,10 +75,9 @@
       if (window.UI) {
         if (manualButton) {
           window.UI.toast("Offline mode: Configured local storage data.", "warning");
-        } else {
-          window.UI.toast("Sync failed. Waiting for next retry...", "warning");
         }
       }
+      if (failsafeTimer) clearTimeout(failsafeTimer);
       isSyncing = false;
       remainingSeconds = SYNC_INTERVAL_SEC;
       updateAllButtonLabels();

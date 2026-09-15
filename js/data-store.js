@@ -242,6 +242,7 @@ window.DataStore = (function () {
   }
 
   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
   // Single Unified Online Transaction Funnel
   // --------------------------------------------------------------------------
   function executeOnlineMutation(action, branch, payload, explicitTargetUrl) {
@@ -256,7 +257,7 @@ window.DataStore = (function () {
     }
 
     const auth = getAuthPayload();
-    const requestId = "req_" + Date.now() + "_" + Math.random().toString(36).substr(2, 7);
+    const requestId = payload && payload.requestId ? payload.requestId : ("req_" + Date.now() + "_" + Math.random().toString(36).substr(2, 7));
     const bodyPayload = {
       action: action,
       branch: branch,
@@ -266,8 +267,10 @@ window.DataStore = (function () {
       ...(payload || {})
     };
 
+    // 35-second generous timeout for Google Apps Script serverless execution and sheet locking
+    const timeoutMs = 35000;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    const timeoutId = controller ? setTimeout(() => controller.abort(), 16000) : null;
+    const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
     return fetch(targetUrl, {
       method: "POST",
@@ -290,6 +293,49 @@ window.DataStore = (function () {
       })
       .catch((err) => {
         if (timeoutId) clearTimeout(timeoutId);
+
+        // If add_sale timed out or had a transient network abort, verify whether Google Sheet actually received and saved the sale
+        if (action === "add_sale" && typeof navigator !== "undefined" && navigator.onLine !== false) {
+          if (window.DevLogger) {
+            window.DevLogger.warn("DataStore", `Sale submission returned notice (${err.message}). Performing server reconciliation verification...`, { branch, requestId });
+          }
+
+          // Immediate verification attempt via direct cloud sync bypassing cache
+          return syncFromCloud(targetUrl, 0, branch, true)
+            .then((syncRes) => {
+              if (syncRes && syncRes.success) {
+                const cloudSales = (syncRes.data && Array.isArray(syncRes.data.sales)) ? syncRes.data.sales : (loadBranchSales(branch) || []);
+                const targetName = String(payload.customerName || "").trim().toLowerCase();
+                const targetTotal = Number(payload.grandTotal || 0);
+
+                const foundVerified = cloudSales.find((cs) => {
+                  if (payload.saleId && cs.saleId && String(payload.saleId) === String(cs.saleId)) return true;
+                  if (payload.saleId && cs.id && String(payload.saleId) === String(cs.id)) return true;
+                  const cName = String(cs.customerName || "").trim().toLowerCase();
+                  const cTotal = Number(cs.grandTotal) || 0;
+                  return (cName === targetName && Math.abs(cTotal - targetTotal) < 0.005);
+                });
+
+                if (foundVerified) {
+                  if (window.DevLogger) {
+                    window.DevLogger.success("DataStore", `Sale verified on server despite client timeout!`, foundVerified);
+                  }
+                  return {
+                    status: "success",
+                    verifiedOnReconciliation: true,
+                    message: "Sale confirmed and verified on server.",
+                    sale: foundVerified,
+                    updatedInventory: syncRes.data ? syncRes.data.inventory : undefined
+                  };
+                }
+              }
+              throw err;
+            })
+            .catch(() => {
+              throw err;
+            });
+        }
+
         if (window.DevLogger) {
           window.DevLogger.warn("DataStore", `Online mutation [${action}] failed: ${err.message || err}`, { branch, error: err.message || err });
         }
@@ -305,38 +351,43 @@ window.DataStore = (function () {
   // Cloud Synchronization Engine
   // --------------------------------------------------------------------------
   const inFlightSyncs = {};
-  function syncFromCloud(webAppUrl, retryCount, targetBranch) {
+  function syncFromCloud(webAppUrl, retryCount, targetBranch, bypassCache) {
     const targetUrl = webAppUrl || (window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "");
     if (!targetUrl || !targetUrl.startsWith("http")) return Promise.resolve({ success: false, reason: "Invalid URL" });
 
     const branch = targetBranch || getActiveBranch();
-    if (inFlightSyncs[branch]) {
+    if (inFlightSyncs[branch] && !bypassCache) {
       return inFlightSyncs[branch];
     }
 
-    // Flush any pending mutations in the background without blocking the sync fetch
-    flushPendingMutations(targetUrl);
-
     const retriesSoFar = typeof retryCount === "number" ? retryCount : (retryCount ? 1 : 0);
     const cacheBuster = `_t=${Date.now()}`;
+    const bypassParam = (bypassCache || retriesSoFar > 0) ? "&bypassCache=1" : "";
     
     const lastSynced = getLastSyncedTime(branch);
-    const sinceParam = lastSynced ? `&since=${encodeURIComponent(lastSynced)}` : "";
+    const sinceParam = (lastSynced && !bypassCache) ? `&since=${encodeURIComponent(lastSynced)}` : "";
     const auth = getAuthPayload();
     const authParams = `&apiKey=${encodeURIComponent(auth.apiKey)}` + (auth.sessionId ? `&sessionId=${encodeURIComponent(auth.sessionId)}` : "");
 
     const syncUrl = targetUrl.includes("?")
-      ? `${targetUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`
-      : `${targetUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}&${cacheBuster}`;
+      ? `${targetUrl}&branch=${encodeURIComponent(branch)}${sinceParam}${authParams}${bypassParam}&${cacheBuster}`
+      : `${targetUrl}?branch=${encodeURIComponent(branch)}${sinceParam}${authParams}${bypassParam}&${cacheBuster}`;
 
-    // Generous serverless window for Google Apps Script cold starts (20s initial, 12s retry)
-    const timeoutMs = retriesSoFar === 0 ? 20000 : 12000;
+    // 22-second window for initial sync, 15-second on retry
+    const timeoutMs = retriesSoFar === 0 ? 22000 : 15000;
     const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timeoutId = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+    // Safety timeout to ensure inFlight lock is never stuck
+    const safetyClearTimer = setTimeout(() => {
+      delete inFlightSyncs[branch];
+    }, 25000);
 
     const syncPromise = fetch(syncUrl, { cache: "no-store", signal: controller ? controller.signal : undefined })
       .then((res) => {
         if (timeoutId) clearTimeout(timeoutId);
+        clearTimeout(safetyClearTimer);
+        delete inFlightSyncs[branch];
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
@@ -359,15 +410,19 @@ window.DataStore = (function () {
 
             const processedCloudSales = data.sales.map((cs) => {
               const rStatus = String(cs.refundStatus || "").trim().toUpperCase();
-              const isRef = rStatus === "REFUNDED" || rStatus === "YES" || cs.paymentStatus === "refunded";
+              const isRef = rStatus === "REFUNDED" || rStatus === "YES" || cs.paymentStatus === "refunded" || Boolean(cs.isRefunded);
+              const stableId = cs.id || cs.saleId || `sale_${branch}_${String(cs.timestamp || "").replace(/[^0-9]/g, "")}_${String(cs.customerName || "").slice(0, 4)}`;
               return {
                 ...cs,
+                id: stableId,
+                saleId: cs.saleId || stableId,
                 refundStatus: isRef ? "REFUNDED" : "NO",
                 paymentStatus: isRef ? "refunded" : (cs.paymentStatus || "paid"),
                 isRefunded: isRef
               };
             });
 
+            // Match local recent sales to retain local state changes (e.g. recent refunds)
             processedCloudSales.forEach((cs) => {
               const matchingLocal = localSales.find((ls) => {
                 if (cs.id && ls.id && String(cs.id) === String(ls.id)) return true;
@@ -378,7 +433,7 @@ window.DataStore = (function () {
                 const lsTotal = Number(ls.grandTotal) || 0;
                 const csDate = String(cs.date || "").trim();
                 const lsDate = String(ls.date || "").trim();
-                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001 && (!csDate || !lsDate || csDate === lsDate);
+                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.005 && (!csDate || !lsDate || csDate === lsDate);
               });
 
               if (matchingLocal) {
@@ -391,7 +446,13 @@ window.DataStore = (function () {
               }
             });
 
+            // Preserve any local sales that might not yet be in cloud (within last 3 minutes)
+            const threeMinsAgo = Date.now() - 3 * 60 * 1000;
             const unmatchedLocalSales = localSales.filter((ls) => {
+              const lsCreatedAt = ls.id && typeof ls.id === "number" ? ls.id : 0;
+              const isVeryRecent = lsCreatedAt > threeMinsAgo;
+              if (!isVeryRecent) return false;
+
               const existsInCloud = processedCloudSales.some((cs) => {
                 if (cs.id && ls.id && String(cs.id) === String(ls.id)) return true;
                 if (cs.saleId && ls.saleId && String(cs.saleId) === String(ls.saleId)) return true;
@@ -401,7 +462,7 @@ window.DataStore = (function () {
                 const lsTotal = Number(ls.grandTotal) || 0;
                 const csDate = String(cs.date || "").trim();
                 const lsDate = String(ls.date || "").trim();
-                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.001 && (!csDate || !lsDate || csDate === lsDate);
+                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.005 && (!csDate || !lsDate || csDate === lsDate);
               });
               return !existsInCloud;
             });
@@ -415,27 +476,30 @@ window.DataStore = (function () {
           } catch (e) {}
 
           window.dispatchEvent(new CustomEvent("inventoryDataChanged", { detail: { branch, syncTime } }));
+          window.dispatchEvent(new CustomEvent("salesDataChanged", { detail: { branch, syncTime } }));
           if (window.DevLogger) {
             window.DevLogger.success("DataStore", `Successfully synced real ${branch} Google Sheet data at ${syncTime}!`, { branch, syncTime });
           }
           return { success: true, branch, syncTime, data };
         } else {
-          throw new Error(data ? data.message : "Invalid response");
+          throw new Error(data ? data.message : "Invalid response from Google Sheets");
         }
       })
       .catch((err) => {
         delete inFlightSyncs[branch];
         if (timeoutId) clearTimeout(timeoutId);
-        if (retriesSoFar < 2) {
+        clearTimeout(safetyClearTimer);
+
+        if (retriesSoFar < 1) {
           if (window.DevLogger) {
-            window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt ${retriesSoFar + 1} failed: ${err.message}), retrying on warm container in 1.5s...`, { branch, attempt: retriesSoFar + 1, error: err.message }, 3);
+            window.DevLogger.warn("DataStore", `Cloud sync notice (${branch}, attempt 1 failed: ${err.message}), retrying on warm container in 1s...`, { branch, error: err.message }, 3);
           }
-          return new Promise((resolve) => setTimeout(resolve, 1500)).then(() =>
-            syncFromCloud(targetUrl, retriesSoFar + 1, branch)
+          return new Promise((resolve) => setTimeout(resolve, 1000)).then(() =>
+            syncFromCloud(targetUrl, retriesSoFar + 1, branch, true)
           );
         }
         if (window.DevLogger) {
-          window.DevLogger.warn("DataStore", `PWA Background sync notice for ${branch} (using local storage data): ${err.message || err}`, { branch, error: err.message || err }, 2);
+          window.DevLogger.warn("DataStore", `PWA Cloud sync notice for ${branch}: ${err.message || err}`, { branch, error: err.message || err }, 2);
         }
         return { success: false, error: err };
       });
@@ -569,9 +633,11 @@ window.DataStore = (function () {
 
       const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
       const staffName = saleData.recordedBy || (user ? (user.name || user.email || "Staff") : "Staff");
+      const clientSaleId = saleData.saleId || `sale_${branch}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
 
       const salePayload = {
         ...saleData,
+        saleId: clientSaleId,
         recordedBy: staffName,
         timestamp: new Date().toISOString()
       };
@@ -581,8 +647,9 @@ window.DataStore = (function () {
           // 1. Add Sale locally to branch history upon cloud confirmation
           const sales = loadBranchSales(branch);
           const newSale = {
-            id: Date.now(),
-            timestamp: new Date().toISOString(),
+            id: clientSaleId,
+            saleId: clientSaleId,
+            timestamp: data.timestamp || new Date().toISOString(),
             date: saleData.date || new Date().toISOString().split("T")[0],
             customerName: saleData.customerName || "Walk-in Customer",
             customerPhone: saleData.customerPhone || saleData.customerNumber || "",
@@ -604,7 +671,13 @@ window.DataStore = (function () {
             refundStatus: "NO"
           };
 
-          sales.unshift(newSale);
+          // Check if sale is already in local sales (e.g. from server reconciliation sync)
+          const existingIdx = sales.findIndex((s) => s.saleId === clientSaleId || s.id === clientSaleId);
+          if (existingIdx >= 0) {
+            sales[existingIdx] = newSale;
+          } else {
+            sales.unshift(newSale);
+          }
           saveBranchData("sales", sales, branch);
 
           // 2. Deduct Inventory Stock locally
@@ -635,7 +708,11 @@ window.DataStore = (function () {
           if (window.DevLogger) {
             window.DevLogger.success("DataStore", `Sale recorded online successfully for ${branch}`, newSale);
           }
-          return { success: true, sale: newSale };
+          return {
+            success: true,
+            sale: newSale,
+            verified: Boolean(data.verifiedOnReconciliation)
+          };
         });
     },
 

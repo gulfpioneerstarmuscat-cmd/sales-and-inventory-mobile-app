@@ -921,7 +921,7 @@ window.initAddSales = (function () {
       if (saveBtn) {
         saveBtn.disabled = true;
         saveBtn.dataset.originalHtml = saveBtn.innerHTML;
-        saveBtn.innerHTML = 'wait...';
+        saveBtn.innerHTML = 'Saving sale...';
       }
 
       const grandTotalVal = getGrandTotalValue();
@@ -943,8 +943,13 @@ window.initAddSales = (function () {
 
       const user = window.Auth && typeof window.Auth.getCurrentUser === "function" ? window.Auth.getCurrentUser() : null;
       const staffName = user ? (user.name || user.email || "Staff") : "Staff";
+      const branch = window.Auth && typeof window.Auth.getActiveBranch === "function" ? window.Auth.getActiveBranch() : "alkhoud";
+      const clientSaleId = `sale_${branch}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+      const clientRequestId = `req_sale_${Date.now()}_${Math.random().toString(36).substr(2, 7)}`;
 
       const saleData = {
+        saleId: clientSaleId,
+        requestId: clientRequestId,
         date: dateInput.value,
         customerName: nameInput.value.trim(),
         customerNumber: numberInput.value.trim(),
@@ -977,9 +982,6 @@ window.initAddSales = (function () {
 
           // Check for Real-Time Low Stock Push Alert
           try {
-            const branch = window.Auth && typeof window.Auth.getActiveBranch === "function" 
-              ? window.Auth.getActiveBranch() 
-              : null;
             if (branch) {
               const invList = window.DataStore.getInventory(branch) || [];
               if (Array.isArray(items) && invList.length > 0) {
@@ -998,13 +1000,18 @@ window.initAddSales = (function () {
             }
           } catch (e) {}
 
-          UI.toast(`Sale recorded successfully! Total: ${formatOMR(saleData.grandTotal)}`, "success");
+          const successMsg = res && res.verified
+            ? `Sale verified and saved! Total: ${formatOMR(saleData.grandTotal)}`
+            : `Sale recorded successfully! Total: ${formatOMR(saleData.grandTotal)}`;
+
+          UI.toast(successMsg, "success");
 
           // Reset form for next sale & return to Section 1
           clearEntireForm();
         })
         .catch((err) => {
-          UI.toast(`⚠️ Sale not saved: ${err.message || "Network error. Please try again."}`, "error");
+          saveDraft();
+          UI.toast(`⚠️ ${err.message || "Network timeout. Tap Sync or check View Sales to verify before re-entering."}`, "error");
         })
         .finally(() => {
           if (saveBtn) {
