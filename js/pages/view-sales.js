@@ -744,7 +744,7 @@ window.initViewSales = (function () {
           if (refundBtn) {
             refundBtn.disabled = true;
             refundBtn.dataset.originalHtml = refundBtn.innerHTML;
-            refundBtn.innerHTML = "Refunding...";
+            refundBtn.innerHTML = '<svg class="btn-loading-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>';
           }
 
           const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
@@ -967,7 +967,7 @@ window.initViewSales = (function () {
 
         confirmBtn.disabled = true;
         confirmBtn.dataset.originalHtml = confirmBtn.innerHTML;
-        confirmBtn.innerHTML = "Recording...";
+        confirmBtn.innerHTML = '<svg class="btn-loading-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>';
 
         const webAppUrl = window.APP_CONFIG ? (window.APP_CONFIG.googleSheetWebAppUrl || window.APP_CONFIG.webAppUrl || "") : "";
         if (!window.DataStore || typeof window.DataStore.markSaleAsPaid !== "function") {

@@ -335,8 +335,8 @@ window.BranchTransferModal = (function () {
 
       // 3. Execute Transfer
       submitBtn.disabled = true;
-      if (spinner) spinner.hidden = false;
-      if (btnText) btnText.textContent = "Transferring...";
+      if (spinner) spinner.hidden = true;
+      if (btnText) btnText.innerHTML = '<svg class="btn-loading-spinner" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>';
 
       const targetUrl = window.APP_CONFIG ? window.APP_CONFIG.googleSheetWebAppUrl : "";
       const currentUser = window.Auth ? window.Auth.getUser() : null;

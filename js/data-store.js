@@ -467,8 +467,19 @@ window.DataStore = (function () {
             // Preserve any local sales that might not yet be in cloud (within last 3 minutes)
             const threeMinsAgo = Date.now() - 3 * 60 * 1000;
             const unmatchedLocalSales = localSales.filter((ls) => {
-              const lsCreatedAt = ls.id && typeof ls.id === "number" ? ls.id : 0;
-              const isVeryRecent = lsCreatedAt > threeMinsAgo;
+              let lsTimestampMs = 0;
+              if (typeof ls.id === "number") {
+                lsTimestampMs = ls.id;
+              } else if (typeof ls.id === "string") {
+                const tsMatch = ls.id.match(/_(\d{10,13})_/);
+                if (tsMatch) lsTimestampMs = Number(tsMatch[1]);
+              }
+              if (!lsTimestampMs && ls.timestamp) {
+                const parsed = new Date(ls.timestamp).getTime();
+                if (!isNaN(parsed) && parsed > 0) lsTimestampMs = parsed;
+              }
+
+              const isVeryRecent = lsTimestampMs > threeMinsAgo;
               if (!isVeryRecent) return false;
 
               const existsInCloud = processedCloudSales.some((cs) => {
@@ -478,9 +489,16 @@ window.DataStore = (function () {
                 const lsName = String(ls.customerName || "").trim().toLowerCase();
                 const csTotal = Number(cs.grandTotal) || 0;
                 const lsTotal = Number(ls.grandTotal) || 0;
-                const csDate = String(cs.date || "").trim();
-                const lsDate = String(ls.date || "").trim();
-                return csName === lsName && Math.abs(csTotal - lsTotal) < 0.005 && (!csDate || !lsDate || csDate === lsDate);
+                const csTime = String(cs.timestamp || "").trim();
+                const lsTime = String(ls.timestamp || "").trim();
+                const csItems = String(cs.itemsDetail || "").trim().toLowerCase();
+                const lsItems = String(ls.itemsDetail || "").trim().toLowerCase();
+                return (
+                  csName === lsName &&
+                  Math.abs(csTotal - lsTotal) < 0.005 &&
+                  (csTime === lsTime || (!csTime && !lsTime)) &&
+                  (csItems === lsItems || (!csItems && !lsItems))
+                );
               });
               return !existsInCloud;
             });
