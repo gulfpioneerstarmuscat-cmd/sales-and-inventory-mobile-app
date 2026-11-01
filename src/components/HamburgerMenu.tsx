@@ -312,3 +312,4 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs - 1,
   },
 });
+

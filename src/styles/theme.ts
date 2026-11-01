@@ -66,3 +66,4 @@ export const TOUCH_TARGET = {
   buttonHeight: 56,
   inputHeight: 54,
 };
+
