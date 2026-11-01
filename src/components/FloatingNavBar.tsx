@@ -129,22 +129,27 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293BE6', // Blur-like translucent slate
+    backgroundColor: 'rgba(15, 23, 42, 0.88)', // Glassmorphism translucent dark slate
     borderRadius: 28,
     height: 56,
     paddingHorizontal: 8,
-    borderWidth: 1.5,
-    borderColor: '#334155AA',
+    borderWidth: 1,
+    borderColor: 'rgba(71, 85, 105, 0.5)', // Subtle slate-700/50 border
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.55,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 10,
+        elevation: 16,
       },
+      web: {
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(71, 85, 105, 0.5)',
+      } as any,
     }),
   },
   tabButton: {
@@ -176,26 +181,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1.5,
+    borderWidth: 1,
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 10,
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.55,
+        shadowRadius: 24,
       },
       android: {
-        elevation: 10,
+        elevation: 16,
       },
+      web: {
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)',
+        boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.65)',
+      } as any,
     }),
   },
   cartPillProceed: {
-    backgroundColor: COLORS.success,
-    borderColor: '#34D399',
+    backgroundColor: 'rgba(16, 185, 129, 0.92)',
+    borderColor: 'rgba(52, 211, 153, 0.6)',
   },
   cartPillBack: {
-    backgroundColor: COLORS.surfaceLight,
-    borderColor: COLORS.surfaceBorder,
+    backgroundColor: 'rgba(51, 65, 85, 0.92)',
+    borderColor: 'rgba(71, 85, 105, 0.5)',
   },
   cartContentRow: {
     flexDirection: 'row',

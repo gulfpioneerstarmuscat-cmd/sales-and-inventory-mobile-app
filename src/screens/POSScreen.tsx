@@ -56,11 +56,11 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const carouselRef = useRef<FlatList>(null);
   const [activeCardIndex, setActiveCardIndex] = useState(0);
 
-  // Carousel Layout Dimensions (Peeking sides)
-  const cardWidth = Math.min(340, Math.round(width * 0.84));
+  // Carousel Layout Dimensions (Standardized 16px padding on 8pt grid)
+  const cardWidth = Math.min(340, Math.round(width * 0.82));
   const cardGap = 10;
   const snapInterval = cardWidth + cardGap;
-  const sideInset = Math.max(16, (width - cardWidth) / 2);
+  const sideInset = 16;
 
   // Keypad Modal State
   const [keypadVisible, setKeypadVisible] = useState(false);
@@ -458,7 +458,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.categoriesScroll}
-          contentContainerStyle={{ paddingHorizontal: SPACING.md, gap: 6 }}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}
         >
           {categories.map((cat) => (
             <TouchableOpacity
@@ -512,7 +512,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
               horizontal
               showsHorizontalScrollIndicator={false}
               snapToInterval={snapInterval}
-              snapToAlignment="center"
+              snapToAlignment="start"
               decelerationRate="fast"
               contentContainerStyle={{
                 paddingHorizontal: sideInset,
@@ -553,6 +553,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                       style={styles.pillBox}
                       onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
                       activeOpacity={0.7}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     >
                       <Text style={styles.pillLabel}>QTY</Text>
                       <Text style={styles.pillValue}>{item.quantity}</Text>
@@ -567,6 +568,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                       ]}
                       onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
                       activeOpacity={0.7}
+                      hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                     >
                       <Text style={styles.pillLabel}>PRICE</Text>
                       <Text
@@ -603,7 +605,8 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             keyExtractor={(item) => item.id}
             scrollEnabled={!isTablet}
             nestedScrollEnabled
-            contentContainerStyle={{ paddingBottom: 110 }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 132 }}
+            ListFooterComponent={<View style={{ height: 24 }} />}
             renderItem={({ item }) => {
               const stock =
                 activeBranch === 'Al Khoudh' ? item.stock_al_khoudh : item.stock_ghala;
@@ -911,31 +914,31 @@ const styles = StyleSheet.create({
   },
   builderContainer: {
     flex: 1,
-    paddingTop: SPACING.sm,
+    paddingTop: 12,
   },
   zone1Container: {
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.xs,
+    paddingHorizontal: 16,
+    marginBottom: 12,
     zIndex: 50,
   },
   customerSearchInputBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.md,
-    height: 46,
-    borderRadius: RADIUS.md,
+    paddingHorizontal: 14,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: '#33415580',
   },
   customerIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#3B82F622',
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#3B82F618',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm,
+    marginRight: 10,
   },
   customerTextInput: {
     flex: 1,
@@ -945,37 +948,42 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   customerClearBtn: {
-    padding: 4,
-    marginRight: 2,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   customerChevronBtn: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   customerDropdownOverlay: {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    borderRadius: RADIUS.md,
-    marginTop: 4,
-    padding: SPACING.xs,
+    borderColor: '#33415580',
+    borderRadius: 12,
+    marginTop: 6,
+    padding: 6,
     elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
   },
   custRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#33415533',
   },
   custRowSelected: {
     backgroundColor: '#3B82F618',
-    borderRadius: RADIUS.sm,
+    borderRadius: 8,
   },
   custRowTitle: {
     color: COLORS.textPrimary,
@@ -993,7 +1001,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   noCustFound: {
-    padding: SPACING.md,
+    padding: 16,
     alignItems: 'center',
   },
   noCustFoundText: {
@@ -1001,18 +1009,18 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs,
   },
   zone2Container: {
-    marginBottom: SPACING.xs,
+    marginBottom: 12,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
-    marginHorizontal: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    height: 46,
-    borderRadius: RADIUS.md,
+    marginHorizontal: 16,
+    paddingHorizontal: 14,
+    height: 48,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: '#33415580',
   },
   searchInput: {
     flex: 1,
@@ -1021,15 +1029,17 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   categoriesScroll: {
-    marginTop: SPACING.xs,
+    marginTop: 8,
   },
   categoryChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    height: 34,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.surfaceLight,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderColor: '#33415580',
   },
   categoryChipActive: {
     backgroundColor: COLORS.primary,
@@ -1046,14 +1056,14 @@ const styles = StyleSheet.create({
   },
   zone3Container: {
     flex: 1,
-    marginTop: SPACING.xs,
+    marginTop: 2,
   },
   trayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    marginBottom: 6,
+    paddingHorizontal: 16,
+    marginBottom: 8,
   },
   trayTitle: {
     color: COLORS.textSecondary,
@@ -1067,16 +1077,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   carouselWrapper: {
-    height: 104,
-    marginBottom: 8,
+    height: 108,
+    marginBottom: 12,
   },
   cartRowCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
+    borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: '#33415580',
     justifyContent: 'space-between',
     height: 98,
   },
@@ -1087,7 +1097,7 @@ const styles = StyleSheet.create({
   },
   cartRowInfo: {
     flex: 1,
-    marginRight: SPACING.sm,
+    marginRight: 8,
   },
   cartRowSku: {
     color: COLORS.primaryLight,
@@ -1102,10 +1112,10 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   trashBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#EF444415',
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#EF444418',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1120,13 +1130,14 @@ const styles = StyleSheet.create({
   },
   pillBox: {
     flex: 1,
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.surfaceLight,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-    borderRadius: RADIUS.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
     gap: 5,
   },
   pricePillBox: {
@@ -1169,25 +1180,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
-    paddingHorizontal: SPACING.md,
-    marginTop: 6,
-    marginBottom: 6,
+    paddingHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 8,
   },
   catalogCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: COLORS.surface,
-    paddingVertical: 10,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.md,
-    marginBottom: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: '#33415580',
   },
   catalogCardInCart: {
     borderColor: COLORS.primaryLight,
-    backgroundColor: '#1E293BEE',
+    backgroundColor: 'rgba(30, 41, 59, 0.95)',
   },
   catalogSkuRow: {
     flexDirection: 'row',
@@ -1210,20 +1221,20 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addBtnContainer: {
-    marginLeft: SPACING.sm,
+    marginLeft: 8,
   },
   plusBtnSolid: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   plusBtnHollow: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     borderWidth: 1.5,
     borderColor: COLORS.primaryLight,
     backgroundColor: 'transparent',
