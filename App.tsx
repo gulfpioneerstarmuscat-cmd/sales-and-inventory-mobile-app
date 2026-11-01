@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { Header } from './src/components/Header';
 import { HamburgerMenu } from './src/components/HamburgerMenu';
 import { FloatingNavBar, TabScreen } from './src/components/FloatingNavBar';
-import { HomeScreen } from './src/screens/HomeScreen';
 import { POSScreen } from './src/screens/POSScreen';
 import { HistoryScreen } from './src/screens/HistoryScreen';
 import { InventoryScreen } from './src/screens/InventoryScreen';
@@ -20,7 +19,7 @@ import { COLORS } from './src/styles/theme';
 
 const MainApp: React.FC = () => {
   const { currentUser, isLoading, logout } = useAuth();
-  const [currentTab, setCurrentTab] = useState<TabScreen>('home');
+  const [currentTab, setCurrentTab] = useState<TabScreen>('pos');
   const [posPage, setPosPage] = useState<1 | 2>(1);
   const [cart, setCart] = useState<CartItem[]>([]);
 
@@ -87,12 +86,6 @@ const MainApp: React.FC = () => {
 
       {/* Screen Switcher */}
       <View style={styles.mainContent}>
-        {currentTab === 'home' && (
-          <HomeScreen
-            onNavigate={(tab) => setCurrentTab(tab)}
-            onOpenTransfer={() => setTransferVisible(true)}
-          />
-        )}
         {currentTab === 'pos' && (
           <POSScreen
             posPage={posPage}

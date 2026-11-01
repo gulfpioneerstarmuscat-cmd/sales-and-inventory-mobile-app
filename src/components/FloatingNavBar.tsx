@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
 
-export type TabScreen = 'home' | 'pos' | 'history' | 'inventory';
+export type TabScreen = 'pos' | 'history' | 'inventory';
 
 interface FloatingNavBarProps {
   currentTab: TabScreen;
@@ -37,7 +37,6 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
   const showCartPill = currentTab === 'pos' && cartItemCount > 0;
 
   const tabs: Array<{ id: TabScreen; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }> = [
-    { id: 'home', label: 'Home', icon: 'home-outline', activeIcon: 'home' },
     { id: 'pos', label: 'POS', icon: 'cart-outline', activeIcon: 'cart' },
     { id: 'history', label: 'History', icon: 'receipt-outline', activeIcon: 'receipt' },
     { id: 'inventory', label: 'Stock', icon: 'cube-outline', activeIcon: 'cube' },
@@ -86,33 +85,24 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
           })}
         </View>
 
-        {/* Dynamic Docked Cart / Back Button */}
+        {/* Dynamic Docked Circular Cart / Back Button */}
         {showCartPill && (
           <TouchableOpacity
             style={[
-              styles.cartPill,
-              posPage === 2 ? styles.cartPillBack : styles.cartPillProceed,
+              styles.cartCircle,
+              posPage === 2 ? styles.cartCircleBack : styles.cartCircleProceed,
             ]}
             onPress={onPressCartButton}
             activeOpacity={0.8}
           >
             {posPage === 2 ? (
-              <View style={styles.cartContentRow}>
-                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
-                <Text style={styles.cartPillText}>BACK</Text>
-              </View>
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
             ) : (
-              <View style={styles.cartContentRow}>
-                <View style={styles.cartBadgeCount}>
-                  <Text style={styles.cartCountText}>{cartItemCount}</Text>
+              <View style={styles.cartCircleContent}>
+                <Ionicons name="cart" size={22} color="#FFFFFF" />
+                <View style={styles.badgeOverlay}>
+                  <Text style={styles.badgeCountText}>{cartItemCount}</Text>
                 </View>
-                <View style={styles.cartInfoColumn}>
-                  <Text style={styles.cartReviewLabel}>CHECKOUT</Text>
-                  <Text style={styles.cartTotalText}>
-                    {cartTotal.toFixed(3)} <Text style={styles.omrSub}>OMR</Text>
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
               </View>
             )}
           </TouchableOpacity>
@@ -141,8 +131,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#1E293BE6', // Blur-like translucent slate
-    borderRadius: RADIUS.pill,
-    paddingVertical: 6,
+    borderRadius: 28,
+    height: 56,
     paddingHorizontal: 8,
     borderWidth: 1.5,
     borderColor: '#334155AA',
@@ -161,7 +151,7 @@ const styles = StyleSheet.create({
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    height: 44,
     paddingHorizontal: 16,
     minWidth: 64,
     borderRadius: RADIUS.pill,
@@ -171,7 +161,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: FONTS.sizes.xs - 1,
-    marginTop: 2,
+    marginTop: 1,
     fontWeight: '600',
   },
   activeTabLabel: {
@@ -186,13 +176,12 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     backgroundColor: '#FFFFFF',
-    marginTop: 2,
+    marginTop: 1,
   },
-  cartPill: {
-    borderRadius: RADIUS.pill,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    minHeight: TOUCH_TARGET.minHeight,
+  cartCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
@@ -208,55 +197,37 @@ const styles = StyleSheet.create({
       },
     }),
   },
-  cartPillProceed: {
+  cartCircleProceed: {
     backgroundColor: COLORS.success,
     borderColor: '#34D399',
   },
-  cartPillBack: {
+  cartCircleBack: {
     backgroundColor: COLORS.surfaceLight,
     borderColor: COLORS.surfaceBorder,
   },
-  cartContentRow: {
-    flexDirection: 'row',
+  cartCircleContent: {
     alignItems: 'center',
-    gap: SPACING.sm,
+    justifyContent: 'center',
+    position: 'relative',
+    width: 32,
+    height: 32,
   },
-  cartBadgeCount: {
+  badgeOverlay: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
     backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.pill,
-    width: 24,
-    height: 24,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 3,
   },
-  cartCountText: {
+  badgeCountText: {
     color: COLORS.success,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '900',
-  },
-  cartInfoColumn: {
-    alignItems: 'flex-start',
-  },
-  cartReviewLabel: {
-    color: '#FFFFFFEE',
     fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  cartTotalText: {
-    color: '#FFFFFF',
-    fontSize: FONTS.sizes.sm,
     fontWeight: '900',
-  },
-  omrSub: {
-    fontSize: 9,
-    fontWeight: '600',
-  },
-  cartPillText: {
-    color: '#FFFFFF',
-    fontSize: FONTS.sizes.sm,
-    fontWeight: '800',
-    letterSpacing: 1,
   },
 });
 
