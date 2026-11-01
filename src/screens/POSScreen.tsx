@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -52,8 +52,15 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
 
-  // Tray Builder State
-  const [trayCollapsed, setTrayCollapsed] = useState(false);
+  // Horizontal Snapping Carousel State & Ref
+  const carouselRef = useRef<FlatList>(null);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+
+  // Carousel Layout Dimensions (Peeking sides)
+  const cardWidth = Math.min(340, Math.round(width * 0.84));
+  const cardGap = 10;
+  const snapInterval = cardWidth + cardGap;
+  const sideInset = Math.max(16, (width - cardWidth) / 2);
 
   // Keypad Modal State
   const [keypadVisible, setKeypadVisible] = useState(false);
@@ -140,7 +147,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
     setCashPaidInput(remaining.toFixed(3));
   };
 
-  // Cart Management
+  // Cart Management - Last added item placed first, smooth snap to active
   const handleAddToCart = (product: Product) => {
     const branchStock = activeBranch === 'Al Khoudh' ? product.stock_al_khoudh : product.stock_ghala;
     if (branchStock <= 0) {
@@ -155,32 +162,42 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           Alert.alert('Max Stock Reached', `Only ${branchStock} units available at ${activeBranch}.`);
           return prev;
         }
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? {
-                ...item,
-                quantity: item.quantity + 1,
-                total_price: (item.quantity + 1) * item.unit_price,
-              }
-            : item
-        );
+        const updatedItem = {
+          ...existing,
+          quantity: existing.quantity + 1,
+          total_price: (existing.quantity + 1) * existing.unit_price,
+        };
+        // Move updated item to the front so it immediately becomes the visible card
+        return [updatedItem, ...prev.filter((item) => item.product.id !== product.id)];
       } else {
-        // Add new item with default unit price 0.000 (ready for negotiated inline entry)
+        // Add new item at the front (index 0)
         return [
-          ...prev,
           {
             product,
             quantity: 1,
             unit_price: 0.0,
             total_price: 0.0,
           },
+          ...prev,
         ];
       }
     });
+
+    // Snap carousel to the newly added item at index 0
+    setTimeout(() => {
+      carouselRef.current?.scrollToOffset({ offset: 0, animated: true });
+      setActiveCardIndex(0);
+    }, 50);
   };
 
   const handleRemoveFromCart = (productId: string) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+    setCart((prev) => {
+      const nextCart = prev.filter((item) => item.product.id !== productId);
+      if (activeCardIndex >= nextCart.length) {
+        setActiveCardIndex(Math.max(0, nextCart.length - 1));
+      }
+      return nextCart;
+    });
   };
 
   const handleOpenKeypad = (productId: string, type: 'qty' | 'price', currentVal: number) => {
@@ -465,113 +482,115 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         </ScrollView>
       </View>
 
-      {/* Zone 3: Item Tray (Available Catalog + Active Builder Line Items) */}
+      {/* Zone 3: Horizontal Snapping Builder Carousel + Catalog Products */}
       <View style={styles.zone3Container}>
-        {/* Selected Cart Items Tray Header */}
-        <View style={styles.trayHeader}>
-          <TouchableOpacity
-            style={styles.trayHeaderLeft}
-            onPress={() => setTrayCollapsed(!trayCollapsed)}
-            activeOpacity={0.7}
-          >
+        {/* Selected Carousel Header (e.g. SELECTED (1/3)) */}
+        {cart.length > 0 && (
+          <View style={styles.trayHeader}>
             <Text style={styles.trayTitle}>
-              SALE ITEMS ({cart.length})
+              SELECTED ({Math.min(activeCardIndex + 1, cart.length)}/{cart.length})
             </Text>
-            {cart.length > 0 && (
-              <Ionicons
-                name={trayCollapsed ? 'chevron-down' : 'chevron-up'}
-                size={16}
-                color={COLORS.textSecondary}
-                style={{ marginLeft: 6 }}
-              />
-            )}
-          </TouchableOpacity>
-
-          {cart.length > 0 && (
-            <TouchableOpacity onPress={() => setCart([])}>
+            <TouchableOpacity
+              onPress={() => {
+                setCart([]);
+                setActiveCardIndex(0);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Text style={styles.clearCartText}>Clear All</Text>
             </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Collapsed Tray Summary */}
-        {cart.length > 0 && trayCollapsed && (
-          <TouchableOpacity
-            style={styles.trayCollapsedBar}
-            onPress={() => setTrayCollapsed(false)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.trayCollapsedText}>
-              {cart.reduce((sum, item) => sum + item.quantity, 0)} items in tray • {subtotal.toFixed(3)} OMR
-            </Text>
-            <Text style={styles.trayCollapsedAction}>Show Items</Text>
-          </TouchableOpacity>
+          </View>
         )}
 
-        {/* Cart Line Items (2-Line Minimal & Spacious Layout) */}
-        {cart.length > 0 && !trayCollapsed && (
-          <ScrollView
-            style={styles.cartItemsScroll}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={true}
-          >
-            {cart.map((item) => (
-              <View key={item.product.id} style={styles.cartRowCard}>
-                {/* Line 1: Name on Left, Trash on Right */}
-                <View style={styles.cartRowLine1}>
-                  <View style={styles.cartRowInfo}>
-                    <Text style={styles.cartRowSku}>{item.product.sku}</Text>
-                    <Text style={styles.cartRowName} numberOfLines={1}>
-                      {item.product.name}
-                    </Text>
+        {/* Horizontal Snapping Carousel Cards (Left-to-Right with Side Peeking) */}
+        {cart.length > 0 && (
+          <View style={styles.carouselWrapper}>
+            <FlatList
+              ref={carouselRef}
+              data={cart}
+              keyExtractor={(item) => item.product.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={snapInterval}
+              snapToAlignment="center"
+              decelerationRate="fast"
+              contentContainerStyle={{
+                paddingHorizontal: sideInset,
+                gap: cardGap,
+              }}
+              onScroll={(e) => {
+                const offsetX = e.nativeEvent.contentOffset.x;
+                const index = Math.round(offsetX / snapInterval);
+                const clamped = Math.max(0, Math.min(index, cart.length - 1));
+                if (clamped !== activeCardIndex) {
+                  setActiveCardIndex(clamped);
+                }
+              }}
+              scrollEventThrottle={16}
+              renderItem={({ item }) => (
+                <View style={[styles.cartRowCard, { width: cardWidth }]}>
+                  {/* Line 1: Name & SKU on Left, Trash on Right */}
+                  <View style={styles.cartRowLine1}>
+                    <View style={styles.cartRowInfo}>
+                      <Text style={styles.cartRowSku}>{item.product.sku}</Text>
+                      <Text style={styles.cartRowName} numberOfLines={1}>
+                        {item.product.name}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleRemoveFromCart(item.product.id)}
+                      style={styles.trashBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity
-                    onPress={() => handleRemoveFromCart(item.product.id)}
-                    style={styles.trashBtn}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <Ionicons name="trash-outline" size={17} color={COLORS.danger} />
-                  </TouchableOpacity>
-                </View>
 
-                {/* Line 2: Qty on Left, Unit Price in Middle, Line Total on Right */}
-                <View style={styles.cartRowLine2}>
-                  {/* Left: Quantity */}
-                  <TouchableOpacity
-                    style={styles.inlineQtyBox}
-                    onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.qtyLabel}>QTY</Text>
-                    <Text style={styles.qtyValue}>{item.quantity}</Text>
-                  </TouchableOpacity>
+                  {/* Line 2: The 3 Matching Pills (QTY, PRICE, TOTAL) */}
+                  <View style={styles.cartRowLine2}>
+                    {/* 1. QTY Pill */}
+                    <TouchableOpacity
+                      style={styles.pillBox}
+                      onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.pillLabel}>QTY</Text>
+                      <Text style={styles.pillValue}>{item.quantity}</Text>
+                    </TouchableOpacity>
 
-                  {/* Middle: Unit Price */}
-                  <TouchableOpacity
-                    style={[
-                      styles.inlinePriceBox,
-                      item.unit_price <= 0 && styles.priceBoxMissing,
-                    ]}
-                    onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.priceLabel}>PRICE (OMR)</Text>
-                    <Text style={styles.priceValue}>
-                      {item.unit_price > 0 ? item.unit_price.toFixed(3) : 'SET PRICE'}
-                    </Text>
-                  </TouchableOpacity>
+                    {/* 2. PRICE Pill */}
+                    <TouchableOpacity
+                      style={[
+                        styles.pillBox,
+                        styles.pricePillBox,
+                        item.unit_price <= 0 && styles.priceBoxMissing,
+                      ]}
+                      onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.pillLabel}>PRICE</Text>
+                      <Text
+                        style={[
+                          styles.pillValue,
+                          item.unit_price <= 0 && styles.pillValueMissing,
+                        ]}
+                      >
+                        {item.unit_price > 0 ? item.unit_price.toFixed(3) : 'SET PRICE'}
+                      </Text>
+                    </TouchableOpacity>
 
-                  {/* Right: Line Total */}
-                  <View style={styles.cartRowTotalCol}>
-                    <Text style={styles.lineTotalLabel}>TOTAL</Text>
-                    <Text style={styles.rowTotalValue}>
-                      {item.total_price.toFixed(3)}
-                    </Text>
+                    {/* 3. TOTAL Pill */}
+                    <View style={[styles.pillBox, styles.totalPillBox]}>
+                      <Text style={styles.pillLabel}>TOTAL</Text>
+                      <Text style={styles.totalPillValue}>
+                        {item.total_price.toFixed(3)}
+                      </Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))}
-          </ScrollView>
+              )}
+            />
+          </View>
         )}
 
         {/* Catalog Search Results Grid */}
@@ -1027,18 +1046,14 @@ const styles = StyleSheet.create({
   },
   zone3Container: {
     flex: 1,
-    paddingHorizontal: SPACING.md,
     marginTop: SPACING.xs,
   },
   trayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: SPACING.md,
     marginBottom: 6,
-  },
-  trayHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   trayTitle: {
     color: COLORS.textSecondary,
@@ -1051,45 +1066,24 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  trayCollapsedBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 8,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    marginBottom: SPACING.xs,
-  },
-  trayCollapsedText: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '600',
-  },
-  trayCollapsedAction: {
-    color: COLORS.primaryLight,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '700',
-  },
-  cartItemsScroll: {
-    maxHeight: 210,
-    marginBottom: SPACING.xs,
+  carouselWrapper: {
+    height: 104,
+    marginBottom: 8,
   },
   cartRowCard: {
     backgroundColor: COLORS.surface,
     borderRadius: RADIUS.md,
-    padding: SPACING.sm + 2,
-    marginBottom: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
+    justifyContent: 'space-between',
+    height: 98,
   },
   cartRowLine1: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xs + 2,
   },
   cartRowInfo: {
     flex: 1,
@@ -1103,15 +1097,15 @@ const styles = StyleSheet.create({
   },
   cartRowName: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.sm,
+    fontSize: FONTS.sizes.xs + 1,
     fontWeight: '700',
     marginTop: 1,
   },
   trashBtn: {
-    width: 30,
-    height: 30,
+    width: 28,
+    height: 28,
     borderRadius: RADIUS.sm,
-    backgroundColor: '#EF444418',
+    backgroundColor: '#EF444415',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1119,37 +1113,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 6,
     paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#33415533',
   },
-  inlineQtyBox: {
+  pillBox: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 6,
     borderRadius: RADIUS.sm,
-    gap: 6,
+    gap: 5,
   },
-  qtyLabel: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  qtyValue: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.sm,
-    fontWeight: '800',
-  },
-  inlinePriceBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: RADIUS.sm,
-    gap: 6,
+  pricePillBox: {
+    flex: 1.25,
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -1157,36 +1138,40 @@ const styles = StyleSheet.create({
     borderColor: COLORS.danger,
     backgroundColor: '#7F1D1D33',
   },
-  priceLabel: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    fontWeight: '800',
+  totalPillBox: {
+    flex: 1.15,
+    backgroundColor: '#10B98115',
+    borderWidth: 1,
+    borderColor: '#10B98133',
   },
-  priceValue: {
+  pillLabel: {
+    color: COLORS.textMuted,
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  pillValue: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xs,
+    fontSize: 11,
     fontWeight: '800',
   },
-  cartRowTotalCol: {
-    alignItems: 'flex-end',
+  pillValueMissing: {
+    color: COLORS.danger,
+    fontSize: 9.5,
   },
-  lineTotalLabel: {
-    color: COLORS.textMuted,
-    fontSize: 8,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  rowTotalValue: {
+  totalPillValue: {
     color: COLORS.success,
-    fontSize: FONTS.sizes.sm,
+    fontSize: 11,
     fontWeight: '800',
   },
   catalogHeader: {
     color: COLORS.textMuted,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
-    marginVertical: 4,
+    paddingHorizontal: SPACING.md,
+    marginTop: 6,
+    marginBottom: 6,
   },
   catalogCard: {
     flexDirection: 'row',
