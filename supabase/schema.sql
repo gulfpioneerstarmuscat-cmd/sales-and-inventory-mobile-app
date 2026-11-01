@@ -57,16 +57,14 @@ CREATE TABLE products (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- 3. Customers (B2B Contractors, Installers, Walk-ins)
+-- 3. Customers (B2B Contractors, Installers, Walk-ins - Global across all branches)
 CREATE TABLE customers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
     company_name TEXT,
     phone TEXT,
-    client_type TEXT NOT NULL CHECK (client_type IN ('retail_installer', 'monthly_contractor', 'walk_in', 'other')),
-    credit_limit NUMERIC(10, 3) NOT NULL DEFAULT 0.000,
-    current_balance NUMERIC(10, 3) NOT NULL DEFAULT 0.000,
-    branch TEXT NOT NULL DEFAULT 'All' CHECK (branch IN ('Al Khoudh', 'Ghala', 'All')),
+    credit_limit NUMERIC(10, 3) DEFAULT NULL, -- Optional credit limit in OMR
+    current_balance NUMERIC(10, 3) DEFAULT 0.000, -- Optional / defaults to 0.000
     notes TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -146,7 +144,6 @@ CREATE INDEX idx_products_stock_ghala ON products(stock_ghala);
 -- Customers: Search by company or contact name
 CREATE INDEX idx_customers_name ON customers USING gin(to_tsvector('english', name));
 CREATE INDEX idx_customers_phone ON customers(phone);
-CREATE INDEX idx_customers_type ON customers(client_type);
 
 -- Sales & Items: Branch filtering & historical analytics
 CREATE INDEX idx_sales_branch ON sales(branch);
@@ -536,13 +533,13 @@ INSERT INTO staff_profiles (id, name, pin, role, branch, phone) VALUES
 ('a0000000-0000-0000-0000-000000000004', 'Showroom Visitor', '0000', 'visitor', 'Al Khoudh', '+968 9111 0004')
 ON CONFLICT (id) DO NOTHING;
 
--- Seed B2B Customers
-INSERT INTO customers (id, name, company_name, phone, client_type, credit_limit, current_balance, branch) VALUES
-('c0000000-0000-0000-0000-000000000001', 'Tariq Al-Riyami', 'Al-Riyami Automation & Gates', '+968 9123 4567', 'retail_installer', 2500.000, 340.000, 'Al Khoudh'),
-('c0000000-0000-0000-0000-000000000002', 'Ahmed Al-Kindi', 'Muscat Integrated Contracting LLC', '+968 9876 5432', 'monthly_contractor', 5000.000, 1150.000, 'Ghala'),
-('c0000000-0000-0000-0000-000000000003', 'Faisal Al-Maamari', 'Barka Gate Systems', '+968 9555 1234', 'retail_installer', 1500.000, 0.000, 'Al Khoudh'),
-('c0000000-0000-0000-0000-000000000004', 'Sultan Al-Habsi', 'Al-Dakhiliyah Security Solutions', '+968 9444 8899', 'monthly_contractor', 4000.000, 780.000, 'Ghala'),
-('c0000000-0000-0000-0000-000000000005', 'Walk-in Installer', 'General Installer / Cash Client', '+968 9000 0000', 'walk_in', 0.000, 0.000, 'All')
+-- Seed B2B Customers (Global across all branches)
+INSERT INTO customers (id, name, company_name, phone, credit_limit, current_balance) VALUES
+('c0000000-0000-0000-0000-000000000001', 'Tariq Al-Riyami', 'Al-Riyami Automation & Gates', '+968 9123 4567', 2500.000, 340.000),
+('c0000000-0000-0000-0000-000000000002', 'Ahmed Al-Kindi', 'Muscat Integrated Contracting LLC', '+968 9876 5432', 5000.000, 1150.000),
+('c0000000-0000-0000-0000-000000000003', 'Faisal Al-Maamari', 'Barka Gate Systems', '+968 9555 1234', 1500.000, 0.000),
+('c0000000-0000-0000-0000-000000000004', 'Sultan Al-Habsi', 'Al-Dakhiliyah Security Solutions', '+968 9444 8899', 4000.000, 780.000),
+('c0000000-0000-0000-0000-000000000005', 'Walk-in Installer', 'General Installer / Cash Client', '+968 9000 0000', NULL, 0.000)
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed Security Automation Hardware Catalog (GPS Muscat core catalog)
@@ -577,3 +574,4 @@ INSERT INTO products (id, sku, name, category, description, stock_al_khoudh, sto
 ('b0000000-0000-0000-0000-000000000019', 'SP-GEAR-RACK-STEEL', 'Heavy Steel Gear Rack M4 (1 Meter)', 'Spare Parts', 'Zinc-plated solid steel 30x12mm gear rack with mounting spacers for sliding motors', 150, 120, 30, 'pcs'),
 ('b0000000-0000-0000-0000-000000000020', 'SP-NICE-EPM-PHOTOCELL', 'Nice EPM Pair Outdoor Safety Photocells', 'Spare Parts', 'Synchronized surface-mounted photocell pair with 15-meter range', 40, 35, 10, 'pair')
 ON CONFLICT (id) DO NOTHING;
+
