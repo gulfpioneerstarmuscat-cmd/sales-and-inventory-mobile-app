@@ -1,12 +1,23 @@
-.vscode
-CNAME
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
 
-# Developer Testing & Telemetry Script
-test-suite.js
+# macOS
+.DS_Store
 
-# Google Apps Script Source Code & Local IDE Configs (Hidden from GitHub)
-apps-script/
-google-apps-script/
-backend/
-.clasp.json
-clasp.json
+# Environment
+.env
+.env.local
+.env*.local
+
+# Editor
+.vscode/
+.idea/
