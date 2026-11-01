@@ -78,8 +78,6 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
                 >
                   {tab.label}
                 </Text>
-                {/* Active indicator dot */}
-                {isActive && <View style={styles.activeDot} />}
               </TouchableOpacity>
             );
           })}
@@ -171,13 +169,6 @@ const styles = StyleSheet.create({
   },
   inactiveTabLabel: {
     color: COLORS.textSecondary,
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#FFFFFF',
-    marginTop: 1,
   },
   cartPill: {
     height: 56,
