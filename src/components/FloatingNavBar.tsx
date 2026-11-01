@@ -85,24 +85,25 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
           })}
         </View>
 
-        {/* Dynamic Docked Circular Cart / Back Button */}
+        {/* Dynamic Docked Cart Pill / Back Button */}
         {showCartPill && (
           <TouchableOpacity
             style={[
-              styles.cartCircle,
-              posPage === 2 ? styles.cartCircleBack : styles.cartCircleProceed,
+              styles.cartPill,
+              posPage === 2 ? styles.cartPillBack : styles.cartPillProceed,
             ]}
             onPress={onPressCartButton}
             activeOpacity={0.8}
           >
             {posPage === 2 ? (
-              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+              <View style={styles.cartContentRow}>
+                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                <Text style={styles.cartPillText}>BACK</Text>
+              </View>
             ) : (
-              <View style={styles.cartCircleContent}>
-                <Ionicons name="cart" size={22} color="#FFFFFF" />
-                <View style={styles.badgeOverlay}>
-                  <Text style={styles.badgeCountText}>{cartItemCount}</Text>
-                </View>
+              <View style={styles.cartContentRow}>
+                <Ionicons name="cart" size={20} color="#FFFFFF" />
+                <Text style={styles.cartCountNumber}>{cartItemCount}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -178,10 +179,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     marginTop: 1,
   },
-  cartCircle: {
-    width: 56,
+  cartPill: {
     height: 56,
     borderRadius: 28,
+    paddingHorizontal: 18,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1.5,
@@ -189,45 +190,37 @@ const styles = StyleSheet.create({
       ios: {
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.35,
         shadowRadius: 10,
       },
       android: {
-        elevation: 12,
+        elevation: 10,
       },
     }),
   },
-  cartCircleProceed: {
+  cartPillProceed: {
     backgroundColor: COLORS.success,
     borderColor: '#34D399',
   },
-  cartCircleBack: {
+  cartPillBack: {
     backgroundColor: COLORS.surfaceLight,
     borderColor: COLORS.surfaceBorder,
   },
-  cartCircleContent: {
+  cartContentRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    width: 32,
-    height: 32,
+    gap: 8,
   },
-  badgeOverlay: {
-    position: 'absolute',
-    top: -6,
-    right: -8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeCountText: {
-    color: COLORS.success,
-    fontSize: 10,
+  cartCountNumber: {
+    color: '#FFFFFF',
+    fontSize: FONTS.sizes.md,
     fontWeight: '900',
+  },
+  cartPillText: {
+    color: '#FFFFFF',
+    fontSize: FONTS.sizes.xs,
+    fontWeight: '800',
+    letterSpacing: 0.8,
   },
 });
 
