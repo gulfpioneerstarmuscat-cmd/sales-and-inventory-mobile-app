@@ -35,12 +35,11 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
     }, 150);
   };
 
-  const isKhoudh = activeBranch === 'Al Khoudh';
+  const otherBranch = activeBranch === 'Al Khoudh' ? 'Ghala' : 'Al Khoudh';
 
   const handleToggleBranch = () => {
     if (isAdmin) {
-      const nextBranch = activeBranch === 'Al Khoudh' ? 'Ghala' : 'Al Khoudh';
-      switchBranch(nextBranch);
+      switchBranch(otherBranch);
       handleAction('switch_branch');
     } else {
       Alert.alert(
@@ -98,7 +97,7 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
 
               <View style={styles.divider} />
 
-              {/* Menu List */}
+              {/* Menu List - Clean without descriptions */}
               <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
                 {/* 1. Profile */}
                 <TouchableOpacity
@@ -110,79 +109,35 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   </View>
                   <View style={styles.menuTextContainer}>
                     <Text style={styles.menuTitle}>Profile</Text>
-                    <Text style={styles.menuSubtitle}>Account info, branch & role</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
 
-                {/* 2. Switch Branches (Below Profile, Above Inter-Branch Transfer) */}
+                {/* 2. Dynamic Switch Branch (e.g. Switch to Ghala / Switch to Al Khoudh) */}
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={handleToggleBranch}
                   activeOpacity={isAdmin ? 0.7 : 0.9}
                 >
-                  <View
-                    style={[
-                      styles.menuIconContainer,
-                      { backgroundColor: isKhoudh ? '#38BDF822' : '#A855F722' },
-                    ]}
-                  >
-                    <Ionicons
-                      name="swap-horizontal"
-                      size={20}
-                      color={isKhoudh ? COLORS.branchKhoudh : COLORS.branchGhala}
-                    />
+                  <View style={[styles.menuIconContainer, { backgroundColor: '#38BDF822' }]}>
+                    <Ionicons name="swap-horizontal" size={20} color={COLORS.branchKhoudh} />
                   </View>
                   <View style={styles.menuTextContainer}>
-                    <Text style={styles.menuTitle}>Switch Branches</Text>
-                    <Text style={styles.menuSubtitle}>
-                      {isAdmin
-                        ? `Active: ${activeBranch} • Tap to switch to ${isKhoudh ? 'Ghala' : 'Al Khoudh'}`
-                        : `Locked to ${activeBranch}`}
-                    </Text>
+                    <Text style={styles.menuTitle}>Switch to {otherBranch}</Text>
                   </View>
-                  <View
-                    style={[
-                      styles.branchBadge,
-                      isKhoudh ? styles.badgeKhoudh : styles.badgeGhala,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.branchDot,
-                        { backgroundColor: isKhoudh ? COLORS.branchKhoudh : COLORS.branchGhala },
-                      ]}
-                    />
-                    <Text style={styles.branchBadgeText}>{activeBranch}</Text>
-                    {isAdmin ? (
-                      <Ionicons
-                        name="swap-horizontal"
-                        size={12}
-                        color={COLORS.textSecondary}
-                        style={{ marginLeft: 4 }}
-                      />
-                    ) : (
-                      <Ionicons
-                        name="lock-closed"
-                        size={12}
-                        color={COLORS.textMuted}
-                        style={{ marginLeft: 4 }}
-                      />
-                    )}
-                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
 
-                {/* 3. Inter-Branch Transfer */}
+                {/* 3. Dynamic Inter-Branch Transfer (e.g. Transfer to Ghala / Transfer to Al Khoudh) */}
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleAction('transfer')}
                 >
                   <View style={[styles.menuIconContainer, { backgroundColor: '#10B98122' }]}>
-                    <Ionicons name="swap-horizontal" size={20} color={COLORS.success} />
+                    <Ionicons name="paper-plane-outline" size={20} color={COLORS.success} />
                   </View>
                   <View style={styles.menuTextContainer}>
-                    <Text style={styles.menuTitle}>Inter-Branch Transfer</Text>
-                    <Text style={styles.menuSubtitle}>Move stock between Khoudh & Ghala</Text>
+                    <Text style={styles.menuTitle}>Transfer to {otherBranch}</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
@@ -197,7 +152,6 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   </View>
                   <View style={styles.menuTextContainer}>
                     <Text style={styles.menuTitle}>Settings</Text>
-                    <Text style={styles.menuSubtitle}>Sound, haptic, theme & build</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
@@ -218,7 +172,6 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                           <Text style={styles.adminTagText}>ADMIN</Text>
                         </View>
                       </View>
-                      <Text style={styles.menuSubtitle}>Staff PINs, OTP & stock privileges</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                   </TouchableOpacity>
@@ -236,7 +189,6 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   </View>
                   <View style={styles.menuTextContainer}>
                     <Text style={[styles.menuTitle, { color: COLORS.danger }]}>Log Out</Text>
-                    <Text style={styles.menuSubtitle}>End current shift & lock app</Text>
                   </View>
                 </TouchableOpacity>
               </ScrollView>
@@ -338,8 +290,8 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    minHeight: TOUCH_TARGET.minHeight,
+    paddingVertical: SPACING.sm + 4,
+    minHeight: 52,
   },
   logoutItem: {
     marginTop: SPACING.sm,
@@ -354,42 +306,12 @@ const styles = StyleSheet.create({
   },
   menuTextContainer: {
     flex: 1,
+    justifyContent: 'center',
   },
   menuTitle: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
-  },
-  menuSubtitle: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.xs,
-    marginTop: 1,
-  },
-  branchBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm + 2,
-    paddingVertical: 5,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.surfaceLight,
-    borderWidth: 1,
-  },
-  badgeKhoudh: {
-    borderColor: '#38BDF855',
-  },
-  badgeGhala: {
-    borderColor: '#A855F755',
-  },
-  branchDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 5,
-  },
-  branchBadgeText: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xs - 1,
-    fontWeight: '700',
   },
   adminTag: {
     backgroundColor: COLORS.warning,

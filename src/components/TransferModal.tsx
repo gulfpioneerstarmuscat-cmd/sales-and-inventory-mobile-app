@@ -39,15 +39,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
 
   useEffect(() => {
     if (visible) {
-      // Set initial directional branches
-      if (isAdmin) {
-        setFromBranch('Al Khoudh');
-        setToBranch('Ghala');
-      } else {
-        const staffBr = activeBranch;
-        setFromBranch(staffBr);
-        setToBranch(staffBr === 'Al Khoudh' ? 'Ghala' : 'Al Khoudh');
-      }
+      // Set initial directional branches matching active branch context
+      const source = activeBranch;
+      const target = activeBranch === 'Al Khoudh' ? 'Ghala' : 'Al Khoudh';
+      setFromBranch(source);
+      setToBranch(target);
       fetchProducts();
     }
   }, [visible, activeBranch, isAdmin]);

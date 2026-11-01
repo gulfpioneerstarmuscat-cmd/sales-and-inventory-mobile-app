@@ -11,9 +11,18 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenMenu }) => {
   const insets = useSafeAreaInsets();
+  const verticalPadding = SPACING.sm + 4; // 12px equal top & bottom padding
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + SPACING.xs }]}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingTop: insets.top + verticalPadding,
+          paddingBottom: verticalPadding,
+        },
+      ]}
+    >
       <View style={styles.content}>
         {/* Left: Company Logo */}
         <View style={styles.logoWrapper}>
@@ -39,7 +48,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.surfaceBorder,
-    paddingBottom: SPACING.sm + 4,
     paddingHorizontal: SPACING.lg,
     zIndex: 10,
   },
@@ -47,9 +55,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    minHeight: 44,
+    height: 44,
   },
   logoWrapper: {
+    height: 44,
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
