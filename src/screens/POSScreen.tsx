@@ -47,10 +47,13 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  // Customer Badge Selection
+  // Customer Direct Search Input State
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState('');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+
+  // Tray Builder State
+  const [trayCollapsed, setTrayCollapsed] = useState(false);
 
   // Keypad Modal State
   const [keypadVisible, setKeypadVisible] = useState(false);
@@ -90,6 +93,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         // Default customer: Walk-in or first
         const defaultCust = custRes.data.find((c: Customer) => c.name.toLowerCase().includes('walk-in')) || custRes.data[0];
         setSelectedCustomer(defaultCust);
+        setCustomerSearchQuery(defaultCust.company_name ? `${defaultCust.company_name} (${defaultCust.name})` : defaultCust.name);
       }
     } catch (e) {
       console.warn('Error fetching Supabase data', e);
@@ -306,6 +310,18 @@ export const POSScreen: React.FC<POSScreenProps> = ({
     });
   }, [products, searchQuery, selectedCategory]);
 
+  // Filtered Customers for Direct Search Input (1-Flow)
+  const filteredCustomers = useMemo(() => {
+    if (!customerSearchQuery.trim()) return customers.slice(0, 10);
+    const q = customerSearchQuery.toLowerCase();
+    return customers.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.company_name && c.company_name.toLowerCase().includes(q)) ||
+        (c.phone && c.phone.includes(q))
+    );
+  }, [customers, customerSearchQuery]);
+
   const categories = ['All', 'Gate Motors', 'Boom Barriers', 'Access Control', 'Locks & Accessories', 'Spare Parts'];
 
   // =========================================================================
@@ -313,66 +329,89 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   // =========================================================================
   const renderItemBuilder = () => (
     <View style={styles.builderContainer}>
-      {/* Zone 1: Collapsible Customer Badge */}
+      {/* Zone 1: Direct Customer Search Input (1-Flow) */}
       <View style={styles.zone1Container}>
-        <TouchableOpacity
-          style={styles.customerBadge}
-          onPress={() => setCustomerPickerOpen(!customerPickerOpen)}
-          activeOpacity={0.8}
-        >
+        <View style={styles.customerSearchInputBox}>
           <View style={styles.customerIcon}>
-            <Ionicons name="business" size={18} color={COLORS.primaryLight} />
+            <Ionicons name="business" size={16} color={COLORS.primaryLight} />
           </View>
-          <View style={styles.customerTextCol}>
-            <Text style={styles.customerLabel}>B2B CLIENT / CONTRACTOR</Text>
-            <Text style={styles.customerName}>
-              {selectedCustomer?.company_name || selectedCustomer?.name || 'Select Customer...'}
-            </Text>
-          </View>
-          <Ionicons
-            name={customerPickerOpen ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color={COLORS.textSecondary}
+          <TextInput
+            style={styles.customerTextInput}
+            placeholder="Search customer name, company or phone..."
+            placeholderTextColor={COLORS.textMuted}
+            value={customerSearchQuery}
+            onChangeText={(text) => {
+              setCustomerSearchQuery(text);
+              setCustomerDropdownOpen(true);
+            }}
+            onFocus={() => setCustomerDropdownOpen(true)}
           />
-        </TouchableOpacity>
+          {customerSearchQuery.length > 0 && (
+            <TouchableOpacity
+              onPress={() => {
+                setCustomerSearchQuery('');
+                setSelectedCustomer(null);
+                setCustomerDropdownOpen(true);
+              }}
+              style={styles.customerClearBtn}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            onPress={() => setCustomerDropdownOpen(!customerDropdownOpen)}
+            style={styles.customerChevronBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons
+              name={customerDropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={COLORS.textSecondary}
+            />
+          </TouchableOpacity>
+        </View>
 
-        {/* Collapsible Customer Picker Dropdown */}
-        {customerPickerOpen && (
-          <View style={styles.customerDropdown}>
-            <View style={styles.custSearchRow}>
-              <Ionicons name="search" size={16} color={COLORS.textMuted} />
-              <TextInput
-                style={styles.custSearchInput}
-                placeholder="Search contractor or installer..."
-                placeholderTextColor={COLORS.textMuted}
-                value={customerSearch}
-                onChangeText={setCustomerSearch}
-              />
-            </View>
-            <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled>
-              {customers
-                .filter((c) =>
-                  (c.company_name || c.name)
-                    .toLowerCase()
-                    .includes(customerSearch.toLowerCase())
-                )
-                .map((cust) => (
-                  <TouchableOpacity
-                    key={cust.id}
-                    style={styles.custRow}
-                    onPress={() => {
-                      setSelectedCustomer(cust);
-                      setCustomerPickerOpen(false);
-                    }}
-                  >
-                    <Text style={styles.custRowTitle}>
-                      {cust.company_name ? `${cust.company_name} (${cust.name})` : cust.name}
-                    </Text>
-                    {cust.current_balance ? (
-                      <Text style={styles.custBalance}>Bal: {cust.current_balance.toFixed(3)} OMR</Text>
-                    ) : null}
-                  </TouchableOpacity>
-                ))}
+        {/* Live Customer Dropdown List */}
+        {customerDropdownOpen && (
+          <View style={styles.customerDropdownOverlay}>
+            <ScrollView
+              style={{ maxHeight: 180 }}
+              nestedScrollEnabled
+              keyboardShouldPersistTaps="handled"
+            >
+              {filteredCustomers.length === 0 ? (
+                <View style={styles.noCustFound}>
+                  <Text style={styles.noCustFoundText}>No matching customer found</Text>
+                </View>
+              ) : (
+                filteredCustomers.map((cust) => {
+                  const isSelected = selectedCustomer?.id === cust.id;
+                  return (
+                    <TouchableOpacity
+                      key={cust.id}
+                      style={[styles.custRow, isSelected && styles.custRowSelected]}
+                      onPress={() => {
+                        setSelectedCustomer(cust);
+                        setCustomerSearchQuery(
+                          cust.company_name ? `${cust.company_name} (${cust.name})` : cust.name
+                        );
+                        setCustomerDropdownOpen(false);
+                      }}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.custRowTitle, isSelected && { color: COLORS.primaryLight }]}>
+                          {cust.company_name ? `${cust.company_name} (${cust.name})` : cust.name}
+                        </Text>
+                        {cust.phone ? <Text style={styles.custPhone}>{cust.phone}</Text> : null}
+                      </View>
+                      {cust.current_balance ? (
+                        <Text style={styles.custBalance}>Bal: {cust.current_balance.toFixed(3)} OMR</Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
             </ScrollView>
           </View>
         )}
@@ -430,9 +469,24 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       <View style={styles.zone3Container}>
         {/* Selected Cart Items Tray Header */}
         <View style={styles.trayHeader}>
-          <Text style={styles.trayTitle}>
-            SALE ITEMS ({cart.length})
-          </Text>
+          <TouchableOpacity
+            style={styles.trayHeaderLeft}
+            onPress={() => setTrayCollapsed(!trayCollapsed)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.trayTitle}>
+              SALE ITEMS ({cart.length})
+            </Text>
+            {cart.length > 0 && (
+              <Ionicons
+                name={trayCollapsed ? 'chevron-down' : 'chevron-up'}
+                size={16}
+                color={COLORS.textSecondary}
+                style={{ marginLeft: 6 }}
+              />
+            )}
+          </TouchableOpacity>
+
           {cart.length > 0 && (
             <TouchableOpacity onPress={() => setCart([])}>
               <Text style={styles.clearCartText}>Clear All</Text>
@@ -440,56 +494,84 @@ export const POSScreen: React.FC<POSScreenProps> = ({
           )}
         </View>
 
-        {/* Cart Line Items (With Inline Quantity & Dynamic B2B Price) */}
-        {cart.length > 0 && (
-          <View style={styles.cartItemsList}>
+        {/* Collapsed Tray Summary */}
+        {cart.length > 0 && trayCollapsed && (
+          <TouchableOpacity
+            style={styles.trayCollapsedBar}
+            onPress={() => setTrayCollapsed(false)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.trayCollapsedText}>
+              {cart.reduce((sum, item) => sum + item.quantity, 0)} items in tray • {subtotal.toFixed(3)} OMR
+            </Text>
+            <Text style={styles.trayCollapsedAction}>Show Items</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Cart Line Items (2-Line Minimal & Spacious Layout) */}
+        {cart.length > 0 && !trayCollapsed && (
+          <ScrollView
+            style={styles.cartItemsScroll}
+            nestedScrollEnabled
+            showsVerticalScrollIndicator={true}
+          >
             {cart.map((item) => (
               <View key={item.product.id} style={styles.cartRowCard}>
-                <View style={styles.cartRowInfo}>
-                  <Text style={styles.cartRowSku}>{item.product.sku}</Text>
-                  <Text style={styles.cartRowName} numberOfLines={1}>
-                    {item.product.name}
-                  </Text>
-                </View>
-
-                {/* Inline Qty Box */}
-                <TouchableOpacity
-                  style={styles.inlineQtyBox}
-                  onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
-                >
-                  <Text style={styles.qtyLabel}>QTY</Text>
-                  <Text style={styles.qtyValue}>{item.quantity}</Text>
-                </TouchableOpacity>
-
-                {/* Inline B2B Price Box */}
-                <TouchableOpacity
-                  style={[
-                    styles.inlinePriceBox,
-                    item.unit_price <= 0 && styles.priceBoxMissing,
-                  ]}
-                  onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
-                >
-                  <Text style={styles.priceLabel}>PRICE (OMR)</Text>
-                  <Text style={styles.priceValue}>
-                    {item.unit_price > 0 ? item.unit_price.toFixed(3) : 'SET PRICE'}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Row Subtotal & Delete */}
-                <View style={styles.cartRowTotalCol}>
-                  <Text style={styles.rowTotalValue}>
-                    {item.total_price.toFixed(3)}
-                  </Text>
+                {/* Line 1: Name on Left, Trash on Right */}
+                <View style={styles.cartRowLine1}>
+                  <View style={styles.cartRowInfo}>
+                    <Text style={styles.cartRowSku}>{item.product.sku}</Text>
+                    <Text style={styles.cartRowName} numberOfLines={1}>
+                      {item.product.name}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => handleRemoveFromCart(item.product.id)}
-                    style={styles.deleteRowBtn}
+                    style={styles.trashBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Ionicons name="trash-outline" size={16} color={COLORS.danger} />
+                    <Ionicons name="trash-outline" size={17} color={COLORS.danger} />
                   </TouchableOpacity>
+                </View>
+
+                {/* Line 2: Qty on Left, Unit Price in Middle, Line Total on Right */}
+                <View style={styles.cartRowLine2}>
+                  {/* Left: Quantity */}
+                  <TouchableOpacity
+                    style={styles.inlineQtyBox}
+                    onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.qtyLabel}>QTY</Text>
+                    <Text style={styles.qtyValue}>{item.quantity}</Text>
+                  </TouchableOpacity>
+
+                  {/* Middle: Unit Price */}
+                  <TouchableOpacity
+                    style={[
+                      styles.inlinePriceBox,
+                      item.unit_price <= 0 && styles.priceBoxMissing,
+                    ]}
+                    onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.priceLabel}>PRICE (OMR)</Text>
+                    <Text style={styles.priceValue}>
+                      {item.unit_price > 0 ? item.unit_price.toFixed(3) : 'SET PRICE'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Right: Line Total */}
+                  <View style={styles.cartRowTotalCol}>
+                    <Text style={styles.lineTotalLabel}>TOTAL</Text>
+                    <Text style={styles.rowTotalValue}>
+                      {item.total_price.toFixed(3)}
+                    </Text>
+                  </View>
                 </View>
               </View>
             ))}
-          </View>
+          </ScrollView>
         )}
 
         {/* Catalog Search Results Grid */}
@@ -502,11 +584,12 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             keyExtractor={(item) => item.id}
             scrollEnabled={!isTablet}
             nestedScrollEnabled
-            contentContainerStyle={{ paddingBottom: 100 }}
+            contentContainerStyle={{ paddingBottom: 110 }}
             renderItem={({ item }) => {
               const stock =
                 activeBranch === 'Al Khoudh' ? item.stock_al_khoudh : item.stock_ghala;
               const inCart = cart.find((c) => c.product.id === item.id);
+              const branchShort = activeBranch === 'Al Khoudh' ? 'Al Khoud' : 'Ghala';
 
               return (
                 <TouchableOpacity
@@ -514,34 +597,29 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                   onPress={() => handleAddToCart(item)}
                   activeOpacity={0.7}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.catalogSku}>{item.sku}</Text>
-                    <Text style={styles.catalogName} numberOfLines={2}>
+                  <View style={{ flex: 1, marginRight: SPACING.sm }}>
+                    {/* Line 1: SKU with Quantity inline in Green: "SKU (Al Khoud - X)" */}
+                    <View style={styles.catalogSkuRow}>
+                      <Text style={styles.catalogSku}>{item.sku}</Text>
+                      <Text style={styles.catalogStockInline}>
+                        {' '}({branchShort} - {stock})
+                      </Text>
+                    </View>
+
+                    {/* Line 2: Product Name */}
+                    <Text style={styles.catalogName} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    <View style={styles.stockRow}>
-                      <View
-                        style={[
-                          styles.stockBadge,
-                          stock <= item.min_stock_alert
-                            ? styles.stockBadgeLow
-                            : styles.stockBadgeNormal,
-                        ]}
-                      >
-                        <Text style={styles.stockBadgeText}>
-                          {activeBranch}: {stock} {item.unit}
-                        </Text>
-                      </View>
-                    </View>
                   </View>
 
+                  {/* Action Button: Solid Plus (not in cart) vs Hollow Plus (in cart) */}
                   <View style={styles.addBtnContainer}>
                     {inCart ? (
-                      <View style={styles.inCartBadge}>
-                        <Text style={styles.inCartBadgeText}>{inCart.quantity} in tray</Text>
+                      <View style={styles.plusBtnHollow}>
+                        <Ionicons name="add" size={20} color={COLORS.primaryLight} />
                       </View>
                     ) : (
-                      <View style={styles.plusBtn}>
+                      <View style={styles.plusBtnSolid}>
                         <Ionicons name="add" size={20} color="#FFFFFF" />
                       </View>
                     )}
@@ -818,78 +896,90 @@ const styles = StyleSheet.create({
   },
   zone1Container: {
     paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
+    zIndex: 50,
   },
-  customerBadge: {
+  customerSearchInputBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    height: 46,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   customerIcon: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     borderRadius: RADIUS.sm,
     backgroundColor: '#3B82F622',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.sm,
   },
-  customerTextCol: {
+  customerTextInput: {
     flex: 1,
-  },
-  customerLabel: {
-    color: COLORS.textMuted,
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-  },
-  customerName: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.sm,
-    fontWeight: '700',
+    fontWeight: '600',
+    paddingVertical: 0,
   },
-  customerDropdown: {
+  customerClearBtn: {
+    padding: 4,
+    marginRight: 2,
+  },
+  customerChevronBtn: {
+    padding: 4,
+  },
+  customerDropdownOverlay: {
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
     borderRadius: RADIUS.md,
     marginTop: 4,
-    padding: SPACING.sm,
-  },
-  custSearchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surfaceLight,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.sm,
-    marginBottom: SPACING.xs,
-  },
-  custSearchInput: {
-    flex: 1,
-    height: 36,
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xs,
-    marginLeft: 6,
+    padding: SPACING.xs,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   custRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#33415544',
+    borderBottomColor: '#33415533',
+  },
+  custRowSelected: {
+    backgroundColor: '#3B82F618',
+    borderRadius: RADIUS.sm,
   },
   custRowTitle: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '600',
   },
+  custPhone: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    marginTop: 1,
+  },
   custBalance: {
     color: COLORS.warning,
     fontSize: 10,
-    marginTop: 2,
+    fontWeight: '700',
+  },
+  noCustFound: {
+    padding: SPACING.md,
+    alignItems: 'center',
+  },
+  noCustFoundText: {
+    color: COLORS.textMuted,
+    fontSize: FONTS.sizes.xs,
   },
   zone2Container: {
     marginBottom: SPACING.xs,
@@ -900,7 +990,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     marginHorizontal: SPACING.md,
     paddingHorizontal: SPACING.md,
-    height: 48,
+    height: 46,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
@@ -909,6 +999,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.sm,
+    paddingVertical: 0,
   },
   categoriesScroll: {
     marginTop: SPACING.xs,
@@ -943,7 +1034,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  trayHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   trayTitle: {
     color: COLORS.textSecondary,
@@ -956,44 +1051,90 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
-  cartItemsList: {
-    gap: 6,
-    marginBottom: SPACING.sm,
-  },
-  cartRowCard: {
+  trayCollapsedBar: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: COLORS.surface,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
     borderRadius: RADIUS.sm,
-    padding: SPACING.sm,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    gap: 8,
+    marginBottom: SPACING.xs,
+  },
+  trayCollapsedText: {
+    color: COLORS.textPrimary,
+    fontSize: FONTS.sizes.xs,
+    fontWeight: '600',
+  },
+  trayCollapsedAction: {
+    color: COLORS.primaryLight,
+    fontSize: FONTS.sizes.xs,
+    fontWeight: '700',
+  },
+  cartItemsScroll: {
+    maxHeight: 210,
+    marginBottom: SPACING.xs,
+  },
+  cartRowCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: RADIUS.md,
+    padding: SPACING.sm + 2,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
+  cartRowLine1: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.xs + 2,
   },
   cartRowInfo: {
-    flex: 1.2,
+    flex: 1,
+    marginRight: SPACING.sm,
   },
   cartRowSku: {
     color: COLORS.primaryLight,
     fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   cartRowName: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '600',
+    fontSize: FONTS.sizes.sm,
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  trashBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#EF444418',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartRowLine2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#33415533',
   },
   inlineQtyBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.surfaceLight,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
-    alignItems: 'center',
-    minWidth: 44,
+    borderRadius: RADIUS.sm,
+    gap: 6,
   },
   qtyLabel: {
     color: COLORS.textMuted,
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '800',
   },
   qtyValue: {
@@ -1002,12 +1143,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   inlinePriceBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: COLORS.surfaceLight,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
-    alignItems: 'center',
-    minWidth: 68,
+    borderRadius: RADIUS.sm,
+    gap: 6,
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -1017,7 +1159,7 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     color: COLORS.textMuted,
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '800',
   },
   priceValue: {
@@ -1027,16 +1169,17 @@ const styles = StyleSheet.create({
   },
   cartRowTotalCol: {
     alignItems: 'flex-end',
-    minWidth: 50,
+  },
+  lineTotalLabel: {
+    color: COLORS.textMuted,
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   rowTotalValue: {
     color: COLORS.success,
-    fontSize: FONTS.sizes.xs,
+    fontSize: FONTS.sizes.sm,
     fontWeight: '800',
-  },
-  deleteRowBtn: {
-    padding: 2,
-    marginTop: 2,
   },
   catalogHeader: {
     color: COLORS.textMuted,
@@ -1048,71 +1191,59 @@ const styles = StyleSheet.create({
   catalogCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: COLORS.surface,
-    padding: SPACING.md,
+    paddingVertical: 10,
+    paddingHorizontal: SPACING.md,
     borderRadius: RADIUS.md,
     marginBottom: 6,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   catalogCardInCart: {
-    borderColor: COLORS.primary,
+    borderColor: COLORS.primaryLight,
     backgroundColor: '#1E293BEE',
+  },
+  catalogSkuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   catalogSku: {
     color: COLORS.primaryLight,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
+  },
+  catalogStockInline: {
+    color: COLORS.success,
+    fontSize: 11,
+    fontWeight: '700',
   },
   catalogName: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '600',
-    marginTop: 1,
-  },
-  stockRow: {
-    flexDirection: 'row',
-    marginTop: 4,
-  },
-  stockBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  stockBadgeNormal: {
-    backgroundColor: '#10B98122',
-  },
-  stockBadgeLow: {
-    backgroundColor: '#F59E0B22',
-  },
-  stockBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+    marginTop: 2,
   },
   addBtnContainer: {
     marginLeft: SPACING.sm,
   },
-  plusBtn: {
-    width: 38,
-    height: 38,
+  plusBtnSolid: {
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.sm,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  inCartBadge: {
-    backgroundColor: COLORS.primaryMuted,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+  plusBtnHollow: {
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-  },
-  inCartBadgeText: {
-    color: COLORS.primaryLight,
-    fontSize: 11,
-    fontWeight: '800',
+    borderWidth: 1.5,
+    borderColor: COLORS.primaryLight,
+    backgroundColor: 'transparent',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   paymentContainer: {
     flex: 1,
