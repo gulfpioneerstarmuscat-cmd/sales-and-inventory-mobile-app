@@ -758,9 +758,8 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <ActivityIndicator color="#FFFFFF" />
           ) : (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="checkmark-done" size={24} color="#FFFFFF" />
               <Text style={styles.saveSaleText}>
-                SAVE SALE & DEDUCT STOCK ({totalAmount.toFixed(3)} OMR)
+                COMPLETE ({totalAmount.toFixed(3)} OMR)
               </Text>
             </View>
           )}

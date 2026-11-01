@@ -48,11 +48,14 @@ const MainApp: React.FC = () => {
   const cartTotal = cart.reduce((sum, item) => sum + item.total_price, 0) * 1.05; // with 5% VAT estimate
 
   const handleMenuOption = (
-    option: 'profile' | 'transfer' | 'settings' | 'admin' | 'logout'
+    option: 'profile' | 'switch_branch' | 'transfer' | 'settings' | 'admin' | 'logout'
   ) => {
     switch (option) {
       case 'profile':
         setProfileVisible(true);
+        break;
+      case 'switch_branch':
+        // Branch toggle is performed dynamically in AuthContext
         break;
       case 'transfer':
         setTransferVisible(true);

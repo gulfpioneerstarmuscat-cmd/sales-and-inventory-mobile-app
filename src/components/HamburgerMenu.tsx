@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 interface HamburgerMenuProps {
   visible: boolean;
   onClose: () => void;
-  onSelectOption: (option: 'profile' | 'transfer' | 'settings' | 'admin' | 'logout') => void;
+  onSelectOption: (option: 'profile' | 'switch_branch' | 'transfer' | 'settings' | 'admin' | 'logout') => void;
 }
 
 export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
@@ -25,13 +26,28 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
   onSelectOption,
 }) => {
   const insets = useSafeAreaInsets();
-  const { currentUser, activeBranch, isAdmin } = useAuth();
+  const { currentUser, activeBranch, isAdmin, switchBranch } = useAuth();
 
-  const handleAction = (option: 'profile' | 'transfer' | 'settings' | 'admin' | 'logout') => {
+  const handleAction = (option: 'profile' | 'switch_branch' | 'transfer' | 'settings' | 'admin' | 'logout') => {
     onClose();
     setTimeout(() => {
       onSelectOption(option);
     }, 150);
+  };
+
+  const isKhoudh = activeBranch === 'Al Khoudh';
+
+  const handleToggleBranch = () => {
+    if (isAdmin) {
+      const nextBranch = activeBranch === 'Al Khoudh' ? 'Ghala' : 'Al Khoudh';
+      switchBranch(nextBranch);
+      handleAction('switch_branch');
+    } else {
+      Alert.alert(
+        'Branch Locked',
+        `Staff accounts are locked to ${currentUser?.branch || activeBranch}. Only Administrators can switch branches.`
+      );
+    }
   };
 
   return (
@@ -99,7 +115,64 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
 
-                {/* 2. Transfer */}
+                {/* 2. Switch Branches (Below Profile, Above Inter-Branch Transfer) */}
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={handleToggleBranch}
+                  activeOpacity={isAdmin ? 0.7 : 0.9}
+                >
+                  <View
+                    style={[
+                      styles.menuIconContainer,
+                      { backgroundColor: isKhoudh ? '#38BDF822' : '#A855F722' },
+                    ]}
+                  >
+                    <Ionicons
+                      name="swap-horizontal"
+                      size={20}
+                      color={isKhoudh ? COLORS.branchKhoudh : COLORS.branchGhala}
+                    />
+                  </View>
+                  <View style={styles.menuTextContainer}>
+                    <Text style={styles.menuTitle}>Switch Branches</Text>
+                    <Text style={styles.menuSubtitle}>
+                      {isAdmin
+                        ? `Active: ${activeBranch} • Tap to switch to ${isKhoudh ? 'Ghala' : 'Al Khoudh'}`
+                        : `Locked to ${activeBranch}`}
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.branchBadge,
+                      isKhoudh ? styles.badgeKhoudh : styles.badgeGhala,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.branchDot,
+                        { backgroundColor: isKhoudh ? COLORS.branchKhoudh : COLORS.branchGhala },
+                      ]}
+                    />
+                    <Text style={styles.branchBadgeText}>{activeBranch}</Text>
+                    {isAdmin ? (
+                      <Ionicons
+                        name="swap-horizontal"
+                        size={12}
+                        color={COLORS.textSecondary}
+                        style={{ marginLeft: 4 }}
+                      />
+                    ) : (
+                      <Ionicons
+                        name="lock-closed"
+                        size={12}
+                        color={COLORS.textMuted}
+                        style={{ marginLeft: 4 }}
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {/* 3. Inter-Branch Transfer */}
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleAction('transfer')}
@@ -114,7 +187,7 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
 
-                {/* 3. Settings */}
+                {/* 4. Settings */}
                 <TouchableOpacity
                   style={styles.menuItem}
                   onPress={() => handleAction('settings')}
@@ -129,7 +202,7 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   <Ionicons name="chevron-forward" size={18} color={COLORS.textMuted} />
                 </TouchableOpacity>
 
-                {/* 4. Admin Settings (Strictly Hidden for Non-Admins) */}
+                {/* 5. Admin Settings (Strictly Hidden for Non-Admins) */}
                 {isAdmin && (
                   <TouchableOpacity
                     style={styles.menuItem}
@@ -153,7 +226,7 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
 
                 <View style={styles.divider} />
 
-                {/* 5. Log Out */}
+                {/* 6. Log Out */}
                 <TouchableOpacity
                   style={[styles.menuItem, styles.logoutItem]}
                   onPress={() => handleAction('logout')}
@@ -292,6 +365,32 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs,
     marginTop: 1,
   },
+  branchBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm + 2,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+  },
+  badgeKhoudh: {
+    borderColor: '#38BDF855',
+  },
+  badgeGhala: {
+    borderColor: '#A855F755',
+  },
+  branchDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 5,
+  },
+  branchBadgeText: {
+    color: COLORS.textPrimary,
+    fontSize: FONTS.sizes.xs - 1,
+    fontWeight: '700',
+  },
   adminTag: {
     backgroundColor: COLORS.warning,
     paddingHorizontal: 5,
@@ -312,4 +411,3 @@ const styles = StyleSheet.create({
     fontSize: FONTS.sizes.xs - 1,
   },
 });
-
