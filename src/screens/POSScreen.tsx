@@ -544,8 +544,25 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       {/* Zone 3: Catalog Products (Clean, High Density, Zero Wasted Space) */}
       <View style={styles.zone3Container}>
         <View style={styles.catalogHeaderRow}>
-          <Text style={styles.catalogHeader}>CATALOG PRODUCTS</Text>
-          <Text style={styles.catalogCount}>({filteredProducts.length} items)</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.catalogHeader}>CATALOG PRODUCTS</Text>
+            <Text style={styles.catalogCount}>({filteredProducts.length} items)</Text>
+          </View>
+          <TouchableOpacity
+            disabled={cart.length === 0}
+            onPress={() => setCart([])}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.clearCartText,
+                cart.length === 0 ? styles.clearCartTextDisabled : styles.clearCartTextActive,
+              ]}
+            >
+              Clear All
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {loadingData ? (
@@ -585,34 +602,16 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                     </Text>
                   </View>
 
-                  {/* Right Action: Stepper [-][QTY][+] with Trash when in cart, else [+] button */}
+                  {/* Right Action: [QTY][TRASH] only when in cart, else [+] button */}
                   {inCart ? (
-                    <View style={styles.stepperContainer}>
-                      <TouchableOpacity
-                        style={styles.stepperMinusBtn}
-                        onPress={() => handleDecrementQuantity(item.id)}
-                        hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="remove" size={16} color={COLORS.textPrimary} />
-                      </TouchableOpacity>
-
+                    <View style={styles.tileActionsRow}>
                       <TouchableOpacity
                         style={styles.stepperQtyPill}
                         onPress={() => handleOpenKeypad(item.id, 'qty', inCart.quantity)}
-                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.stepperQtyText}>{inCart.quantity}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.stepperPlusBtn}
-                        onPress={() => handleIncrementQuantity(item)}
                         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="add" size={16} color="#FFFFFF" />
+                        <Text style={styles.stepperQtyText}>{inCart.quantity}</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
@@ -621,7 +620,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="trash-outline" size={15} color={COLORS.accent} />
+                        <Ionicons name="trash-outline" size={16} color={COLORS.accent} />
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -657,24 +656,43 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       >
         <View style={styles.page2HeaderRow}>
           <Text style={styles.page2Title}>CART & CHECKOUT</Text>
-          {cart.length > 0 && (
-            <TouchableOpacity
-              onPress={() => {
-                setCart([]);
-                setActiveCardIndex(0);
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          <TouchableOpacity
+            disabled={cart.length === 0}
+            onPress={() => setCart([])}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.clearCartText,
+                cart.length === 0 ? styles.clearCartTextDisabled : styles.clearCartTextActive,
+              ]}
             >
-              <Text style={styles.clearCartText}>Clear All</Text>
-            </TouchableOpacity>
-          )}
+              Clear All
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Selected Carousel / Cart Section */}
+        {/* Customer Receipt Summary (Compact, Unified Banner) */}
+        <View style={styles.receiptHeaderCard}>
+          <View style={styles.receiptIconWrap}>
+            <Ionicons name="business" size={16} color={COLORS.primaryLight} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.receiptCustomerName} numberOfLines={1}>
+              {selectedCustomer?.company_name || selectedCustomer?.name || 'Walk-in Client'}
+            </Text>
+            <Text style={styles.receiptMeta}>
+              Branch: {activeBranch} • Cashier: {currentUser?.name || 'Staff'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Selected Items (Top-Down Vertical List) */}
         {cart.length === 0 ? (
           <View style={styles.emptyCartCard}>
             <View style={styles.emptyCartIconWrap}>
-              <Ionicons name="cart-outline" size={32} color={COLORS.textMuted} />
+              <Ionicons name="cart-outline" size={28} color={COLORS.textMuted} />
             </View>
             <Text style={styles.emptyCartTitle}>Your Cart is Empty</Text>
             <Text style={styles.emptyCartSubtitle}>
@@ -690,116 +708,81 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.page2CarouselSection}>
-            <View style={styles.trayHeader}>
-              <Text style={styles.trayTitle}>
-                SELECTED ITEMS ({Math.min(activeCardIndex + 1, cart.length)}/{cart.length})
+          <View style={styles.selectedSection}>
+            <View style={styles.selectedHeaderRow}>
+              <Text style={styles.sectionHeaderInline}>
+                SELECTED ITEMS ({cart.length})
               </Text>
-              <Text style={styles.traySubtitle}>Slide to review items</Text>
+              <Text style={styles.selectedHeaderHint}>Tap price to edit rate</Text>
             </View>
 
-            {/* Horizontal Snapping Carousel Cards (Left-to-Right with Side Peeking) */}
-            <View style={styles.carouselWrapper}>
-              <FlatList
-                ref={carouselRef}
-                data={cart}
-                keyExtractor={(item) => item.product.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={snapInterval}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                contentContainerStyle={{
-                  paddingHorizontal: sideInset,
-                  gap: cardGap,
-                }}
-                onScroll={(e) => {
-                  const offsetX = e.nativeEvent.contentOffset.x;
-                  const index = Math.round(offsetX / snapInterval);
-                  const clamped = Math.max(0, Math.min(index, cart.length - 1));
-                  if (clamped !== activeCardIndex) {
-                    setActiveCardIndex(clamped);
-                  }
-                }}
-                scrollEventThrottle={16}
-                renderItem={({ item }) => (
-                  <View style={[styles.cartRowCard, { width: cardWidth }]}>
-                    {/* Line 1: Name & SKU on Left, Trash on Right */}
-                    <View style={styles.cartRowLine1}>
-                      <View style={styles.cartRowInfo}>
-                        <Text style={styles.cartRowSku}>{item.product.sku}</Text>
-                        <Text style={styles.cartRowName} numberOfLines={1}>
-                          {item.product.name}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleRemoveFromCart(item.product.id)}
-                        style={styles.trashBtn}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Ionicons name="trash-outline" size={16} color={COLORS.accent} />
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Line 2: The 3 Matching Pills (QTY, PRICE, TOTAL) */}
-                    <View style={styles.cartRowLine2}>
-                      {/* 1. QTY Pill */}
-                      <TouchableOpacity
-                        style={styles.pillBox}
-                        onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                      >
-                        <Text style={styles.pillLabel}>QTY</Text>
-                        <Text style={styles.pillValue}>{item.quantity}</Text>
-                      </TouchableOpacity>
-
-                      {/* 2. PRICE Pill */}
-                      <TouchableOpacity
-                        style={[
-                          styles.pillBox,
-                          styles.pricePillBox,
-                          item.unit_price <= 0 && styles.priceBoxMissing,
-                        ]}
-                        onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
-                        activeOpacity={0.7}
-                        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
-                      >
-                        <Text style={styles.pillLabel}>PRICE</Text>
-                        <Text
-                          style={[
-                            styles.pillValue,
-                            item.unit_price <= 0 && styles.pillValueMissing,
-                          ]}
-                        >
-                          {item.unit_price > 0 ? item.unit_price.toFixed(3) : 'SET PRICE'}
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* 3. TOTAL Pill */}
-                      <View style={[styles.pillBox, styles.totalPillBox]}>
-                        <Text style={styles.pillLabel}>TOTAL</Text>
-                        <Text style={styles.totalPillValue}>
-                          {item.total_price.toFixed(3)}
-                        </Text>
-                      </View>
-                    </View>
+            {cart.map((item) => (
+              <View key={item.product.id} style={styles.selectedItemCard}>
+                {/* Line 1: SKU & Name on Left, Trash on Right */}
+                <View style={styles.selectedCardLine1}>
+                  <View style={styles.selectedCardInfo}>
+                    <Text style={styles.catalogSku}>{item.product.sku}</Text>
+                    <Text style={styles.selectedItemName} numberOfLines={1}>
+                      {item.product.name}
+                    </Text>
                   </View>
-                )}
-              />
-            </View>
+                  <TouchableOpacity
+                    onPress={() => handleRemoveFromCart(item.product.id)}
+                    style={styles.stepperTrashBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="trash-outline" size={15} color={COLORS.accent} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Line 2: The 3 Compact Pills (QTY, PRICE, TOTAL) */}
+                <View style={styles.selectedCardLine2}>
+                  {/* 1. QTY Pill */}
+                  <TouchableOpacity
+                    style={styles.pillBox}
+                    onPress={() => handleOpenKeypad(item.product.id, 'qty', item.quantity)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  >
+                    <Text style={styles.pillLabel}>QTY</Text>
+                    <Text style={styles.pillValue}>{item.quantity}</Text>
+                  </TouchableOpacity>
+
+                  {/* 2. PRICE Pill */}
+                  <TouchableOpacity
+                    style={[
+                      styles.pillBox,
+                      styles.pricePillBox,
+                      item.unit_price <= 0 && styles.priceBoxMissing,
+                    ]}
+                    onPress={() => handleOpenKeypad(item.product.id, 'price', item.unit_price)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+                  >
+                    <Text style={styles.pillLabel}>PRICE</Text>
+                    <Text
+                      style={[
+                        styles.pillValue,
+                        item.unit_price <= 0 && styles.pillValueMissing,
+                      ]}
+                    >
+                      {item.unit_price > 0 ? item.unit_price.toFixed(3) : 'SET PRICE'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* 3. TOTAL Pill */}
+                  <View style={[styles.pillBox, styles.totalPillBox]}>
+                    <Text style={styles.pillLabel}>TOTAL</Text>
+                    <Text style={styles.totalPillValue}>
+                      {item.total_price.toFixed(3)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
           </View>
         )}
-
-        {/* Customer Receipt Summary */}
-        <View style={styles.receiptHeaderCard}>
-          <Text style={styles.receiptCustomerName}>
-            {selectedCustomer?.company_name || selectedCustomer?.name || 'Walk-in Client'}
-          </Text>
-          <Text style={styles.receiptMeta}>
-            Branch: {activeBranch} • Cashier: {currentUser?.name}
-          </Text>
-        </View>
 
         {/* Totals & VAT Calculation */}
         <View style={styles.totalsCard}>
@@ -1271,55 +1254,36 @@ const styles = StyleSheet.create({
       } as any,
     }),
   },
-  stepperContainer: {
+  tileActionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-  },
-  stepperMinusBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: COLORS.surfaceRaised,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    gap: 6,
   },
   stepperQtyPill: {
-    minWidth: 32,
-    height: 30,
-    paddingHorizontal: 6,
+    minWidth: 38,
+    height: 32,
+    paddingHorizontal: 8,
     borderRadius: 8,
     backgroundColor: COLORS.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(0, 99, 247, 0.35)',
+    borderColor: 'rgba(0, 99, 247, 0.4)',
   },
   stepperQtyText: {
     color: COLORS.primaryLight,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
   },
-  stepperPlusBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   stepperTrashBtn: {
-    width: 30,
-    height: 30,
+    width: 32,
+    height: 32,
     borderRadius: 8,
     backgroundColor: COLORS.accentMuted,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 90, 54, 0.25)',
-    marginLeft: 3,
   },
   paymentContainer: {
     flex: 1,
@@ -1329,106 +1293,131 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
+    paddingHorizontal: 16,
+    marginBottom: 10,
   },
   page2Title: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xl,
+    fontSize: FONTS.sizes.lg,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.headerTracking,
-    lineHeight: 28,
-  },
-  page2CarouselSection: {
-    marginBottom: SPACING.md,
-  },
-  trayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-  },
-  trayTitle: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: FONTS.metrics.headerTracking,
-    lineHeight: 16,
-  },
-  traySubtitle: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '500',
+    lineHeight: 24,
   },
   clearCartText: {
-    color: COLORS.accent,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
-  carouselWrapper: {
-    height: 136,
+  clearCartTextActive: {
+    color: COLORS.accent,
   },
-  cartRowCard: {
+  clearCartTextDisabled: {
+    color: COLORS.textMuted,
+    opacity: 0.35,
+  },
+  receiptHeaderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    justifyContent: 'space-between',
-    height: 124,
+    marginBottom: 10,
     ...SHADOWS.ambientCard,
   },
-  cartRowLine1: {
+  receiptIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: COLORS.primaryMuted,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  receiptCustomerName: {
+    color: COLORS.textPrimary,
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: FONTS.metrics.headerTracking,
+  },
+  receiptMeta: {
+    color: COLORS.textSecondary,
+    fontSize: 11,
+    letterSpacing: FONTS.metrics.bodyTracking,
+    marginTop: 2,
+  },
+  selectedSection: {
+    marginBottom: 10,
+  },
+  selectedHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 6,
   },
-  cartRowInfo: {
-    flex: 1,
-    marginRight: SPACING.sm,
-  },
-  cartRowSku: {
-    color: COLORS.primary,
+  sectionHeaderInline: {
+    color: COLORS.textSecondary,
     fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    letterSpacing: FONTS.metrics.headerTracking,
   },
-  cartRowName: {
+  selectedHeaderHint: {
+    color: COLORS.textMuted,
+    fontSize: 10,
+    fontWeight: '500',
+    letterSpacing: FONTS.metrics.bodyTracking,
+  },
+  selectedItemCard: {
+    marginHorizontal: 16,
+    backgroundColor: COLORS.surface,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+    ...SHADOWS.ambientCard,
+  },
+  selectedCardLine1: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  selectedCardInfo: {
+    flex: 1,
+    marginRight: 10,
+  },
+  selectedItemName: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.sm,
+    fontSize: FONTS.sizes.xs,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.headerTracking,
     marginTop: 2,
   },
-  trashBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.accentMuted,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cartRowLine2: {
+  selectedCardLine2: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: SPACING.sm,
-    paddingTop: SPACING.sm,
+    gap: 6,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    borderTopColor: 'rgba(255, 255, 255, 0.04)',
   },
   pillBox: {
     flex: 1,
-    height: 40,
+    height: 34,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.surfaceRaised,
-    paddingHorizontal: 8,
-    borderRadius: RADIUS.sm,
-    gap: 6,
+    paddingHorizontal: 6,
+    borderRadius: 8,
+    gap: 4,
     borderWidth: 1,
     borderColor: 'transparent',
   },
@@ -1452,7 +1441,7 @@ const styles = StyleSheet.create({
   },
   pillValue: {
     color: COLORS.textPrimary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
@@ -1463,114 +1452,93 @@ const styles = StyleSheet.create({
   },
   totalPillValue: {
     color: COLORS.primaryLight,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   emptyCartCard: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: 16,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: 10,
     ...SHADOWS.ambientCard,
   },
   emptyCartIconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: COLORS.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   emptyCartTitle: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.md,
+    fontSize: 13,
     fontWeight: '700',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   emptyCartSubtitle: {
     color: COLORS.textMuted,
-    fontSize: FONTS.sizes.xs,
+    fontSize: 11,
     textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 16,
+    lineHeight: 16,
+    marginBottom: 12,
   },
   returnToCatalogBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: RADIUS.md,
   },
   returnToCatalogText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-  },
-  receiptHeaderCard: {
-    marginHorizontal: SPACING.lg,
-    backgroundColor: COLORS.surface,
-    padding: 20,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    marginBottom: SPACING.md,
-    ...SHADOWS.ambientCard,
-  },
-  receiptCustomerName: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.md,
-    fontWeight: '700',
-    letterSpacing: FONTS.metrics.headerTracking,
-  },
-  receiptMeta: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.xs,
-    letterSpacing: FONTS.metrics.bodyTracking,
-    marginTop: 4,
   },
   totalsCard: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: 16,
     backgroundColor: COLORS.surface,
-    padding: 20,
-    borderRadius: RADIUS.xl,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    marginBottom: SPACING.lg,
+    marginBottom: 10,
     ...SHADOWS.ambientCard,
   },
   totalRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 6,
+    marginVertical: 4,
   },
   vatRow: {
-    marginTop: 8,
+    marginTop: 4,
   },
   totalLabel: {
     color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.sm,
+    fontSize: FONTS.sizes.xs,
     fontWeight: '500',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   totalVal: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.sm,
+    fontSize: FONTS.sizes.xs,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   togglePill: {
     backgroundColor: COLORS.surfaceRaised,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: RADIUS.pill,
   },
   togglePillActive: {
@@ -1578,49 +1546,49 @@ const styles = StyleSheet.create({
   },
   togglePillText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '700',
   },
   divider: {
     height: 1,
     backgroundColor: COLORS.surfaceBorder,
-    marginVertical: SPACING.lg,
+    marginVertical: 8,
   },
   grandTotalLabel: {
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.lg,
+    fontSize: 13,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   grandTotalVal: {
     color: COLORS.primary,
-    fontSize: FONTS.sizes.xxl,
+    fontSize: 18,
     fontWeight: '900',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   sectionHeader: {
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
+    paddingHorizontal: 16,
+    marginBottom: 6,
   },
   toggleGroup: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 10,
   },
   statusToggleBtn: {
     flex: 1,
-    height: TOUCH_TARGET.buttonHeight,
+    height: 42,
     backgroundColor: COLORS.surfaceRaised,
-    borderRadius: RADIUS.md,
+    borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
@@ -1634,7 +1602,7 @@ const styles = StyleSheet.create({
   },
   statusToggleText: {
     color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.sm,
+    fontSize: 12,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
@@ -1646,20 +1614,20 @@ const styles = StyleSheet.create({
   },
   methodRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    gap: 8,
+    paddingHorizontal: 16,
+    marginBottom: 10,
   },
   methodBtn: {
     flex: 1,
-    height: TOUCH_TARGET.buttonHeight,
+    height: 42,
     backgroundColor: COLORS.surfaceRaised,
-    borderRadius: RADIUS.md,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    gap: 4,
+    gap: 2,
   },
   methodBtnSelected: {
     backgroundColor: COLORS.primary,
@@ -1672,7 +1640,7 @@ const styles = StyleSheet.create({
   },
   methodBtnText: {
     color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.xs,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
@@ -1680,86 +1648,88 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   splitBox: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: 16,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: 16,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    marginBottom: SPACING.lg,
+    marginBottom: 10,
     ...SHADOWS.ambientCard,
   },
   splitBoxTitle: {
     color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.xs,
+    fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
-    marginBottom: SPACING.sm,
+    marginBottom: 6,
   },
   splitInputsRow: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    gap: 8,
   },
   splitInputCol: {
     flex: 1,
   },
   splitInputLabel: {
     color: COLORS.textMuted,
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   splitInputField: {
     backgroundColor: COLORS.surfaceRaised,
-    height: TOUCH_TARGET.inputHeight,
+    height: 38,
     borderRadius: RADIUS.sm,
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.md,
+    fontSize: 13,
     fontWeight: '700',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   notesInput: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: 16,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
-    padding: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.sm,
+    fontSize: FONTS.sizes.xs,
     letterSpacing: FONTS.metrics.bodyTracking,
-    minHeight: 68,
-    marginBottom: SPACING.lg,
+    minHeight: 46,
+    marginBottom: 12,
     ...SHADOWS.ambientCard,
   },
   saveSaleBtn: {
-    marginHorizontal: SPACING.lg,
+    marginHorizontal: 16,
     backgroundColor: COLORS.primary,
-    height: 54,
-    borderRadius: RADIUS.lg,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
     ...Platform.select({
       ios: {
         shadowColor: '#0063F7',
-        shadowOffset: { width: 0, height: 12 },
+        shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.35,
-        shadowRadius: 20,
+        shadowRadius: 14,
       },
       android: {
-        elevation: 8,
+        elevation: 6,
       },
       web: {
-        boxShadow: '0 20px 40px -10px rgba(0, 99, 247, 0.45)',
+        boxShadow: '0 12px 28px -6px rgba(0, 99, 247, 0.45)',
       } as any,
     }),
   },
   saveSaleText: {
     color: '#FFFFFF',
-    fontSize: FONTS.sizes.md,
+    fontSize: FONTS.sizes.sm,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
