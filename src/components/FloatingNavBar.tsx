@@ -5,14 +5,20 @@ import {
   StyleSheet,
   TouchableOpacity,
   Animated,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { COLORS, SPACING, FONTS, RADIUS } from '../styles/theme';
 
 export type TabScreen = 'pos' | 'history' | 'inventory';
+
+interface TabConfig {
+  id: TabScreen;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  activeIcon: keyof typeof Ionicons.glyphMap;
+}
 
 interface FloatingNavBarProps {
   currentTab: TabScreen;
@@ -21,26 +27,26 @@ interface FloatingNavBarProps {
   cartTotal?: number;
   posPage?: 1 | 2;
   onPressCartButton?: () => void;
-  translateY?: Animated.Value; // For scroll-hide animation
+  translateY?: Animated.Value;
 }
 
 export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
   currentTab,
   onSelectTab,
   cartItemCount = 0,
-  cartTotal = 0,
   posPage = 1,
   onPressCartButton,
   translateY,
 }) => {
   const insets = useSafeAreaInsets();
-  const showCartPill = currentTab === 'pos' && cartItemCount > 0;
 
-  const tabs: Array<{ id: TabScreen; label: string; icon: keyof typeof Ionicons.glyphMap; activeIcon: keyof typeof Ionicons.glyphMap }> = [
+  const tabs: TabConfig[] = [
     { id: 'pos', label: 'POS', icon: 'cart-outline', activeIcon: 'cart' },
     { id: 'history', label: 'History', icon: 'receipt-outline', activeIcon: 'receipt' },
     { id: 'inventory', label: 'Stock', icon: 'cube-outline', activeIcon: 'cube' },
   ];
+
+  const showCartPill = currentTab === 'pos' && (cartItemCount > 0 || posPage === 2);
 
   return (
     <Animated.View
@@ -54,7 +60,7 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
       pointerEvents="box-none"
     >
       <View style={styles.pillGroup}>
-        {/* Main 4-Tab Floating Bar */}
+        {/* Main 3-Tab Floating Bar */}
         <View style={styles.navBar}>
           {tabs.map((tab) => {
             const isActive = currentTab === tab.id;
@@ -67,7 +73,7 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
               >
                 <Ionicons
                   name={isActive ? tab.activeIcon : tab.icon}
-                  size={22}
+                  size={20}
                   color={isActive ? '#FFFFFF' : COLORS.textSecondary}
                 />
                 <Text
@@ -83,7 +89,7 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
           })}
         </View>
 
-        {/* Dynamic Docked Cart Pill / Back Button */}
+        {/* Dynamic Docked Cart Pill / Back Button with High-Impact Sunset Coral Pop */}
         {showCartPill && (
           <TouchableOpacity
             style={[
@@ -95,13 +101,15 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
           >
             {posPage === 2 ? (
               <View style={styles.cartContentRow}>
-                <Ionicons name="arrow-back" size={20} color="#FFFFFF" />
+                <Ionicons name="arrow-back" size={18} color={COLORS.textPrimary} />
                 <Text style={styles.cartPillText}>BACK</Text>
               </View>
             ) : (
               <View style={styles.cartContentRow}>
-                <Ionicons name="cart" size={20} color="#FFFFFF" />
-                <Text style={styles.cartCountNumber}>{cartItemCount}</Text>
+                <Ionicons name="cart" size={19} color="#FFFFFF" />
+                <View style={styles.accentBadge}>
+                  <Text style={styles.cartCountNumber}>{cartItemCount}</Text>
+                </View>
               </View>
             )}
           </TouchableOpacity>
@@ -123,32 +131,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     maxWidth: 540,
   },
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.88)', // Glassmorphism translucent dark slate
+    backgroundColor: 'rgba(11, 12, 16, 0.90)', // Apple obsidian translucent glass
     borderRadius: 28,
     height: 56,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     borderWidth: 1,
-    borderColor: 'rgba(71, 85, 105, 0.5)', // Subtle slate-700/50 border
+    borderColor: COLORS.surfaceBorder,
     ...Platform.select({
       ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.55,
-        shadowRadius: 24,
+        shadowColor: '#0063F7',
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.15,
+        shadowRadius: 28,
       },
       android: {
         elevation: 16,
       },
       web: {
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(71, 85, 105, 0.5)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: '0 20px 40px -15px rgba(0, 99, 247, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.08)',
       } as any,
     }),
   },
@@ -161,16 +169,22 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   activeTabButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
+    ...Platform.select({
+      web: {
+        boxShadow: '0 4px 16px rgba(0, 99, 247, 0.4)',
+      } as any,
+    }),
   },
   tabLabel: {
     fontSize: FONTS.sizes.xs - 1,
-    marginTop: 1,
-    fontWeight: '600',
+    marginTop: 2,
+    letterSpacing: FONTS.metrics.bodyTracking,
+    fontWeight: '500',
   },
   activeTabLabel: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   inactiveTabLabel: {
     color: COLORS.textSecondary,
@@ -178,50 +192,58 @@ const styles = StyleSheet.create({
   cartPill: {
     height: 56,
     borderRadius: 28,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     ...Platform.select({
       ios: {
-        shadowColor: '#000000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.55,
-        shadowRadius: 24,
+        shadowColor: '#0063F7',
+        shadowOffset: { width: 0, height: 16 },
+        shadowOpacity: 0.2,
+        shadowRadius: 28,
       },
       android: {
         elevation: 16,
       },
       web: {
-        backdropFilter: 'blur(16px)',
-        WebkitBackdropFilter: 'blur(16px)',
-        boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.65)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxShadow: '0 20px 40px -15px rgba(0, 99, 247, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.08)',
       } as any,
     }),
   },
   cartPillProceed: {
-    backgroundColor: 'rgba(16, 185, 129, 0.92)',
-    borderColor: 'rgba(52, 211, 153, 0.6)',
+    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
+    borderColor: 'rgba(0, 99, 247, 0.6)',
   },
   cartPillBack: {
-    backgroundColor: 'rgba(51, 65, 85, 0.92)',
-    borderColor: 'rgba(71, 85, 105, 0.5)',
+    backgroundColor: 'rgba(31, 34, 44, 0.92)',
+    borderColor: COLORS.surfaceBorder,
   },
   cartContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
+  accentBadge: {
+    backgroundColor: COLORS.accent, // Vibrant Sunset Coral - The High-Impact Pop
+    borderRadius: RADIUS.pill,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   cartCountNumber: {
     color: '#FFFFFF',
-    fontSize: FONTS.sizes.md,
-    fontWeight: '900',
+    fontSize: 12,
+    fontWeight: '800',
   },
   cartPillText: {
-    color: '#FFFFFF',
+    color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xs,
-    fontWeight: '800',
-    letterSpacing: 0.8,
+    fontWeight: '700',
+    letterSpacing: 0.6,
   },
 });
-

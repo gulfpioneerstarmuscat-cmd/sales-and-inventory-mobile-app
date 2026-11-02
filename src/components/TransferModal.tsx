@@ -275,9 +275,11 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: RADIUS.lg,
-    borderTopRightRadius: RADIUS.lg,
-    padding: SPACING.xl,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
+    padding: 24,
+    borderTopWidth: 1,
+    borderColor: COLORS.surfaceBorder,
     maxHeight: '90%',
   },
   header: {
@@ -426,9 +428,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   confirmBtn: {
-    backgroundColor: COLORS.success,
-    height: TOUCH_TARGET.buttonHeight,
-    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
+    height: 56,
+    borderRadius: RADIUS.lg, // 18px squircle
     justifyContent: 'center',
     alignItems: 'center',
   },

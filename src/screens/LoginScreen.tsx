@@ -158,78 +158,85 @@ const styles = StyleSheet.create({
   logoBadge: {
     width: 64,
     height: 64,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.primary,
+    borderRadius: RADIUS.lg, // 18px squircle
+    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
     ...Platform.select({
       ios: {
-        shadowColor: COLORS.primary,
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.4,
-        shadowRadius: 10,
+        shadowColor: '#0063F7',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 20,
       },
       android: {
         elevation: 8,
       },
+      web: {
+        boxShadow: '0 16px 36px -8px rgba(0, 99, 247, 0.45)',
+      } as any,
     }),
   },
   title: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xl,
-    fontWeight: '900',
-    letterSpacing: 1.5,
+    fontWeight: '800',
+    letterSpacing: FONTS.metrics.headerTracking,
   },
   subtitle: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.xs,
-    fontWeight: '600',
-    marginTop: 2,
+    fontWeight: '500',
+    letterSpacing: FONTS.metrics.bodyTracking,
+    marginTop: 4,
   },
   pinSection: {
     alignItems: 'center',
-    marginVertical: SPACING.lg,
+    marginVertical: SPACING.xl,
   },
   pinPrompt: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '600',
-    marginBottom: SPACING.lg,
+    letterSpacing: FONTS.metrics.bodyTracking,
+    marginBottom: SPACING.xl,
   },
   dotsRow: {
     flexDirection: 'row',
     gap: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   dot: {
     width: 18,
     height: 18,
     borderRadius: 9,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: COLORS.surfaceBorder,
     backgroundColor: 'transparent',
   },
   dotFilled: {
-    backgroundColor: COLORS.primaryLight,
-    borderColor: COLORS.primaryLight,
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
   },
   dotError: {
-    borderColor: COLORS.danger,
-    backgroundColor: COLORS.danger,
+    borderColor: COLORS.accent, // High impact pop
+    backgroundColor: COLORS.accent,
   },
   statusIndicator: {
     marginTop: SPACING.xs,
   },
   errorText: {
-    color: COLORS.danger,
+    color: COLORS.accent,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
+    letterSpacing: FONTS.metrics.bodyTracking,
     marginTop: SPACING.xs,
   },
   hintText: {
     color: COLORS.textMuted,
     fontSize: FONTS.sizes.xs - 1,
+    letterSpacing: FONTS.metrics.bodyTracking,
     marginTop: SPACING.xs,
   },
   keypad: {
@@ -245,7 +252,7 @@ const styles = StyleSheet.create({
   key: {
     flex: 1,
     height: 64,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.md, // 12px squircle
     backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -253,12 +260,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.surfaceBorder,
   },
   actionKey: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: COLORS.surfaceRaised,
   },
   keyText: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xxl,
-    fontWeight: '700',
+    fontWeight: '600',
+    letterSpacing: FONTS.metrics.bodyTracking,
   },
   demoHelper: {
     alignItems: 'center',

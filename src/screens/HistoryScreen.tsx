@@ -339,30 +339,32 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
   },
   filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md, // 12px squircle
     backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   filterPillActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryLight,
+    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
+    borderColor: 'rgba(0, 99, 247, 0.6)',
   },
   filterPillText: {
     color: COLORS.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: FONTS.metrics.bodyTracking,
   },
   filterPillTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   refreshBtn: {
     marginLeft: 'auto',
-    width: 32,
-    height: 32,
-    borderRadius: RADIUS.pill,
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
     backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -377,13 +379,14 @@ const styles = StyleSheet.create({
   emptyText: {
     color: COLORS.textMuted,
     fontSize: FONTS.sizes.sm,
+    letterSpacing: FONTS.metrics.bodyTracking,
     marginTop: SPACING.sm,
   },
   saleRowCard: {
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.lg, // 18px squircle
+    padding: 20, // Strict >= 20px internal padding
+    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
@@ -391,12 +394,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
   },
   invoiceNum: {
-    color: COLORS.primaryLight,
+    color: COLORS.primary, // Cobalt Blue
     fontSize: FONTS.sizes.xs,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   branchBadge: {
     paddingHorizontal: 6,
@@ -446,26 +450,27 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   statusPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    marginTop: 4,
   },
   statusPillPaid: {
-    backgroundColor: '#10B98122',
+    backgroundColor: COLORS.primaryMuted,
   },
   statusPillCredit: {
-    backgroundColor: '#F59E0B22',
+    backgroundColor: COLORS.accentMuted,
   },
   statusPillText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   statusPaidText: {
-    color: COLORS.success,
+    color: COLORS.primaryLight,
   },
   statusCreditText: {
-    color: COLORS.warning,
+    color: COLORS.accent,
   },
   modalOverlay: {
     flex: 1,
@@ -474,9 +479,11 @@ const styles = StyleSheet.create({
   },
   detailSheet: {
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: RADIUS.lg,
-    borderTopRightRadius: RADIUS.lg,
-    padding: SPACING.xl,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
+    padding: 24,
+    borderTopWidth: 1,
+    borderColor: COLORS.surfaceBorder,
     maxHeight: '90%',
   },
   detailHeader: {

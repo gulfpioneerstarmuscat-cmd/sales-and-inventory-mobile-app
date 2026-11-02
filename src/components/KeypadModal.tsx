@@ -6,6 +6,7 @@ import {
   Modal,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
@@ -83,7 +84,7 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
             <View style={styles.sheet}>
               <View style={styles.header}>
                 <Text style={styles.title}>{title}</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
                   <Ionicons name="close" size={24} color={COLORS.textSecondary} />
                 </TouchableOpacity>
               </View>
@@ -144,48 +145,56 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   sheet: {
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: RADIUS.lg,
-    borderTopRightRadius: RADIUS.lg,
-    padding: SPACING.xl,
-    paddingBottom: SPACING.massive,
+    borderTopLeftRadius: RADIUS.xxl, // 24px Apple Squircle
+    borderTopRightRadius: RADIUS.xxl,
+    padding: 24, // Generous Apple padding
+    paddingBottom: 40,
     borderTopWidth: 1,
     borderColor: COLORS.surfaceBorder,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(30px)',
+        WebkitBackdropFilter: 'blur(30px)',
+        boxShadow: '0 -20px 48px rgba(0, 0, 0, 0.65)',
+      } as any,
+    }),
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   title: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: FONTS.metrics.headerTracking,
   },
   closeBtn: {
     padding: SPACING.xs,
   },
   displayContainer: {
     backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg, // 18px
     paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: 24,
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   displayText: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.giant,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: FONTS.metrics.headerTracking,
   },
   suffix: {
     fontSize: FONTS.sizes.md,
@@ -193,43 +202,57 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   grid: {
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+    gap: SPACING.sm + 2,
+    marginBottom: SPACING.xl,
   },
   row: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: SPACING.sm + 2,
   },
   key: {
     flex: 1,
-    height: 60,
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: RADIUS.md,
+    height: 56,
+    backgroundColor: COLORS.surfaceRaised,
+    borderRadius: RADIUS.md, // 12px squircle
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#47556955',
+    borderColor: COLORS.surfaceBorder,
   },
   actionKey: {
-    backgroundColor: '#334155AA',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   keyText: {
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xl,
-    fontWeight: '700',
+    fontWeight: '600',
+    letterSpacing: FONTS.metrics.bodyTracking,
   },
   confirmButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
     height: TOUCH_TARGET.buttonHeight,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.lg, // 18px
     justifyContent: 'center',
     alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0063F7',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.35,
+        shadowRadius: 20,
+      },
+      android: {
+        elevation: 8,
+      },
+      web: {
+        boxShadow: '0 16px 36px -8px rgba(0, 99, 247, 0.45)',
+      } as any,
+    }),
   },
   confirmText: {
     color: '#FFFFFF',
     fontSize: FONTS.sizes.md,
     fontWeight: '800',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
 });
-

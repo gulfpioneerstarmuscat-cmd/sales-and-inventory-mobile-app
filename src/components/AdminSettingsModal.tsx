@@ -297,9 +297,11 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: COLORS.surface,
-    borderTopLeftRadius: RADIUS.lg,
-    borderTopRightRadius: RADIUS.lg,
-    padding: SPACING.xl,
+    borderTopLeftRadius: RADIUS.xxl,
+    borderTopRightRadius: RADIUS.xxl,
+    padding: 24,
+    borderTopWidth: 1,
+    borderColor: COLORS.surfaceBorder,
     maxHeight: '88%',
   },
   header: {

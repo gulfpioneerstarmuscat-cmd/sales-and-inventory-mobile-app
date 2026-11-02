@@ -103,8 +103,8 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.xl,
+    borderRadius: RADIUS.xl, // 22px Apple Squircle
+    padding: 24, // Generous Apple padding
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },

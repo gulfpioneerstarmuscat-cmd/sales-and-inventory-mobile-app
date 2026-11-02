@@ -184,11 +184,11 @@ export const HamburgerMenu: React.FC<HamburgerMenuProps> = ({
                   style={[styles.menuItem, styles.logoutItem]}
                   onPress={() => handleAction('logout')}
                 >
-                  <View style={[styles.menuIconContainer, { backgroundColor: '#EF444422' }]}>
-                    <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
+                  <View style={[styles.menuIconContainer, { backgroundColor: COLORS.accentMuted }]}>
+                    <Ionicons name="log-out-outline" size={20} color={COLORS.accent} />
                   </View>
                   <View style={styles.menuTextContainer}>
-                    <Text style={[styles.menuTitle, { color: COLORS.danger }]}>Log Out</Text>
+                    <Text style={[styles.menuTitle, { color: COLORS.accent }]}>Log Out</Text>
                   </View>
                 </TouchableOpacity>
               </ScrollView>
@@ -213,11 +213,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   drawer: {
-    width: '82%',
+    width: '84%',
     maxWidth: 360,
     height: '100%',
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: SPACING.lg,
+    backgroundColor: COLORS.background, // Deep obsidian canvas
+    paddingHorizontal: 24, // Generous Apple breathing room
     borderLeftWidth: 1,
     borderLeftColor: COLORS.surfaceBorder,
   },
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
   userInfo: {
     flexDirection: 'row',
@@ -233,10 +233,10 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   avatar: {
-    width: 44,
-    height: 44,
+    width: 48,
+    height: 48,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary, // Cobalt Blue
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -249,32 +249,35 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.md,
     fontWeight: '700',
+    letterSpacing: FONTS.metrics.headerTracking,
   },
   roleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 3,
     gap: 6,
   },
   roleBadge: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: RADIUS.sm,
   },
   badgeAdmin: {
-    backgroundColor: '#F59E0B33',
+    backgroundColor: COLORS.accentMuted,
   },
   badgeStaff: {
-    backgroundColor: '#3B82F633',
+    backgroundColor: COLORS.primaryMuted,
   },
   roleText: {
-    fontSize: FONTS.sizes.xs - 2,
+    fontSize: 10,
     fontWeight: '800',
     color: COLORS.textPrimary,
+    letterSpacing: 0.5,
   },
   userBranch: {
     color: COLORS.textSecondary,
     fontSize: FONTS.sizes.xs,
+    letterSpacing: FONTS.metrics.bodyTracking,
   },
   closeBtn: {
     padding: SPACING.xs,
@@ -282,7 +285,7 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: COLORS.surfaceBorder,
-    marginVertical: SPACING.md,
+    marginVertical: SPACING.lg,
   },
   menuList: {
     flex: 1,
@@ -290,19 +293,24 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.sm + 4,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: 8,
+    borderRadius: RADIUS.md, // 12px
     minHeight: 52,
   },
   logoutItem: {
     marginTop: SPACING.sm,
   },
   menuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.md,
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.sm, // 10px squircle
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
+    backgroundColor: COLORS.surfaceRaised,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
   },
   menuTextContainer: {
     flex: 1,
@@ -312,24 +320,28 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     fontSize: FONTS.sizes.md,
     fontWeight: '600',
+    letterSpacing: FONTS.metrics.bodyTracking,
   },
   adminTag: {
-    backgroundColor: COLORS.warning,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 3,
+    backgroundColor: COLORS.accentMuted,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
   },
   adminTagText: {
-    color: '#000000',
+    color: COLORS.accent,
     fontSize: 9,
     fontWeight: '800',
+    letterSpacing: 0.5,
   },
   drawerFooter: {
     alignItems: 'center',
-    paddingTop: SPACING.sm,
+    paddingTop: SPACING.md,
+    paddingBottom: SPACING.lg,
   },
   footerVersion: {
     color: COLORS.textMuted,
     fontSize: FONTS.sizes.xs - 1,
+    letterSpacing: FONTS.metrics.bodyTracking,
   },
 });
