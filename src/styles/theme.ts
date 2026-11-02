@@ -2,62 +2,172 @@ import { Platform } from 'react-native';
 
 /**
  * ============================================================================
- * EXPLICIT 3-COLOR SYSTEM ARCHITECTURE & APPLE-INSPIRED DESIGN TOKENS
- * ============================================================================
- * 1. PRIMARY:
- *    - Light Mode Surface: #F8F9FA (Crisp Apple silver-white base)
- *    - Dark Mode Surface / Canvas: #0B0C10 (Deep obsidian space-gray base)
- * 2. SECONDARY:
- *    - Brand Cobalt Blue: #0063F7 (Primary actions, active states, focal gradients)
- * 3. ACCENT:
- *    - Vibrant Sunset Coral: #FF5A36 (High-priority badges, urgent callouts, pop)
+ * GPS MUSCAT POS - THEME DESIGN SYSTEM & DESIGN TOKENS
+ * Inspired directly by gpsmuscat.com visual architecture
  * ============================================================================
  */
 
-export const COLORS = {
-  // 1. Primary: Theme-Adaptive Surface & Canvas
-  background: '#0B0C10',              // Deep, rich obsidian space-gray base
-  backgroundLight: '#F8F9FA',         // Crisp Apple silver-white base
-  surface: '#16181F',                 // Primary elevated card surface
-  surfaceRaised: '#1F222C',           // Higher elevation / active container surface
-  surfaceLight: '#262A36',            // Raised pill / tertiary element
-  surfaceGlass: 'rgba(22, 24, 31, 0.88)', // Organic glass surface with blur
-  surfaceBorder: 'rgba(255, 255, 255, 0.08)', // Ultra-subtle context-aware border
-  surfaceBorderLight: 'rgba(0, 0, 0, 0.06)',
-  surfaceBorderActive: 'rgba(0, 99, 247, 0.45)', // Focused blue border
+export type ThemeMode = 'light' | 'dark' | 'auto';
 
-  // 2. Secondary: Core Brand Blue
-  primary: '#0063F7',                 // Vibrant Cobalt Blue
-  primaryLight: '#3385FF',            // Bright Cobalt Accent
-  primaryDark: '#004EC2',             // Deep Pressed Blue
-  primaryMuted: 'rgba(0, 99, 247, 0.15)', // Subtle Cobalt Blue glow fill
-  primaryGlow: 'rgba(0, 99, 247, 0.25)',
+export interface ThemeColors {
+  // Canvases & Surfaces
+  background: string;
+  surface: string;
+  surfaceRaised: string;
+  surfaceLight: string;
+  surfaceGlass: string;
+  surfaceBorder: string;
+  surfaceBorderLight: string;
+  surfaceBorderActive: string;
 
-  // 3. Accent: The High-Impact Pop
-  accent: '#FF5A36',                  // Vibrant Sunset Coral
-  accentLight: '#FF7B5E',             // Bright Sunset Coral
-  accentMuted: 'rgba(255, 90, 54, 0.15)', // High-priority badge pill fill
-  danger: '#FF5A36',                  // Delete / Alert / Shortage (matches accent mandate)
-  dangerMuted: 'rgba(255, 90, 54, 0.15)',
+  // Brand Blues (gpsmuscat.com identity)
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  primaryMuted: string;
+  primaryGlow: string;
 
-  // Supporting Semantic Statuses
-  success: '#10B981',                 // Emerald Green (Cash / In-Stock indicator)
-  successMuted: 'rgba(16, 185, 129, 0.15)',
-  warning: '#F59E0B',                 // Amber Gold (Credit balance / Alerts)
-  warningMuted: 'rgba(245, 158, 11, 0.15)',
+  // Accents & Signals
+  accent: string;
+  accentLight: string;
+  accentMuted: string;
+  danger: string;
+  dangerMuted: string;
+  success: string;
+  successMuted: string;
+  warning: string;
+  warningMuted: string;
 
-  // Typography Neutrals (Never pure #000000)
-  textPrimary: '#F1F5F9',             // Supreme contrast without harsh glare
-  textPrimaryLight: '#1E293B',        // For light mode surfaces
-  textSecondary: '#94A3B8',           // Muted slate text
-  textMuted: '#64748B',               // Subdued captions & placeholders
-  disabled: '#262A36',                // Inactive / Disabled background
-  disabledText: '#475569',            // Inactive text
+  // Typography Neutrals
+  textPrimary: string;
+  textSecondary: string;
+  textMuted: string;
+  disabled: string;
+  disabledText: string;
 
   // Branch Distinct Accents
-  branchKhoudh: '#38BDF8',            // Cyan Sky
-  branchGhala: '#A855F7',             // Purple Violet
+  branchKhoudh: string;
+  branchGhala: string;
+
+  // Form & Card Surfaces
+  inputBackground: string;
+  inputBorder: string;
+  cardBackground: string;
+
+  // Ambient Gradient Meshes
+  ambientGradientStart: string;
+  ambientGradientMid: string;
+  ambientGradientEnd: string;
+}
+
+export const DARK_THEME_COLORS: ThemeColors = {
+  // 1. Primary: Dark Obsidian Canvas (gpsmuscat.com)
+  background: '#030712',
+  surface: '#0F172A',
+  surfaceRaised: '#1E293B',
+  surfaceLight: '#334155',
+  surfaceGlass: 'rgba(15, 23, 42, 0.88)',
+  surfaceBorder: 'rgba(255, 255, 255, 0.08)',
+  surfaceBorderLight: 'rgba(255, 255, 255, 0.05)',
+  surfaceBorderActive: 'rgba(14, 165, 233, 0.45)',
+
+  // 2. Secondary: GPS Muscat Vibrant Blue & Sky Cyan
+  primary: '#0063F7',
+  primaryLight: '#0EA5E9',
+  primaryDark: '#004EC2',
+  primaryMuted: 'rgba(0, 99, 247, 0.16)',
+  primaryGlow: 'rgba(14, 165, 233, 0.25)',
+
+  // 3. Accent: Sunset Coral
+  accent: '#FF5A36',
+  accentLight: '#FF7B5E',
+  accentMuted: 'rgba(255, 90, 54, 0.16)',
+  danger: '#FF5A36',
+  dangerMuted: 'rgba(255, 90, 54, 0.16)',
+
+  // Statuses
+  success: '#10B981',
+  successMuted: 'rgba(16, 185, 129, 0.16)',
+  warning: '#F59E0B',
+  warningMuted: 'rgba(245, 158, 11, 0.16)',
+
+  // Text Neutrals
+  textPrimary: '#F8FAFC',
+  textSecondary: '#94A3B8',
+  textMuted: '#64748B',
+  disabled: '#1E293B',
+  disabledText: '#475569',
+
+  // Branches
+  branchKhoudh: '#38BDF8',
+  branchGhala: '#A855F7',
+
+  // Forms
+  inputBackground: '#0F172A',
+  inputBorder: 'rgba(255, 255, 255, 0.1)',
+  cardBackground: '#0F172A',
+
+  // Gradients
+  ambientGradientStart: '#020617',
+  ambientGradientMid: '#0B1528',
+  ambientGradientEnd: '#030712',
 };
+
+export const LIGHT_THEME_COLORS: ThemeColors = {
+  // 1. Primary: Crisp Slate-50 Base (gpsmuscat.com light mode)
+  background: '#F8FAFC',
+  surface: '#FFFFFF',
+  surfaceRaised: '#F1F5F9',
+  surfaceLight: '#E2E8F0',
+  surfaceGlass: 'rgba(255, 255, 255, 0.92)',
+  surfaceBorder: 'rgba(0, 0, 0, 0.08)',
+  surfaceBorderLight: 'rgba(0, 0, 0, 0.04)',
+  surfaceBorderActive: 'rgba(0, 99, 247, 0.45)',
+
+  // 2. Secondary: GPS Muscat Vibrant Blue & Sky Cyan
+  primary: '#0063F7',
+  primaryLight: '#0284C7',
+  primaryDark: '#004EC2',
+  primaryMuted: 'rgba(0, 99, 247, 0.10)',
+  primaryGlow: 'rgba(0, 99, 247, 0.18)',
+
+  // 3. Accent: Sunset Coral
+  accent: '#FF5A36',
+  accentLight: '#FF7B5E',
+  accentMuted: 'rgba(255, 90, 54, 0.12)',
+  danger: '#FF5A36',
+  dangerMuted: 'rgba(255, 90, 54, 0.12)',
+
+  // Statuses
+  success: '#059669',
+  successMuted: 'rgba(5, 150, 105, 0.12)',
+  warning: '#D97706',
+  warningMuted: 'rgba(217, 119, 6, 0.12)',
+
+  // Text Neutrals
+  textPrimary: '#0F172A',
+  textSecondary: '#475569',
+  textMuted: '#94A3B8',
+  disabled: '#F1F5F9',
+  disabledText: '#94A3B8',
+
+  // Branches
+  branchKhoudh: '#0284C7',
+  branchGhala: '#9333EA',
+
+  // Forms
+  inputBackground: '#FFFFFF',
+  inputBorder: '#E2E8F0',
+  cardBackground: '#FFFFFF',
+
+  // Gradients
+  ambientGradientStart: '#F8FAFC',
+  ambientGradientMid: '#F0F9FF',
+  ambientGradientEnd: '#EEF2F6',
+};
+
+// Default export for backward compatibility
+export const COLORS = DARK_THEME_COLORS;
 
 export const SPACING = {
   xs: 4,
@@ -109,40 +219,44 @@ export const TOUCH_TARGET = {
   inputHeight: 52,
 };
 
-export const SHADOWS = {
+export const getShadows = (isDark: boolean) => ({
   atmospheric: Platform.select({
     ios: {
       shadowColor: '#0063F7',
       shadowOffset: { width: 0, height: 16 },
-      shadowOpacity: 0.12,
+      shadowOpacity: isDark ? 0.12 : 0.08,
       shadowRadius: 28,
     },
     android: {
       elevation: 8,
     },
     web: {
-      boxShadow: '0 20px 40px -15px rgba(0, 99, 247, 0.12)',
+      boxShadow: isDark
+        ? '0 20px 40px -15px rgba(0, 99, 247, 0.14)'
+        : '0 20px 40px -15px rgba(0, 99, 247, 0.10)',
     } as any,
   }),
   ambientCard: Platform.select({
     ios: {
-      shadowColor: '#000000',
+      shadowColor: isDark ? '#000000' : '#0F172A',
       shadowOffset: { width: 0, height: 12 },
-      shadowOpacity: 0.45,
+      shadowOpacity: isDark ? 0.45 : 0.06,
       shadowRadius: 24,
     },
     android: {
-      elevation: 6,
+      elevation: isDark ? 6 : 3,
     },
     web: {
-      boxShadow: '0 16px 36px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+      boxShadow: isDark
+        ? '0 16px 36px -8px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08)'
+        : '0 12px 32px -8px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.06)',
     } as any,
   }),
   floatingNav: Platform.select({
     ios: {
-      shadowColor: '#000000',
+      shadowColor: isDark ? '#000000' : '#0F172A',
       shadowOffset: { width: 0, height: 20 },
-      shadowOpacity: 0.55,
+      shadowOpacity: isDark ? 0.55 : 0.12,
       shadowRadius: 36,
     },
     android: {
@@ -151,7 +265,11 @@ export const SHADOWS = {
     web: {
       backdropFilter: 'blur(24px)',
       WebkitBackdropFilter: 'blur(24px)',
-      boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+      boxShadow: isDark
+        ? '0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.08)'
+        : '0 24px 48px -12px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.08)',
     } as any,
   }),
-};
+});
+
+export const SHADOWS = getShadows(true);

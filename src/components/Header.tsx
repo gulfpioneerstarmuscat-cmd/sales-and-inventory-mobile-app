@@ -2,8 +2,9 @@ import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS } from '../styles/theme';
+import { SPACING, RADIUS } from '../styles/theme';
 import { GpsLogo } from './GpsLogo';
+import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   onOpenMenu: () => void;
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenMenu }) => {
   const insets = useSafeAreaInsets();
+  const { isDark, colors } = useTheme();
   const verticalPadding = SPACING.md; // 12px equal top & bottom padding
 
   return (
@@ -18,25 +20,33 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMenu }) => {
       style={[
         styles.container,
         {
+          backgroundColor: colors.surfaceGlass,
+          borderBottomColor: colors.surfaceBorder,
           paddingTop: insets.top + verticalPadding,
           paddingBottom: verticalPadding,
         },
       ]}
     >
       <View style={styles.content}>
-        {/* Left: Company Logo */}
+        {/* Left: Company Logo (Adapts to Light / Dark Theme) */}
         <View style={styles.logoWrapper}>
-          <GpsLogo width={180} height={24} />
+          <GpsLogo width={180} height={24} isDark={isDark} />
         </View>
 
         {/* Right: Hamburger Menu Button */}
         <TouchableOpacity
-          style={styles.menuButton}
+          style={[
+            styles.menuButton,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.surfaceBorder,
+            },
+          ]}
           onPress={onOpenMenu}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           activeOpacity={0.7}
         >
-          <Ionicons name="menu" size={24} color={COLORS.textPrimary} />
+          <Ionicons name="menu" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
       </View>
     </View>
@@ -45,9 +55,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenMenu }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.surfaceBorder,
     paddingHorizontal: SPACING.lg,
     zIndex: 10,
     ...Platform.select({
@@ -72,9 +80,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: RADIUS.md, // 12px squircle
-    backgroundColor: COLORS.surface,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,9 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET, ThemeColors } from '../styles/theme';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 interface ProfileModalProps {
   visible: boolean;
@@ -23,6 +24,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   onLogout,
 }) => {
   const { currentUser, activeBranch } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -33,7 +36,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <View style={styles.header}>
                 <Text style={styles.title}>STAFF PROFILE</Text>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                  <Ionicons name="close" size={24} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
@@ -78,8 +81,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                   onClose();
                   onLogout();
                 }}
+                activeOpacity={0.7}
               >
-                <Ionicons name="log-out-outline" size={18} color={COLORS.danger} />
+                <Ionicons name="log-out-outline" size={18} color={colors.danger} />
                 <Text style={styles.logoutText}>LOG OUT OF THIS DEVICE</Text>
               </TouchableOpacity>
             </View>
@@ -90,113 +94,113 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING.lg,
-  },
-  card: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: COLORS.surface,
-    borderRadius: RADIUS.xl, // 22px Apple Squircle
-    padding: 24, // Generous Apple padding
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  title: {
-    color: COLORS.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  closeBtn: {
-    padding: SPACING.xs,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontSize: FONTS.sizes.xl,
-    fontWeight: '900',
-  },
-  name: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.md,
-    fontWeight: '800',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    marginTop: 4,
-  },
-  badge: {
-    backgroundColor: '#3B82F633',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeText: {
-    color: COLORS.primaryLight,
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  infoBox: {
-    backgroundColor: COLORS.background,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-    gap: 8,
-    marginBottom: SPACING.xl,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  infoLabel: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.xs,
-  },
-  infoVal: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '700',
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: TOUCH_TARGET.buttonHeight,
-    borderRadius: RADIUS.md,
-    backgroundColor: '#EF444422',
-    borderWidth: 1,
-    borderColor: '#EF444455',
-  },
-  logoutText: {
-    color: COLORS.danger,
-    fontSize: FONTS.sizes.sm,
-    fontWeight: '800',
-  },
-});
-
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: SPACING.lg,
+    },
+    card: {
+      width: '100%',
+      maxWidth: 380,
+      backgroundColor: colors.surface,
+      borderRadius: RADIUS.xl, // 22px Apple Squircle
+      padding: 24, // Generous Apple padding
+      borderWidth: 1,
+      borderColor: colors.surfaceBorder,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+    },
+    title: {
+      color: colors.textMuted,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 1,
+    },
+    closeBtn: {
+      padding: SPACING.xs,
+    },
+    avatarSection: {
+      alignItems: 'center',
+      marginBottom: SPACING.lg,
+    },
+    avatar: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: SPACING.sm,
+    },
+    avatarText: {
+      color: '#FFFFFF',
+      fontSize: FONTS.sizes.xl,
+      fontWeight: '900',
+    },
+    name: {
+      color: colors.textPrimary,
+      fontSize: FONTS.sizes.md,
+      fontWeight: '800',
+    },
+    badgeRow: {
+      flexDirection: 'row',
+      marginTop: 4,
+    },
+    badge: {
+      backgroundColor: colors.primaryMuted,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    badgeText: {
+      color: colors.primaryLight,
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    infoBox: {
+      backgroundColor: colors.background,
+      borderRadius: RADIUS.md,
+      padding: SPACING.md,
+      gap: 8,
+      marginBottom: SPACING.xl,
+      borderWidth: 1,
+      borderColor: colors.surfaceBorder,
+    },
+    infoRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    infoLabel: {
+      color: colors.textSecondary,
+      fontSize: FONTS.sizes.xs,
+    },
+    infoVal: {
+      color: colors.textPrimary,
+      fontSize: FONTS.sizes.xs,
+      fontWeight: '700',
+    },
+    logoutBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      height: TOUCH_TARGET.buttonHeight,
+      borderRadius: RADIUS.md,
+      backgroundColor: colors.dangerMuted,
+      borderWidth: 1,
+      borderColor: colors.danger,
+    },
+    logoutText: {
+      color: colors.danger,
+      fontSize: FONTS.sizes.sm,
+      fontWeight: '800',
+    },
+  });

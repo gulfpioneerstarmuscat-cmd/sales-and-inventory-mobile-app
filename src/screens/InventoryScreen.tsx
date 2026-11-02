@@ -12,7 +12,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET, SHADOWS } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET, ThemeColors, getShadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Product } from '../types';
 import { supabase } from '../config/supabase';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +23,8 @@ interface InventoryScreenProps {
 }
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer }) => {
+  const { colors, isDark, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark, shadows), [colors, isDark, shadows]);
   const { activeBranch, isAdmin } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,18 +72,18 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
       {/* Zone 1: Top Search Bar & Category Chips (Unified with POS Screen) */}
       <View style={styles.zone1}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+          <Ionicons name="search" size={20} color={colors.textMuted} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search SKU, gate motor, barrier, lock..."
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -121,7 +124,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.7}
           >
-            <Ionicons name="refresh" size={16} color={COLORS.textSecondary} />
+            <Ionicons name="refresh" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -139,7 +142,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.7}
           >
-            <Ionicons name="swap-horizontal" size={14} color={COLORS.primaryLight} />
+            <Ionicons name="swap-horizontal" size={14} color={colors.primaryLight} />
             <Text style={styles.quickTransferText}>Transfer Stock</Text>
           </TouchableOpacity>
         )}
@@ -147,11 +150,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
 
       {/* Zone 3: Compact Unified Data Rows */}
       {loading ? (
-        <ActivityIndicator color={COLORS.primaryLight} style={{ marginVertical: 32 }} />
+        <ActivityIndicator color={colors.primaryLight} style={{ marginVertical: 32 }} />
       ) : filteredProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
-            <Ionicons name="cube-outline" size={32} color={COLORS.textMuted} />
+            <Ionicons name="cube-outline" size={32} color={colors.textMuted} />
           </View>
           <Text style={styles.emptyTitle}>No Products Found</Text>
           <Text style={styles.emptySubtitle}>
@@ -223,7 +226,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
                     </View>
                   </View>
 
-                  <Ionicons name="chevron-forward" size={16} color={COLORS.textMuted} style={{ marginLeft: 4 }} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginLeft: 4 }} />
                 </View>
               </TouchableOpacity>
             );
@@ -251,7 +254,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
                 style={styles.closeBtn}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <Ionicons name="close" size={22} color={COLORS.textSecondary} />
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -309,7 +312,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
                 </View>
                 <View style={styles.specRow}>
                   <Text style={styles.specLabel}>Min Stock Alert</Text>
-                  <Text style={[styles.specVal, { color: COLORS.accent }]}>
+                  <Text style={[styles.specVal, { color: colors.accent }]}>
                     {selectedProduct?.min_stock_alert} units
                   </Text>
                 </View>
@@ -351,10 +354,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({ onOpenTransfer
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, shadows: ReturnType<typeof getShadows>) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   zone1: {
     paddingTop: SPACING.md,
@@ -363,18 +367,18 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
     paddingHorizontal: 16,
     height: TOUCH_TARGET.inputHeight,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    ...SHADOWS.ambientCard,
+    borderColor: colors.surfaceBorder,
+    ...shadows.ambientCard,
   },
   searchInput: {
     flex: 1,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     letterSpacing: FONTS.metrics.bodyTracking,
     paddingVertical: 0,
@@ -392,12 +396,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   categoryChipActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     borderColor: 'rgba(0, 99, 247, 0.6)',
     ...Platform.select({
       web: {
@@ -406,7 +410,7 @@ const styles = StyleSheet.create({
     }),
   },
   categoryText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -419,11 +423,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   headerRow: {
     flexDirection: 'row',
@@ -434,14 +438,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sectionTitle: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
     lineHeight: 16,
   },
   itemCount: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -453,10 +457,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: COLORS.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
   quickTransferText: {
-    color: COLORS.primaryLight,
+    color: colors.primaryLight,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -468,31 +472,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     padding: 32,
     marginTop: 20,
-    ...SHADOWS.ambientCard,
+    ...shadows.ambientCard,
   },
   emptyIconWrap: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   emptyTitle: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.md,
     fontWeight: '700',
     marginBottom: 4,
   },
   emptySubtitle: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONTS.sizes.xs,
     textAlign: 'center',
     lineHeight: 18,
@@ -501,14 +505,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     paddingVertical: 10,
     paddingHorizontal: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    ...SHADOWS.ambientCard,
+    borderColor: colors.surfaceBorder,
+    ...shadows.ambientCard,
   },
   productInfoCol: {
     flex: 1,
@@ -521,37 +525,37 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   skuText: {
-    color: COLORS.primary,
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   categoryBadge: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   categoryBadgeText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   alertBadge: {
-    backgroundColor: COLORS.accentMuted,
+    backgroundColor: colors.accentMuted,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   alertText: {
-    color: COLORS.accent,
+    color: colors.accent,
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   nameText: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -570,7 +574,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -581,17 +585,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 99, 247, 0.08)',
   },
   branchStockLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     fontWeight: '500',
   },
   branchStockValue: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 11,
     fontWeight: '700',
   },
   lowStockText: {
-    color: COLORS.accent,
+    color: colors.accent,
   },
   modalOverlay: {
     flex: 1,
@@ -599,12 +603,12 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   detailSheet: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     padding: 20,
     borderTopWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     maxHeight: '90%',
   },
   detailHeader: {
@@ -614,13 +618,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   detailSku: {
-    color: COLORS.primaryLight,
+    color: colors.primaryLight,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   detailTitle: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.md,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -630,12 +634,12 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
   },
   detailSectionTitle: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -649,11 +653,11 @@ const styles = StyleSheet.create({
   },
   branchCard: {
     flex: 1,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     alignItems: 'center',
   },
   activeBranchCard: {
@@ -666,24 +670,24 @@ const styles = StyleSheet.create({
     }),
   },
   branchCardTitle: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   branchCardQty: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xl,
     fontWeight: '900',
     marginVertical: 4,
   },
   unitSub: {
     fontSize: FONTS.sizes.xs,
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   currentPill: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: RADIUS.pill,
@@ -695,12 +699,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   specBox: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     marginBottom: 14,
   },
   specRow: {
@@ -712,16 +716,16 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.04)',
   },
   specLabel: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: FONTS.sizes.xs,
   },
   specVal: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
   },
   specDesc: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     lineHeight: 18,
   },
@@ -729,7 +733,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   transferStockBtn: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     height: 46,
     borderRadius: 12,
     flexDirection: 'row',
@@ -749,18 +753,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   returnBtn: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     height: 42,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   returnBtnText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
-});
+  });

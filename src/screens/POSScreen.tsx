@@ -13,7 +13,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET, SHADOWS } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET, ThemeColors, getShadows } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Product, Customer, CartItem, PaymentMethod, PaymentStatus } from '../types';
 import { KeypadModal } from '../components/KeypadModal';
 import { useAuth } from '../context/AuthContext';
@@ -37,6 +38,8 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
   const { activeBranch, currentUser } = useAuth();
+  const { colors, isDark, shadows } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark, shadows), [colors, isDark, shadows]);
 
   // Products & Customers State
   const [products, setProducts] = useState<Product[]>([]);
@@ -409,12 +412,12 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       <View style={styles.zone1Container}>
         <View style={styles.customerSearchInputBox}>
           <View style={styles.customerIcon}>
-            <Ionicons name="business" size={16} color={COLORS.primaryLight} />
+            <Ionicons name="business" size={16} color={colors.primaryLight} />
           </View>
           <TextInput
             style={styles.customerTextInput}
             placeholder="Search customer name, company or phone..."
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
             value={customerSearchQuery}
             onChangeText={(text) => {
               setCustomerSearchQuery(text);
@@ -432,7 +435,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
               style={styles.customerClearBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -443,7 +446,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <Ionicons
               name={customerDropdownOpen ? 'chevron-up' : 'chevron-down'}
               size={18}
-              color={COLORS.textSecondary}
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         </View>
@@ -476,7 +479,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                       }}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.custRowTitle, isSelected && { color: COLORS.primaryLight }]}>
+                        <Text style={[styles.custRowTitle, isSelected && { color: colors.primaryLight }]}>
                           {cust.company_name ? `${cust.company_name} (${cust.name})` : cust.name}
                         </Text>
                         {cust.phone ? <Text style={styles.custPhone}>{cust.phone}</Text> : null}
@@ -496,18 +499,18 @@ export const POSScreen: React.FC<POSScreenProps> = ({
       {/* Zone 2: Product Quick Search Bar & Category Chips */}
       <View style={styles.zone2Container}>
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={20} color={COLORS.textMuted} style={{ marginRight: 8 }} />
+          <Ionicons name="search" size={20} color={colors.textMuted} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search gate motor, remote, SKU..."
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             clearButtonMode="while-editing"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={COLORS.textMuted} />
+              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
@@ -566,7 +569,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         </View>
 
         {loadingData ? (
-          <ActivityIndicator color={COLORS.primaryLight} style={{ marginVertical: 20 }} />
+          <ActivityIndicator color={colors.primaryLight} style={{ marginVertical: 20 }} />
         ) : (
           <FlatList
             data={filteredProducts}
@@ -620,7 +623,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                         hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                         activeOpacity={0.7}
                       >
-                        <Ionicons name="trash-outline" size={16} color={COLORS.accent} />
+                        <Ionicons name="trash-outline" size={16} color={colors.accent} />
                       </TouchableOpacity>
                     </View>
                   ) : (
@@ -676,7 +679,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         {/* Customer Receipt Summary (Compact, Unified Banner) */}
         <View style={styles.receiptHeaderCard}>
           <View style={styles.receiptIconWrap}>
-            <Ionicons name="business" size={16} color={COLORS.primaryLight} />
+            <Ionicons name="business" size={16} color={colors.primaryLight} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.receiptCustomerName} numberOfLines={1}>
@@ -692,7 +695,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         {cart.length === 0 ? (
           <View style={styles.emptyCartCard}>
             <View style={styles.emptyCartIconWrap}>
-              <Ionicons name="cart-outline" size={28} color={COLORS.textMuted} />
+              <Ionicons name="cart-outline" size={28} color={colors.textMuted} />
             </View>
             <Text style={styles.emptyCartTitle}>Your Cart is Empty</Text>
             <Text style={styles.emptyCartSubtitle}>
@@ -732,7 +735,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                     hitSlop={{ top: 8, bottom: 8, left: 6, right: 6 }}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="trash-outline" size={15} color={COLORS.accent} />
+                    <Ionicons name="trash-outline" size={15} color={colors.accent} />
                   </TouchableOpacity>
                 </View>
 
@@ -827,7 +830,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <Ionicons
               name="checkmark-circle"
               size={20}
-              color={!isCredit ? '#FFFFFF' : COLORS.textMuted}
+              color={!isCredit ? '#FFFFFF' : colors.textMuted}
             />
             <Text
               style={[
@@ -849,7 +852,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
             <Ionicons
               name="time"
               size={20}
-              color={isCredit ? '#FFFFFF' : COLORS.textMuted}
+              color={isCredit ? '#FFFFFF' : colors.textMuted}
             />
             <Text
               style={[
@@ -889,17 +892,17 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                     size={22}
                     color={
                       isCredit
-                        ? COLORS.disabledText
+                        ? colors.disabledText
                         : isSelected
                         ? '#FFFFFF'
-                        : COLORS.textSecondary
+                        : colors.textSecondary
                     }
                   />
                   <Text
                     style={[
                       styles.methodBtnText,
                       isSelected && !isCredit && styles.methodBtnTextActive,
-                      isCredit && { color: COLORS.disabledText },
+                      isCredit && { color: colors.disabledText },
                     ]}
                   >
                     {m.toUpperCase()}
@@ -926,7 +929,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
                 <Ionicons
                   name="add"
                   size={20}
-                  color={COLORS.textMuted}
+                  color={colors.textMuted}
                   style={{ alignSelf: 'center', marginTop: 14 }}
                 />
                 <View style={styles.splitInputCol}>
@@ -948,7 +951,7 @@ export const POSScreen: React.FC<POSScreenProps> = ({
         <TextInput
           style={styles.notesInput}
           placeholder="e.g. Collected by installer driver, project site Seeb..."
-          placeholderTextColor={COLORS.textMuted}
+          placeholderTextColor={colors.textMuted}
           value={saleNotes}
           onChangeText={setSaleNotes}
           multiline
@@ -1001,10 +1004,11 @@ export const POSScreen: React.FC<POSScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean, shadows: ReturnType<typeof getShadows>) =>
+  StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   splitScreenWrapper: {
     flex: 1,
@@ -1013,7 +1017,7 @@ const styles = StyleSheet.create({
   leftPane: {
     flex: 1.1,
     borderRightWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   rightPane: {
     flex: 0.9,
@@ -1030,26 +1034,26 @@ const styles = StyleSheet.create({
   customerSearchInputBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: SPACING.lg,
     height: TOUCH_TARGET.inputHeight,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    ...SHADOWS.ambientCard,
+    borderColor: colors.surfaceBorder,
+    ...shadows.ambientCard,
   },
   customerIcon: {
     width: 36,
     height: 36,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: SPACING.md,
   },
   customerTextInput: {
     flex: 1,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '500',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -1068,13 +1072,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   customerDropdownOverlay: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     borderRadius: RADIUS.lg,
     marginTop: SPACING.sm,
     padding: SPACING.sm,
-    ...SHADOWS.atmospheric,
+    ...shadows.atmospheric,
   },
   custRow: {
     flexDirection: 'row',
@@ -1087,22 +1091,22 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 255, 255, 0.04)',
   },
   custRowSelected: {
-    backgroundColor: COLORS.primaryMuted,
+    backgroundColor: colors.primaryMuted,
   },
   custRowTitle: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   custPhone: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     marginTop: 2,
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   custBalance: {
-    color: COLORS.accent,
+    color: colors.accent,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -1111,7 +1115,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noCustFoundText: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONTS.sizes.xs,
     letterSpacing: FONTS.metrics.bodyTracking,
   },
@@ -1121,18 +1125,18 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     marginHorizontal: SPACING.lg,
     paddingHorizontal: SPACING.lg,
     height: TOUCH_TARGET.inputHeight,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    ...SHADOWS.ambientCard,
+    borderColor: colors.surfaceBorder,
+    ...shadows.ambientCard,
   },
   searchInput: {
     flex: 1,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     letterSpacing: FONTS.metrics.bodyTracking,
     paddingVertical: 0,
@@ -1146,12 +1150,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: RADIUS.md,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   categoryChipActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     borderColor: 'rgba(0, 99, 247, 0.6)',
     ...Platform.select({
       web: {
@@ -1160,7 +1164,7 @@ const styles = StyleSheet.create({
     }),
   },
   categoryChipText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '500',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -1182,14 +1186,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   catalogHeader: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
     lineHeight: 16,
   },
   catalogCount: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 11,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -1202,14 +1206,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    ...SHADOWS.ambientCard,
+    borderColor: colors.surfaceBorder,
+    ...shadows.ambientCard,
   },
   catalogCardInCart: {
     borderColor: 'rgba(0, 99, 247, 0.45)',
@@ -1224,18 +1228,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   catalogSku: {
-    color: COLORS.primary,
+    color: colors.primary,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   catalogStockInline: {
-    color: COLORS.success,
+    color: colors.success,
     fontSize: 12,
     fontWeight: '700',
   },
   catalogName: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -1245,7 +1249,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: RADIUS.sm,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     ...Platform.select({
@@ -1264,14 +1268,14 @@ const styles = StyleSheet.create({
     height: 32,
     paddingHorizontal: 8,
     borderRadius: 8,
-    backgroundColor: COLORS.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: 'rgba(0, 99, 247, 0.4)',
   },
   stepperQtyText: {
-    color: COLORS.primaryLight,
+    color: colors.primaryLight,
     fontSize: 13,
     fontWeight: '800',
   },
@@ -1279,7 +1283,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: COLORS.accentMuted,
+    backgroundColor: colors.accentMuted,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -1297,7 +1301,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   page2Title: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.lg,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -1309,42 +1313,42 @@ const styles = StyleSheet.create({
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   clearCartTextActive: {
-    color: COLORS.accent,
+    color: colors.accent,
   },
   clearCartTextDisabled: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     opacity: 0.35,
   },
   receiptHeaderCard: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     marginBottom: 10,
-    ...SHADOWS.ambientCard,
+    ...shadows.ambientCard,
   },
   receiptIconWrap: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: COLORS.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,
   },
   receiptCustomerName: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   receiptMeta: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     letterSpacing: FONTS.metrics.bodyTracking,
     marginTop: 2,
@@ -1360,27 +1364,27 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   sectionHeaderInline: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   selectedHeaderHint: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     fontWeight: '500',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   selectedItemCard: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 14,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    ...SHADOWS.ambientCard,
+    borderColor: colors.surfaceBorder,
+    ...shadows.ambientCard,
   },
   selectedCardLine1: {
     flexDirection: 'row',
@@ -1392,7 +1396,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   selectedItemName: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -1414,7 +1418,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     paddingHorizontal: 6,
     borderRadius: 8,
     gap: 4,
@@ -1425,8 +1429,8 @@ const styles = StyleSheet.create({
     flex: 1.25,
   },
   priceBoxMissing: {
-    borderColor: COLORS.accent,
-    backgroundColor: COLORS.accentMuted,
+    borderColor: colors.accent,
+    backgroundColor: colors.accentMuted,
   },
   totalPillBox: {
     flex: 1.15,
@@ -1434,56 +1438,56 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(0, 99, 247, 0.25)',
   },
   pillLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 9,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
   pillValue: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   pillValueMissing: {
-    color: COLORS.accent,
+    color: colors.accent,
     fontSize: 10,
     fontWeight: '800',
   },
   totalPillValue: {
-    color: COLORS.primaryLight,
+    color: colors.primaryLight,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   emptyCartCard: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     padding: 20,
     alignItems: 'center',
     marginBottom: 10,
-    ...SHADOWS.ambientCard,
+    ...shadows.ambientCard,
   },
   emptyCartIconWrap: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
   },
   emptyCartTitle: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 4,
   },
   emptyCartSubtitle: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 11,
     textAlign: 'center',
     lineHeight: 16,
@@ -1493,7 +1497,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: RADIUS.md,
@@ -1505,14 +1509,14 @@ const styles = StyleSheet.create({
   },
   totalsCard: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     marginBottom: 10,
-    ...SHADOWS.ambientCard,
+    ...shadows.ambientCard,
   },
   totalRow: {
     flexDirection: 'row',
@@ -1524,25 +1528,25 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   totalLabel: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '500',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   totalVal: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   togglePill: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.pill,
   },
   togglePillActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
   },
   togglePillText: {
     color: '#FFFFFF',
@@ -1551,23 +1555,23 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: COLORS.surfaceBorder,
+    backgroundColor: colors.surfaceBorder,
     marginVertical: 8,
   },
   grandTotalLabel: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   grandTotalVal: {
-    color: COLORS.primary,
+    color: colors.primary,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   sectionHeader: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -1583,25 +1587,25 @@ const styles = StyleSheet.create({
   statusToggleBtn: {
     flex: 1,
     height: 42,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   statusToggleBtnPaid: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryLight,
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryLight,
   },
   statusToggleBtnCredit: {
-    backgroundColor: COLORS.accent,
-    borderColor: COLORS.accentLight,
+    backgroundColor: colors.accent,
+    borderColor: colors.accentLight,
   },
   statusToggleText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -1621,17 +1625,17 @@ const styles = StyleSheet.create({
   methodBtn: {
     flex: 1,
     height: 42,
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     gap: 2,
   },
   methodBtnSelected: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primaryLight,
+    backgroundColor: colors.primary,
+    borderColor: colors.primaryLight,
     ...Platform.select({
       web: {
         boxShadow: '0 4px 16px rgba(0, 99, 247, 0.35)',
@@ -1639,7 +1643,7 @@ const styles = StyleSheet.create({
     }),
   },
   methodBtnText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
@@ -1649,16 +1653,16 @@ const styles = StyleSheet.create({
   },
   splitBox: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     marginBottom: 10,
-    ...SHADOWS.ambientCard,
+    ...shadows.ambientCard,
   },
   splitBoxTitle: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.headerTracking,
@@ -1672,41 +1676,41 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   splitInputLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: FONTS.metrics.bodyTracking,
     marginBottom: 4,
   },
   splitInputField: {
-    backgroundColor: COLORS.surfaceRaised,
+    backgroundColor: colors.surfaceRaised,
     height: 38,
     borderRadius: RADIUS.sm,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 13,
     fontWeight: '700',
     paddingHorizontal: 10,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   notesInput: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     letterSpacing: FONTS.metrics.bodyTracking,
     minHeight: 46,
     marginBottom: 12,
-    ...SHADOWS.ambientCard,
+    ...shadows.ambientCard,
   },
   saveSaleBtn: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     height: 48,
     borderRadius: 12,
     justifyContent: 'center',
@@ -1733,4 +1737,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-});
+  });

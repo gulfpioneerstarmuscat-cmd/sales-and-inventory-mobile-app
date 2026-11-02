@@ -9,7 +9,8 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 interface KeypadModalProps {
   visible: boolean;
@@ -30,6 +31,7 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
   onConfirm,
   onClose,
 }) => {
+  const { colors, isDark } = useTheme();
   const [val, setVal] = useState(initialValue || '0');
 
   useEffect(() => {
@@ -81,18 +83,39 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
-            <View style={styles.sheet}>
+            <View
+              style={[
+                styles.sheet,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.surfaceBorder,
+                },
+              ]}
+            >
               <View style={styles.header}>
-                <Text style={styles.title}>{title}</Text>
-                <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                  <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                <Text style={[styles.title, { color: colors.textSecondary }]}>{title}</Text>
+                <TouchableOpacity
+                  onPress={onClose}
+                  style={styles.closeBtn}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={24} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
 
               {/* Value Display */}
-              <View style={styles.displayContainer}>
-                <Text style={styles.displayText}>
-                  {val} <Text style={styles.suffix}>{suffix}</Text>
+              <View
+                style={[
+                  styles.displayContainer,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: colors.surfaceBorder,
+                  },
+                ]}
+              >
+                <Text style={[styles.displayText, { color: colors.textPrimary }]}>
+                  {val}{' '}
+                  <Text style={[styles.suffix, { color: colors.primaryLight }]}>{suffix}</Text>
                 </Text>
               </View>
 
@@ -105,7 +128,15 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
                       return (
                         <TouchableOpacity
                           key={cIdx}
-                          style={[styles.key, isAction && styles.actionKey]}
+                          style={[
+                            styles.key,
+                            {
+                              backgroundColor: isAction
+                                ? colors.surfaceLight
+                                : colors.surfaceRaised,
+                              borderColor: colors.surfaceBorder,
+                            },
+                          ]}
                           onPress={() => {
                             if (btn === '⌫') handleBackspace();
                             else if (btn === 'C') handleClear();
@@ -115,9 +146,15 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
                           activeOpacity={0.6}
                         >
                           {btn === '⌫' ? (
-                            <Ionicons name="backspace-outline" size={24} color={COLORS.textPrimary} />
+                            <Ionicons
+                              name="backspace-outline"
+                              size={24}
+                              color={colors.textPrimary}
+                            />
                           ) : (
-                            <Text style={styles.keyText}>{btn}</Text>
+                            <Text style={[styles.keyText, { color: colors.textPrimary }]}>
+                              {btn}
+                            </Text>
                           )}
                         </TouchableOpacity>
                       );
@@ -128,7 +165,7 @@ export const KeypadModal: React.FC<KeypadModalProps> = ({
 
               {/* Confirm Button */}
               <TouchableOpacity
-                style={styles.confirmButton}
+                style={[styles.confirmButton, { backgroundColor: colors.primary }]}
                 onPress={handleConfirm}
                 activeOpacity={0.8}
               >
@@ -149,13 +186,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: COLORS.surface,
     borderTopLeftRadius: RADIUS.xxl, // 24px Apple Squircle
     borderTopRightRadius: RADIUS.xxl,
     padding: 24, // Generous Apple padding
     paddingBottom: 40,
     borderTopWidth: 1,
-    borderColor: COLORS.surfaceBorder,
     ...Platform.select({
       web: {
         backdropFilter: 'blur(30px)',
@@ -171,7 +206,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   title: {
-    color: COLORS.textSecondary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -181,24 +215,20 @@ const styles = StyleSheet.create({
     padding: SPACING.xs,
   },
   displayContainer: {
-    backgroundColor: COLORS.background,
     borderRadius: RADIUS.lg, // 18px
     paddingVertical: SPACING.lg,
     paddingHorizontal: 24,
     alignItems: 'center',
     marginBottom: SPACING.xl,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
   },
   displayText: {
-    color: COLORS.textPrimary,
     fontSize: FONTS.sizes.giant,
     fontWeight: '800',
     letterSpacing: FONTS.metrics.headerTracking,
   },
   suffix: {
     fontSize: FONTS.sizes.md,
-    color: COLORS.primaryLight,
     fontWeight: '600',
   },
   grid: {
@@ -212,24 +242,18 @@ const styles = StyleSheet.create({
   key: {
     flex: 1,
     height: 56,
-    backgroundColor: COLORS.surfaceRaised,
     borderRadius: RADIUS.md, // 12px squircle
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
   },
-  actionKey: {
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-  },
+  actionKey: {},
   keyText: {
-    color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xl,
     fontWeight: '600',
     letterSpacing: FONTS.metrics.bodyTracking,
   },
   confirmButton: {
-    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
     height: TOUCH_TARGET.buttonHeight,
     borderRadius: RADIUS.lg, // 18px
     justifyContent: 'center',

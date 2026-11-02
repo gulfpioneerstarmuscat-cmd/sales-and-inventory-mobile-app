@@ -3,6 +3,8 @@ import { StyleSheet, View, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { AmbientBackground } from './src/components/AmbientBackground';
 import { Header } from './src/components/Header';
 import { HamburgerMenu } from './src/components/HamburgerMenu';
 import { FloatingNavBar, TabScreen } from './src/components/FloatingNavBar';
@@ -15,10 +17,10 @@ import { TransferModal } from './src/components/TransferModal';
 import { SettingsModal } from './src/components/SettingsModal';
 import { AdminSettingsModal } from './src/components/AdminSettingsModal';
 import { CartItem } from './src/types';
-import { COLORS } from './src/styles/theme';
 
 const MainApp: React.FC = () => {
   const { currentUser, isLoading, logout } = useAuth();
+  const { isDark, colors } = useTheme();
   const [currentTab, setCurrentTab] = useState<TabScreen>('pos');
   const [posPage, setPosPage] = useState<1 | 2>(1);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -32,8 +34,8 @@ const MainApp: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primaryLight} />
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primaryLight} />
       </View>
     );
   }
@@ -81,82 +83,86 @@ const MainApp: React.FC = () => {
   };
 
   return (
-    <View style={styles.appRoot}>
-      <StatusBar style="light" />
+    <AmbientBackground>
+      <View style={styles.appRoot}>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
 
-      {/* Global Top Header with Branding, Branch Switcher & Hamburger */}
-      <Header onOpenMenu={() => setMenuVisible(true)} />
+        {/* Global Top Header with Branding, Branch Switcher & Hamburger */}
+        <Header onOpenMenu={() => setMenuVisible(true)} />
 
-      {/* Screen Switcher */}
-      <View style={styles.mainContent}>
-        {currentTab === 'pos' && (
-          <POSScreen
-            posPage={posPage}
-            setPosPage={setPosPage}
-            cart={cart}
-            setCart={setCart}
-            onSaleCompleted={() => {
-              // optional post-checkout navigation
-            }}
-          />
-        )}
-        {currentTab === 'history' && <HistoryScreen />}
-        {currentTab === 'inventory' && (
-          <InventoryScreen onOpenTransfer={() => setTransferVisible(true)} />
-        )}
+        {/* Screen Switcher */}
+        <View style={styles.mainContent}>
+          {currentTab === 'pos' && (
+            <POSScreen
+              posPage={posPage}
+              setPosPage={setPosPage}
+              cart={cart}
+              setCart={setCart}
+              onSaleCompleted={() => {
+                // optional post-checkout navigation
+              }}
+            />
+          )}
+          {currentTab === 'history' && <HistoryScreen />}
+          {currentTab === 'inventory' && (
+            <InventoryScreen onOpenTransfer={() => setTransferVisible(true)} />
+          )}
+        </View>
+
+        {/* Universal Floating Navigation Bar with Dynamic Docked Cart Button */}
+        <FloatingNavBar
+          currentTab={currentTab}
+          onSelectTab={(tab) => {
+            setCurrentTab(tab);
+            if (tab !== 'pos') setPosPage(1);
+          }}
+          cartItemCount={cartItemCount}
+          cartTotal={cartTotal}
+          posPage={posPage}
+          onPressCartButton={handlePressCartPill}
+        />
+
+        {/* Hamburger Menu Drawer */}
+        <HamburgerMenu
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          onSelectOption={handleMenuOption}
+        />
+
+        {/* Modals */}
+        <ProfileModal
+          visible={profileVisible}
+          onClose={() => setProfileVisible(false)}
+          onLogout={logout}
+        />
+
+        <TransferModal
+          visible={transferVisible}
+          onClose={() => setTransferVisible(false)}
+        />
+
+        <SettingsModal
+          visible={settingsVisible}
+          onClose={() => setSettingsVisible(false)}
+        />
+
+        <AdminSettingsModal
+          visible={adminVisible}
+          onClose={() => setAdminVisible(false)}
+        />
       </View>
-
-      {/* Universal Floating Navigation Bar with Dynamic Docked Cart Button */}
-      <FloatingNavBar
-        currentTab={currentTab}
-        onSelectTab={(tab) => {
-          setCurrentTab(tab);
-          if (tab !== 'pos') setPosPage(1);
-        }}
-        cartItemCount={cartItemCount}
-        cartTotal={cartTotal}
-        posPage={posPage}
-        onPressCartButton={handlePressCartPill}
-      />
-
-      {/* Hamburger Menu Drawer */}
-      <HamburgerMenu
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        onSelectOption={handleMenuOption}
-      />
-
-      {/* Modals */}
-      <ProfileModal
-        visible={profileVisible}
-        onClose={() => setProfileVisible(false)}
-        onLogout={logout}
-      />
-
-      <TransferModal
-        visible={transferVisible}
-        onClose={() => setTransferVisible(false)}
-      />
-
-      <SettingsModal
-        visible={settingsVisible}
-        onClose={() => setSettingsVisible(false)}
-      />
-
-      <AdminSettingsModal
-        visible={adminVisible}
-        onClose={() => setAdminVisible(false)}
-      />
-    </View>
+    </AmbientBackground>
   );
 };
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <MainApp />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainApp />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -164,11 +170,10 @@ export default function App() {
 const styles = StyleSheet.create({
   appRoot: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: COLORS.background,
     justifyContent: 'center',
     alignItems: 'center',
   },

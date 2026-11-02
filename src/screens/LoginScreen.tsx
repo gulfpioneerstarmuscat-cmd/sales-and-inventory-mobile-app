@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET, ThemeColors } from '../styles/theme';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
+import { AmbientBackground } from '../components/AmbientBackground';
 
 export const LoginScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const { loginWithPin } = useAuth();
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+
   const [pin, setPin] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -57,244 +62,266 @@ export const LoginScreen: React.FC = () => {
   ];
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + SPACING.xl, paddingBottom: insets.bottom + SPACING.lg }]}>
-      {/* Branding Header */}
-      <View style={styles.header}>
-        <View style={styles.logoBadge}>
-          <Ionicons name="shield-checkmark" size={32} color="#FFFFFF" />
-        </View>
-        <Text style={styles.title}>GPS MUSCAT</Text>
-        <Text style={styles.subtitle}>Security Automation Wholesale POS</Text>
-      </View>
-
-      {/* PIN Prompt & Dots */}
-      <View style={styles.pinSection}>
-        <Text style={styles.pinPrompt}>Enter 4-Digit Floor Staff PIN</Text>
-        <View style={styles.dotsRow}>
-          {[0, 1, 2, 3].map((idx) => {
-            const filled = pin.length > idx;
-            return (
-              <View
-                key={idx}
-                style={[
-                  styles.dot,
-                  filled && styles.dotFilled,
-                  errorMsg ? styles.dotError : null,
-                ]}
-              />
-            );
-          })}
+    <AmbientBackground>
+      <View
+        style={[
+          styles.container,
+          {
+            paddingTop: insets.top + SPACING.xl,
+            paddingBottom: insets.bottom + SPACING.lg,
+          },
+        ]}
+      >
+        {/* Branding Header */}
+        <View style={styles.header}>
+          <View style={styles.logoBadge}>
+            <Ionicons name="shield-checkmark" size={32} color="#FFFFFF" />
+          </View>
+          <Text style={styles.title}>GPS MUSCAT</Text>
+          <Text style={styles.subtitle}>Security Automation Wholesale POS</Text>
         </View>
 
-        {loading ? (
-          <ActivityIndicator color={COLORS.primaryLight} style={styles.statusIndicator} />
-        ) : errorMsg ? (
-          <Text style={styles.errorText}>{errorMsg}</Text>
-        ) : (
-          <Text style={styles.hintText}>Al Khoudh & Ghala Branch System</Text>
-        )}
-      </View>
-
-      {/* Massive Keypad */}
-      <View style={styles.keypad}>
-        {keys.map((row, rIdx) => (
-          <View key={rIdx} style={styles.keyRow}>
-            {row.map((k, cIdx) => {
-              const isAction = k === 'C' || k === '⌫';
+        {/* PIN Prompt & Dots */}
+        <View style={styles.pinSection}>
+          <Text style={styles.pinPrompt}>Enter 4-Digit Floor Staff PIN</Text>
+          <View style={styles.dotsRow}>
+            {[0, 1, 2, 3].map((idx) => {
+              const filled = pin.length > idx;
               return (
-                <TouchableOpacity
-                  key={cIdx}
-                  style={[styles.key, isAction && styles.actionKey]}
-                  onPress={() => {
-                    if (k === 'C') handleClear();
-                    else if (k === '⌫') handleBackspace();
-                    else handleDigit(k);
-                  }}
-                  activeOpacity={0.6}
-                  disabled={loading}
-                >
-                  {k === '⌫' ? (
-                    <Ionicons name="backspace-outline" size={26} color={COLORS.textPrimary} />
-                  ) : (
-                    <Text style={styles.keyText}>{k}</Text>
-                  )}
-                </TouchableOpacity>
+                <View
+                  key={idx}
+                  style={[
+                    styles.dot,
+                    filled && styles.dotFilled,
+                    errorMsg ? styles.dotError : null,
+                  ]}
+                />
               );
             })}
           </View>
-        ))}
-      </View>
 
-      {/* Quick Demo Pins Helper */}
-      <View style={styles.demoHelper}>
-        <Text style={styles.demoTitle}>Quick Access PINs:</Text>
-        <View style={styles.demoPills}>
-          <TouchableOpacity style={styles.demoPill} onPress={() => handleDigit('1')}>
-            <Text style={styles.demoPillText}>Admin: 1234</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.demoPill} onPress={() => handleDigit('5')}>
-            <Text style={styles.demoPillText}>Khoudh: 5678</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.demoPill} onPress={() => handleDigit('5')}>
-            <Text style={styles.demoPillText}>Ghala: 5679</Text>
-          </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator color={colors.primaryLight} style={styles.statusIndicator} />
+          ) : errorMsg ? (
+            <Text style={styles.errorText}>{errorMsg}</Text>
+          ) : (
+            <Text style={styles.hintText}>Al Khoudh & Ghala Branch System</Text>
+          )}
+        </View>
+
+        {/* Massive Keypad */}
+        <View style={styles.keypad}>
+          {keys.map((row, rIdx) => (
+            <View key={rIdx} style={styles.keyRow}>
+              {row.map((k, cIdx) => {
+                const isAction = k === 'C' || k === '⌫';
+                return (
+                  <TouchableOpacity
+                    key={cIdx}
+                    style={[styles.key, isAction && styles.actionKey]}
+                    onPress={() => {
+                      if (k === '⌫') handleBackspace();
+                      else if (k === 'C') handleClear();
+                      else handleDigit(k);
+                    }}
+                    activeOpacity={0.6}
+                  >
+                    {k === '⌫' ? (
+                      <Ionicons
+                        name="backspace-outline"
+                        size={28}
+                        color={colors.textPrimary}
+                      />
+                    ) : (
+                      <Text style={styles.keyText}>{k}</Text>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
+        </View>
+
+        {/* Demo Credentials Pill */}
+        <View style={styles.demoHelper}>
+          <Text style={styles.demoTitle}>Staff Quick PINs</Text>
+          <View style={styles.demoPills}>
+            <TouchableOpacity
+              style={styles.demoPill}
+              onPress={() => setPin('1111')}
+            >
+              <Text style={styles.demoPillText}>Admin: 1111</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.demoPill}
+              onPress={() => setPin('2222')}
+            >
+              <Text style={styles.demoPillText}>Salim: 2222</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.demoPill}
+              onPress={() => setPin('3333')}
+            >
+              <Text style={styles.demoPillText}>Nasser: 3333</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </AmbientBackground>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.xl,
-  },
-  header: {
-    alignItems: 'center',
-    marginTop: SPACING.md,
-  },
-  logoBadge: {
-    width: 64,
-    height: 64,
-    borderRadius: RADIUS.lg, // 18px squircle
-    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#0063F7',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.35,
-        shadowRadius: 20,
-      },
-      android: {
-        elevation: 8,
-      },
-      web: {
-        boxShadow: '0 16px 36px -8px rgba(0, 99, 247, 0.45)',
-      } as any,
-    }),
-  },
-  title: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xl,
-    fontWeight: '800',
-    letterSpacing: FONTS.metrics.headerTracking,
-  },
-  subtitle: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '500',
-    letterSpacing: FONTS.metrics.bodyTracking,
-    marginTop: 4,
-  },
-  pinSection: {
-    alignItems: 'center',
-    marginVertical: SPACING.xl,
-  },
-  pinPrompt: {
-    color: COLORS.textSecondary,
-    fontSize: FONTS.sizes.sm,
-    fontWeight: '600',
-    letterSpacing: FONTS.metrics.bodyTracking,
-    marginBottom: SPACING.xl,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  dot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: COLORS.surfaceBorder,
-    backgroundColor: 'transparent',
-  },
-  dotFilled: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  dotError: {
-    borderColor: COLORS.accent, // High impact pop
-    backgroundColor: COLORS.accent,
-  },
-  statusIndicator: {
-    marginTop: SPACING.xs,
-  },
-  errorText: {
-    color: COLORS.accent,
-    fontSize: FONTS.sizes.xs,
-    fontWeight: '700',
-    letterSpacing: FONTS.metrics.bodyTracking,
-    marginTop: SPACING.xs,
-  },
-  hintText: {
-    color: COLORS.textMuted,
-    fontSize: FONTS.sizes.xs - 1,
-    letterSpacing: FONTS.metrics.bodyTracking,
-    marginTop: SPACING.xs,
-  },
-  keypad: {
-    gap: SPACING.md,
-    maxWidth: 380,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  keyRow: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  key: {
-    flex: 1,
-    height: 64,
-    borderRadius: RADIUS.md, // 12px squircle
-    backgroundColor: COLORS.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  actionKey: {
-    backgroundColor: COLORS.surfaceRaised,
-  },
-  keyText: {
-    color: COLORS.textPrimary,
-    fontSize: FONTS.sizes.xxl,
-    fontWeight: '600',
-    letterSpacing: FONTS.metrics.bodyTracking,
-  },
-  demoHelper: {
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  demoTitle: {
-    color: COLORS.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginBottom: 6,
-  },
-  demoPills: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  demoPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-  },
-  demoPillText: {
-    color: COLORS.textSecondary,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-});
-
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: 'transparent',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING.xl,
+    },
+    header: {
+      alignItems: 'center',
+      marginTop: SPACING.md,
+    },
+    logoBadge: {
+      width: 64,
+      height: 64,
+      borderRadius: RADIUS.lg, // 18px squircle
+      backgroundColor: colors.primary, // Vibrant Cobalt Blue
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+      ...Platform.select({
+        ios: {
+          shadowColor: '#0063F7',
+          shadowOffset: { width: 0, height: 12 },
+          shadowOpacity: 0.35,
+          shadowRadius: 20,
+        },
+        android: {
+          elevation: 8,
+        },
+        web: {
+          boxShadow: '0 16px 36px -8px rgba(0, 99, 247, 0.45)',
+        } as any,
+      }),
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: FONTS.sizes.xl,
+      fontWeight: '800',
+      letterSpacing: FONTS.metrics.headerTracking,
+    },
+    subtitle: {
+      color: colors.textSecondary,
+      fontSize: FONTS.sizes.xs,
+      fontWeight: '500',
+      letterSpacing: FONTS.metrics.bodyTracking,
+      marginTop: 4,
+    },
+    pinSection: {
+      alignItems: 'center',
+      marginVertical: SPACING.xl,
+    },
+    pinPrompt: {
+      color: colors.textSecondary,
+      fontSize: FONTS.sizes.sm,
+      fontWeight: '600',
+      letterSpacing: FONTS.metrics.bodyTracking,
+      marginBottom: SPACING.xl,
+    },
+    dotsRow: {
+      flexDirection: 'row',
+      gap: SPACING.lg,
+      marginBottom: SPACING.lg,
+    },
+    dot: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      borderWidth: 1.5,
+      borderColor: colors.surfaceBorder,
+      backgroundColor: 'transparent',
+    },
+    dotFilled: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    dotError: {
+      borderColor: colors.accent,
+      backgroundColor: colors.accent,
+    },
+    statusIndicator: {
+      marginTop: SPACING.xs,
+    },
+    errorText: {
+      color: colors.accent,
+      fontSize: FONTS.sizes.xs,
+      fontWeight: '700',
+      letterSpacing: FONTS.metrics.bodyTracking,
+      marginTop: SPACING.xs,
+    },
+    hintText: {
+      color: colors.textMuted,
+      fontSize: FONTS.sizes.xs - 1,
+      letterSpacing: FONTS.metrics.bodyTracking,
+      marginTop: SPACING.xs,
+    },
+    keypad: {
+      gap: SPACING.md,
+      maxWidth: 380,
+      width: '100%',
+      alignSelf: 'center',
+    },
+    keyRow: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+    },
+    key: {
+      flex: 1,
+      height: 64,
+      borderRadius: RADIUS.md, // 12px squircle
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.surfaceBorder,
+    },
+    actionKey: {
+      backgroundColor: colors.surfaceRaised,
+    },
+    keyText: {
+      color: colors.textPrimary,
+      fontSize: FONTS.sizes.xxl,
+      fontWeight: '600',
+      letterSpacing: FONTS.metrics.bodyTracking,
+    },
+    demoHelper: {
+      alignItems: 'center',
+      marginTop: SPACING.sm,
+    },
+    demoTitle: {
+      color: colors.textMuted,
+      fontSize: 10,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      marginBottom: 6,
+    },
+    demoPills: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    demoPill: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: RADIUS.pill,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.surfaceBorder,
+    },
+    demoPillText: {
+      color: colors.textSecondary,
+      fontSize: 10,
+      fontWeight: '600',
+    },
+  });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET, ThemeColors } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { StaffProfile, Branch, UserRole, AuditLog } from '../types';
 import { supabase } from '../config/supabase';
 
@@ -24,6 +25,8 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({
   visible,
   onClose,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [tab, setTab] = useState<'staff' | 'audit'>('staff');
   const [staffList, setStaffList] = useState<StaffProfile[]>([]);
   const [auditList, setAuditList] = useState<AuditLog[]>([]);
@@ -106,11 +109,11 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="shield-checkmark" size={22} color={COLORS.warning} />
+              <Ionicons name="shield-checkmark" size={22} color={colors.warning} />
               <Text style={styles.title}>ADMIN CONSOLE & GOVERNANCE</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -136,7 +139,7 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({
           </View>
 
           {loading ? (
-            <ActivityIndicator color={COLORS.primaryLight} style={{ marginVertical: 30 }} />
+            <ActivityIndicator color={colors.primaryLight} style={{ marginVertical: 30 }} />
           ) : tab === 'staff' ? (
             <ScrollView showsVerticalScrollIndicator={false}>
               {/* Add Staff Button / Form Toggle */}
@@ -156,7 +159,7 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({
                   <TextInput
                     style={styles.inputField}
                     placeholder="e.g. Salim Al-Harthy"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={colors.textMuted}
                     value={newName}
                     onChangeText={setNewName}
                   />
@@ -165,7 +168,7 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({
                   <TextInput
                     style={styles.inputField}
                     placeholder="e.g. 5678"
-                    placeholderTextColor={COLORS.textMuted}
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                     maxLength={4}
                     value={newPin}
@@ -289,19 +292,20 @@ export const AdminSettingsModal: React.FC<AdminSettingsModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
     padding: 24,
     borderTopWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     maxHeight: '88%',
   },
   header: {
@@ -311,7 +315,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   title: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -321,7 +325,7 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderRadius: RADIUS.md,
     padding: 4,
     marginBottom: SPACING.md,
@@ -333,22 +337,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tabBtnActive: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
   },
   tabText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
   },
   tabTextActive: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
   },
   addStaffBtn: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
     height: TOUCH_TARGET.buttonHeight,
     borderRadius: RADIUS.md,
     marginBottom: SPACING.md,
@@ -360,33 +364,33 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
   addFormCard: {
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     marginBottom: SPACING.md,
   },
   formTitle: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '800',
     letterSpacing: 0.8,
     marginBottom: SPACING.sm,
   },
   inputLabel: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: '700',
     marginTop: 6,
     marginBottom: 4,
   },
   inputField: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: colors.surfaceLight,
     height: 42,
     borderRadius: RADIUS.sm,
     paddingHorizontal: SPACING.md,
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
   },
   rolePickerRow: {
@@ -398,13 +402,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: colors.surfaceLight,
   },
   roleChipActive: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: colors.primary,
   },
   roleChipText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -422,12 +426,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   cancelFormText: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
   },
   saveStaffBtn: {
-    backgroundColor: COLORS.success,
+    backgroundColor: colors.success,
     paddingHorizontal: SPACING.lg,
     paddingVertical: 10,
     borderRadius: RADIUS.sm,
@@ -445,24 +449,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     padding: SPACING.md,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   staffCardName: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '700',
   },
   staffCardMeta: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 10,
     marginTop: 2,
   },
   pinSecret: {
-    color: COLORS.warning,
+    color: colors.warning,
     fontWeight: '800',
   },
   roleBadge: {
@@ -479,27 +483,27 @@ const styles = StyleSheet.create({
   roleBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
   },
   auditRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     padding: SPACING.sm,
     borderRadius: RADIUS.sm,
     marginBottom: 6,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   auditActionCol: {
     minWidth: 110,
   },
   auditAction: {
-    color: COLORS.primaryLight,
+    color: colors.primaryLight,
     fontSize: 10,
     fontWeight: '800',
   },
   auditTime: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 9,
     marginTop: 2,
   },
@@ -507,14 +511,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   auditStaff: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: 10,
     fontWeight: '700',
   },
   auditMeta: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 9,
     marginTop: 1,
   },
-});
-
+  });

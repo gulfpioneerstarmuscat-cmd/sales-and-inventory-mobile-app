@@ -9,7 +9,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS } from '../styles/theme';
+import { SPACING, FONTS, RADIUS } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 
 export type TabScreen = 'pos' | 'history' | 'inventory';
 
@@ -39,6 +40,7 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
   translateY,
 }) => {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
 
   const tabs: TabConfig[] = [
     { id: 'pos', label: 'POS', icon: 'cart-outline', activeIcon: 'cart' },
@@ -61,25 +63,40 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
     >
       <View style={styles.pillGroup}>
         {/* Main 3-Tab Floating Bar */}
-        <View style={styles.navBar}>
+        <View
+          style={[
+            styles.navBar,
+            {
+              backgroundColor: colors.surfaceGlass,
+              borderColor: colors.surfaceBorder,
+            },
+          ]}
+        >
           {tabs.map((tab) => {
             const isActive = currentTab === tab.id;
             return (
               <TouchableOpacity
                 key={tab.id}
-                style={[styles.tabButton, isActive && styles.activeTabButton]}
+                style={[
+                  styles.tabButton,
+                  isActive && {
+                    backgroundColor: colors.primary,
+                  },
+                ]}
                 onPress={() => onSelectTab(tab.id)}
                 activeOpacity={0.7}
               >
                 <Ionicons
                   name={isActive ? tab.activeIcon : tab.icon}
                   size={20}
-                  color={isActive ? '#FFFFFF' : COLORS.textSecondary}
+                  color={isActive ? '#FFFFFF' : colors.textSecondary}
                 />
                 <Text
                   style={[
                     styles.tabLabel,
-                    isActive ? styles.activeTabLabel : styles.inactiveTabLabel,
+                    isActive
+                      ? [styles.activeTabLabel, { color: '#FFFFFF' }]
+                      : [styles.inactiveTabLabel, { color: colors.textSecondary }],
                   ]}
                 >
                   {tab.label}
@@ -94,20 +111,28 @@ export const FloatingNavBar: React.FC<FloatingNavBarProps> = ({
           <TouchableOpacity
             style={[
               styles.cartPill,
-              posPage === 2 ? styles.cartPillBack : styles.cartPillProceed,
+              posPage === 2
+                ? {
+                    backgroundColor: colors.surfaceRaised,
+                    borderColor: colors.surfaceBorder,
+                  }
+                : {
+                    backgroundColor: colors.primary,
+                    borderColor: colors.surfaceBorderActive,
+                  },
             ]}
             onPress={onPressCartButton}
             activeOpacity={0.8}
           >
             {posPage === 2 ? (
               <View style={styles.cartContentRow}>
-                <Ionicons name="arrow-back" size={18} color={COLORS.textPrimary} />
-                <Text style={styles.cartPillText}>BACK</Text>
+                <Ionicons name="arrow-back" size={18} color={colors.textPrimary} />
+                <Text style={[styles.cartPillText, { color: colors.textPrimary }]}>BACK</Text>
               </View>
             ) : (
               <View style={styles.cartContentRow}>
                 <Ionicons name="cart" size={19} color="#FFFFFF" />
-                <View style={styles.accentBadge}>
+                <View style={[styles.accentBadge, { backgroundColor: colors.accent }]}>
                   <Text style={styles.cartCountNumber}>{cartItemCount}</Text>
                 </View>
               </View>
@@ -137,12 +162,10 @@ const styles = StyleSheet.create({
   navBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(11, 12, 16, 0.90)', // Apple obsidian translucent glass
     borderRadius: 28,
     height: 56,
     paddingHorizontal: 6,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
     ...Platform.select({
       ios: {
         shadowColor: '#0063F7',
@@ -168,14 +191,6 @@ const styles = StyleSheet.create({
     minWidth: 64,
     borderRadius: RADIUS.pill,
   },
-  activeTabButton: {
-    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
-    ...Platform.select({
-      web: {
-        boxShadow: '0 4px 16px rgba(0, 99, 247, 0.4)',
-      } as any,
-    }),
-  },
   tabLabel: {
     fontSize: FONTS.sizes.xs - 1,
     marginTop: 2,
@@ -183,11 +198,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   activeTabLabel: {
-    color: '#FFFFFF',
     fontWeight: '700',
   },
   inactiveTabLabel: {
-    color: COLORS.textSecondary,
   },
   cartPill: {
     height: 56,
@@ -213,21 +226,12 @@ const styles = StyleSheet.create({
       } as any,
     }),
   },
-  cartPillProceed: {
-    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
-    borderColor: 'rgba(0, 99, 247, 0.6)',
-  },
-  cartPillBack: {
-    backgroundColor: 'rgba(31, 34, 44, 0.92)',
-    borderColor: COLORS.surfaceBorder,
-  },
   cartContentRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   accentBadge: {
-    backgroundColor: COLORS.accent, // Vibrant Sunset Coral - The High-Impact Pop
     borderRadius: RADIUS.pill,
     minWidth: 22,
     height: 22,
@@ -241,7 +245,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   cartPillText: {
-    color: COLORS.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '700',
     letterSpacing: 0.6,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, FONTS, RADIUS, TOUCH_TARGET } from '../styles/theme';
+import { SPACING, FONTS, RADIUS, TOUCH_TARGET, ThemeColors } from '../styles/theme';
+import { useTheme } from '../context/ThemeContext';
 import { Product, Branch } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../config/supabase';
@@ -27,6 +28,8 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { currentUser, activeBranch, isAdmin } = useAuth();
   const [fromBranch, setFromBranch] = useState<Branch>('Al Khoudh');
   const [toBranch, setToBranch] = useState<Branch>('Ghala');
@@ -146,11 +149,11 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Ionicons name="swap-horizontal" size={22} color={COLORS.success} />
+              <Ionicons name="swap-horizontal" size={22} color={colors.success} />
               <Text style={styles.title}>INTER-BRANCH STOCK TRANSFER</Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+              <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -170,7 +173,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 <Ionicons
                   name="arrow-forward"
                   size={20}
-                  color={isAdmin ? COLORS.primaryLight : COLORS.textMuted}
+                  color={isAdmin ? colors.primaryLight : colors.textMuted}
                 />
               </TouchableOpacity>
 
@@ -188,7 +191,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             {/* Select Product */}
             <Text style={styles.inputLabel}>SELECT PRODUCT</Text>
             {loadingProds ? (
-              <ActivityIndicator color={COLORS.primaryLight} style={{ marginVertical: 10 }} />
+              <ActivityIndicator color={colors.primaryLight} style={{ marginVertical: 10 }} />
             ) : (
               <ScrollView
                 horizontal
@@ -241,7 +244,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             <TextInput
               style={styles.notesField}
               placeholder="e.g. Replenishing Ghala showroom gate motors..."
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={colors.textMuted}
               value={notes}
               onChangeText={setNotes}
             />
@@ -267,19 +270,20 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) =>
+  StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: COLORS.surface,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: RADIUS.xxl,
     borderTopRightRadius: RADIUS.xxl,
     padding: 24,
     borderTopWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     maxHeight: '90%',
   },
   header: {
@@ -289,7 +293,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   title: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.sm,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -300,11 +304,11 @@ const styles = StyleSheet.create({
   directionBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
     marginVertical: SPACING.sm,
   },
   branchEndpoint: {
@@ -312,13 +316,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   endpointLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 9,
     fontWeight: '800',
     letterSpacing: 1,
   },
   endpointName: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.md,
     fontWeight: '900',
     marginTop: 2,
@@ -327,23 +331,23 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   switchBtnDisabled: {
     opacity: 0.5,
   },
   staffLockedNotice: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
   inputLabel: {
-    color: COLORS.textSecondary,
+    color: colors.textSecondary,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -355,29 +359,29 @@ const styles = StyleSheet.create({
   },
   prodSelectCard: {
     width: 160,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     padding: SPACING.sm,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   prodSelectCardActive: {
-    borderColor: COLORS.primary,
+    borderColor: colors.primary,
     backgroundColor: '#3B82F611',
   },
   prodCardSku: {
-    color: COLORS.primaryLight,
+    color: colors.primaryLight,
     fontSize: 10,
     fontWeight: '800',
   },
   prodCardName: {
-    color: COLORS.textPrimary,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     fontWeight: '600',
     marginVertical: 4,
   },
   prodCardStock: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
   },
   qtyRow: {
@@ -387,48 +391,48 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   textInput: {
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     height: TOUCH_TARGET.inputHeight,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    color: COLORS.textPrimary,
+    borderColor: colors.surfaceBorder,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.lg,
     fontWeight: '800',
     paddingHorizontal: SPACING.md,
   },
   availableStockBadge: {
-    backgroundColor: COLORS.surfaceLight,
+    backgroundColor: colors.surfaceLight,
     paddingHorizontal: SPACING.md,
     height: TOUCH_TARGET.inputHeight,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
+    borderColor: colors.surfaceBorder,
   },
   availableLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: 9,
   },
   availableVal: {
-    color: COLORS.success,
+    color: colors.success,
     fontSize: FONTS.sizes.sm,
     fontWeight: '800',
   },
   notesField: {
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
     height: 48,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.surfaceBorder,
-    color: COLORS.textPrimary,
+    borderColor: colors.surfaceBorder,
+    color: colors.textPrimary,
     fontSize: FONTS.sizes.xs,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.xl,
   },
   confirmBtn: {
-    backgroundColor: COLORS.primary, // Vibrant Cobalt Blue
+    backgroundColor: colors.primary, // Vibrant Cobalt Blue
     height: 56,
     borderRadius: RADIUS.lg, // 18px squircle
     justifyContent: 'center',
@@ -440,5 +444,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
   },
-});
-
+  });
